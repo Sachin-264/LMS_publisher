@@ -12,6 +12,9 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:lms_publisher/Provider/UserProvider.dart';
+import 'package:provider/provider.dart';
+
 
 const String _imageBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
 const String _documentBaseUrl = "https://storage.googleapis.com/upload-images-34/documents/LMS/";
@@ -26,6 +29,52 @@ String getFullDocumentUrl(String filename) {
   } else {
     return '$_documentBaseUrl$filename';
   }
+}
+
+void _showPermissionDeniedDialog(BuildContext context, String action) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Iconsax.shield_cross, color: Colors.red, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              'Permission Denied',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w700,
+                color: AppTheme.darkText,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: Text(
+        'You do not have permission to $action. Please contact your administrator.',
+        style: GoogleFonts.inter(color: AppTheme.bodyText),
+      ),
+      actions: [
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryGreen,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: Text('Understood', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+        ),
+      ],
+    ),
+  );
 }
 
 
@@ -332,7 +381,7 @@ class _ChaptersPageState extends State<ChaptersPage> {
       }
 
       // Load all subjects
-      final subjectsResponse = await ApiService.getSubjects(schoolRecNo: 1);
+      final subjectsResponse = await ApiService.getSubjects();
       if (subjectsResponse['success'] == true && subjectsResponse['data'] != null) {
         setState(() {
           allSubjects = (subjectsResponse['data'] as List).map((json) => SubjectModel.fromJson(json)).toList();
@@ -341,7 +390,7 @@ class _ChaptersPageState extends State<ChaptersPage> {
       }
 
       // Load all chapters initially
-      context.read<AcademicsBloc>().add(LoadChaptersEvent(schoolRecNo: 1));
+      context.read<AcademicsBloc>().add(LoadChaptersEvent());
     } catch (e) {
       print('❌ ChaptersPage: Error loading initial data: $e');
     }
@@ -374,7 +423,7 @@ class _ChaptersPageState extends State<ChaptersPage> {
     } else {
       // If subject is cleared, load all chapters
       print('📖 ChaptersPage: Loading all chapters');
-      context.read<AcademicsBloc>().add(LoadChaptersEvent(schoolRecNo: 1));
+      context.read<AcademicsBloc>().add(LoadChaptersEvent());
     }
   }
 
@@ -469,7 +518,7 @@ class _MaterialsPageState extends State<MaterialsPage> {
       }
 
       // Load all materials initially
-      context.read<AcademicsBloc>().add(LoadMaterialsEvent(schoolRecNo: 1));
+      context.read<AcademicsBloc>().add(LoadMaterialsEvent());
     } catch (e) {
       print('❌ MaterialsPage: Error loading initial data: $e');
     }
@@ -523,7 +572,7 @@ class _MaterialsPageState extends State<MaterialsPage> {
     } else {
       // If subject is cleared, load all materials
       print('📁 MaterialsPage: Loading all materials');
-      context.read<AcademicsBloc>().add(LoadMaterialsEvent(schoolRecNo: 1));
+      context.read<AcademicsBloc>().add(LoadMaterialsEvent());
     }
   }
 
@@ -550,7 +599,7 @@ class _MaterialsPageState extends State<MaterialsPage> {
     } else {
       // Load all materials
       print('📁 MaterialsPage: Loading all materials');
-      context.read<AcademicsBloc>().add(LoadMaterialsEvent(schoolRecNo: 1));
+      context.read<AcademicsBloc>().add(LoadMaterialsEvent());
     }
   }
 
@@ -632,7 +681,7 @@ class _MaterialsPageState extends State<MaterialsPage> {
           itemCount: isLoading ? 6 : materials.length,
           itemBuilder: (context, index) {
             if (isLoading) {
-              return const Center(child: CircularProgressIndicator());
+              return _buildMaterialSkeletonCard(context);
             }
             if (isGridView) {
               return MaterialGridItem(
@@ -645,6 +694,42 @@ class _MaterialsPageState extends State<MaterialsPage> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildMaterialSkeletonCard(BuildContext context) {
+    final color = AppTheme.borderGrey;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.4)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 3,
+            child: _SkeletonBox(borderRadius: 12),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            flex: 1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                _SkeletonLine(widthFactor: 0.9),
+                SizedBox(height: 8),
+                _SkeletonLine(widthFactor: 0.5),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -873,92 +958,176 @@ child: Icon(icon, size: 22, color: isActive ? AppTheme.primaryGreen : AppTheme.b
 }
 
 class MasterViewTemplate extends StatelessWidget {
-final String title, buttonLabel;
-final VoidCallback? onAddPressed;
-final Widget header;
-final int itemCount;
-final IndexedWidgetBuilder itemBuilder;
-final Widget? filters;
-final List<Widget>? headerActions;
+  final String title;
+  final String? buttonLabel; // MADE NULLABLE
+  final IconData? buttonIcon;
+  final VoidCallback? onAddPressed;
+  final Widget header;
+  final int itemCount;
+  final IndexedWidgetBuilder itemBuilder;
+  final Widget? filters;
+  final List<Widget>? headerActions;
+  final bool placeHeaderActionsOnNewRow;
 
-const MasterViewTemplate({
-super.key,
-required this.title,
-required this.buttonLabel,
-this.onAddPressed,
-required this.header,
-required this.itemCount,
-required this.itemBuilder,
-this.filters,
-this.headerActions,
-});
+  const MasterViewTemplate({
+    super.key,
+    required this.title,
+    this.buttonLabel, // MADE OPTIONAL
+    this.buttonIcon,
+    this.onAddPressed,
+    required this.header,
+    required this.itemCount,
+    required this.itemBuilder,
+    this.filters,
+    this.headerActions,
+    this.placeHeaderActionsOnNewRow = false,
+  });
 
-@override
-Widget build(BuildContext context) {
-return StyledContainer(
-child: Column(
-crossAxisAlignment: CrossAxisAlignment.start,
-mainAxisSize: MainAxisSize.min,
-children: [
-Row(
-mainAxisAlignment: MainAxisAlignment.spaceBetween,
-children: [
-Expanded(
-child: Text(
-title,
-style: GoogleFonts.poppins(
-fontSize: 22,
-fontWeight: FontWeight.w600,
-color: AppTheme.darkText,
-),
-),
-),
-if (headerActions != null) ...headerActions!,
-if (headerActions != null) const SizedBox(width: 16),
-ElevatedButton.icon(
-onPressed: onAddPressed,
-icon: const Icon(Iconsax.add, size: 20),
-label: Text(buttonLabel, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-style: ElevatedButton.styleFrom(
-backgroundColor: AppTheme.primaryGreen,
-foregroundColor: Colors.white,
-shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-elevation: 0,
-shadowColor: AppTheme.primaryGreen.withOpacity(0.3),
-),
-),
-],
-),
-const Divider(height: 40, thickness: 1),
-if (filters != null) filters!,
-LayoutBuilder(
-builder: (context, constraints) {
-final isMobile = constraints.maxWidth < 700;
-final showHeader = !(header is SizedBox);
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 700;
 
-return Column(
-mainAxisSize: MainAxisSize.min,
-children: [
-if (!isMobile && showHeader) header,
-if (!isMobile && showHeader) const SizedBox(height: 12),
-ListView.separated(
-shrinkWrap: true,
-physics: const NeverScrollableScrollPhysics(),
-itemCount: itemCount,
-itemBuilder: itemBuilder,
-separatorBuilder: (context, index) => const SizedBox(height: 0),
-),
-],
-);
-},
-),
-],
-),
-);
+    return StyledContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Responsive Header
+          _buildResponsiveHeader(context, isMobile),
 
+          const Divider(height: 40, thickness: 1),
+
+          // Filters
+          if (filters != null) ...[
+            filters!,
+            const SizedBox(height: AppTheme.defaultPadding),
+          ],
+
+          // Header Actions on new row for mobile (if needed)
+          if (isMobile && placeHeaderActionsOnNewRow && headerActions != null && headerActions!.isNotEmpty) ...[
+            ...headerActions!,
+            const SizedBox(height: AppTheme.defaultPadding),
+          ],
+
+          // Content
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 700;
+              final showHeader = !(header is SizedBox);
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!isMobile && showHeader) header,
+                  if (!isMobile && showHeader) const SizedBox(height: 12),
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: itemCount,
+                    itemBuilder: itemBuilder,
+                    separatorBuilder: (context, index) => const SizedBox(height: 0),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResponsiveHeader(BuildContext context, bool isMobile) {
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Only show button if label and callback are provided
+              if (buttonLabel != null && onAddPressed != null)
+                _buildMobileIconButton(context),
+            ],
+          ),
+        ],
+      );
+    } else {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.darkText,
+              ),
+            ),
+          ),
+          if (headerActions != null && !placeHeaderActionsOnNewRow)
+            ...headerActions!,
+          if (headerActions != null && !placeHeaderActionsOnNewRow)
+            const SizedBox(width: 16),
+          // Only show button if label and callback are provided
+          if (buttonLabel != null && onAddPressed != null)
+            _buildDesktopButton(context),
+        ],
+      );
+    }
+  }
+
+  Widget _buildMobileIconButton(BuildContext context) {
+    return Material(
+      color: AppTheme.primaryGreen,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 0,
+      child: InkWell(
+        onTap: onAddPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          child: Icon(
+            buttonIcon ?? Iconsax.add,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopButton(BuildContext context) {
+    return ElevatedButton.icon(
+      onPressed: onAddPressed,
+      icon: Icon(buttonIcon ?? Iconsax.add, size: 20),
+      label: Text(buttonLabel!, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppTheme.primaryGreen,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+        elevation: 0,
+        shadowColor: AppTheme.primaryGreen.withOpacity(0.3),
+      ),
+    );
+  }
 }
-}
+
+
 
 class ResponsiveTableHeader extends StatelessWidget {
 final List<HeaderItem> headers;
@@ -1059,94 +1228,144 @@ fontSize: 12,
 // ==================== REPLACED ClassListItem WIDGET ====================
 class ClassListItem extends StatelessWidget {
   final ClassModel item;
+
   const ClassListItem({super.key, required this.item});
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final canEdit = userProvider.hasPermission('M004', 'edit');
+    final canDelete = userProvider.hasPermission('M004', 'delete');
+
     return EnhancedListItem(
       icon: Iconsax.building_4,
       iconColor: Colors.blue,
       title: item.name,
-      subtitle: item.description, // Show description instead of status
-      statusBadge: StatusBadge(isActive: item.isActive), // Keep status badge in case it's needed elsewhere
-      onEdit: () => showEditClassDialog(context, item),
-      onDelete: () => showConfirmDeleteDialog( // ADDED onDelete
-        context,
-        item.name,
-        Colors.blue,
-            () => context.read<AcademicsBloc>().add(DeleteClassEvent(classId: int.parse(item.id), hardDelete: true)),
-      ),
-      onTap: () => showDetailDialog(
-        context,
-        DetailDialogData(
-          title: item.name,
-          icon: Iconsax.building_4,
-          color: Colors.blue,
-          fields: [
-            DetailField(label: 'Class Name', value: item.name, icon: Iconsax.edit),
-            DetailField(label: 'Description', value: item.description, icon: Iconsax.document_text), // Added description
-            DetailField(label: 'Subjects', value: item.subjectCount.toString(), icon: Iconsax.book_1),
-            DetailField(label: 'Status', value: item.isActive ? 'Active' : 'Inactive', icon: Iconsax.status),
-          ],
-          onEdit: () {
-            Navigator.pop(context);
-            showEditClassDialog(context, item);
-          },
-        ),
-      ),
+      subtitle: item.description,
+      statusBadge: StatusBadge(isActive: item.isActive),
+      onEdit: canEdit ? () {
+        print('🔐 ClassListItem: Checking EDIT permission for M004');
+        if (userProvider.hasPermission('M004', 'edit')) {
+          print('✅ ClassListItem: EDIT permission granted');
+          showEditClassDialog(context, item);
+        } else {
+          print('❌ ClassListItem: EDIT permission denied');
+          _showPermissionDeniedDialog(context, 'edit classes');
+        }
+      } : null,
+      onDelete: canDelete ? () {
+        print('🔐 ClassListItem: Checking DELETE permission for M004');
+        if (userProvider.hasPermission('M004', 'delete')) {
+          print('✅ ClassListItem: DELETE permission granted');
+          showConfirmDeleteDialog(
+            context,
+            item.name,
+            Colors.blue,
+                () {
+              context.read<AcademicsBloc>().add(DeleteClassEvent(
+                classId: int.parse(item.id),
+                hardDelete: true,
+              ));
+            },
+          );
+        } else {
+          print('❌ ClassListItem: DELETE permission denied');
+          _showPermissionDeniedDialog(context, 'delete classes');
+        }
+      } : null,
+      onTap: () {
+        showDetailDialog(
+          context,
+          DetailDialogData(
+            title: item.name,
+            icon: Iconsax.building_4,
+            color: Colors.blue,
+            fields: [
+              DetailField(label: 'Class Name', value: item.name, icon: Iconsax.edit),
+              DetailField(label: 'Description', value: item.description, icon: Iconsax.document_text),
+              DetailField(label: 'Subjects', value: item.subjectCount.toString(), icon: Iconsax.book_1),
+              DetailField(label: 'Status', value: item.isActive ? 'Active' : 'Inactive', icon: Iconsax.status),
+            ],
+            onEdit: canEdit ? () {
+              Navigator.pop(context);
+              showEditClassDialog(context, item);
+            } : null,
+          ),
+        );
+      },
       webCells: [
-        WebCell(flex: 3, child: Text(item.name, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15))),
         WebCell(
-            flex: 3,
-            child: Text(
-              item.description,
-              style: GoogleFonts.inter(fontSize: 14),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            )), // Changed to description
-        WebCell(flex: 2, child: Text(item.subjectCount.toString(), style: GoogleFonts.inter(fontSize: 14))),
-        WebCell(flex: 1, child: StatusBadge(isActive: item.isActive)), // Status is now in its own column
+          flex: 3,
+          child: Text(item.name, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15)),
+        ),
+        WebCell(
+          flex: 3,
+          child: Text(
+            item.description,
+            style: GoogleFonts.inter(fontSize: 14),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        WebCell(
+          flex: 2,
+          child: Text(item.subjectCount.toString(), style: GoogleFonts.inter(fontSize: 14)),
+        ),
+        WebCell(
+          flex: 1,
+          child: StatusBadge(isActive: item.isActive),
+        ),
         WebCell(
           flex: 1,
           alignment: Alignment.centerRight,
           child: ActionButtons(
-            onEdit: () => showEditClassDialog(context, item),
-            onDelete: () => showConfirmDeleteDialog( // ADDED onDelete
-              context,
-              item.name,
-              Colors.blue,
-                  () => context.read<AcademicsBloc>().add(DeleteClassEvent(classId: int.parse(item.id), hardDelete: true)),
-            ),
-            onView: () => showDetailDialog(
-              context,
-              DetailDialogData(
-                title: item.name,
-                icon: Iconsax.building_4,
-                color: Colors.blue,
-                fields: [
-                  DetailField(label: 'Class Name', value: item.name, icon: Iconsax.edit),
-                  DetailField(label: 'Description', value: item.description, icon: Iconsax.document_text),
-                  DetailField(label: 'Subjects', value: item.subjectCount.toString(), icon: Iconsax.book_1),
-                  DetailField(label: 'Status', value: item.isActive ? 'Active' : 'Inactive', icon: Iconsax.status),
-                ],
-                onEdit: () {
-                  Navigator.pop(context);
-                  showEditClassDialog(context, item);
+            onEdit: canEdit ? () => showEditClassDialog(context, item) : null,
+            onDelete: canDelete ? () {
+              showConfirmDeleteDialog(
+                context,
+                item.name,
+                Colors.blue,
+                    () {
+                  context.read<AcademicsBloc>().add(DeleteClassEvent(
+                    classId: int.parse(item.id),
+                    hardDelete: true,
+                  ));
                 },
-              ),
-            ),
+              );
+            } : null,
+            onView: () {
+              showDetailDialog(
+                context,
+                DetailDialogData(
+                  title: item.name,
+                  icon: Iconsax.building_4,
+                  color: Colors.blue,
+                  fields: [
+                    DetailField(label: 'Class Name', value: item.name, icon: Iconsax.edit),
+                    DetailField(label: 'Description', value: item.description, icon: Iconsax.document_text),
+                    DetailField(label: 'Subjects', value: item.subjectCount.toString(), icon: Iconsax.book_1),
+                    DetailField(label: 'Status', value: item.isActive ? 'Active' : 'Inactive', icon: Iconsax.status),
+                  ],
+                  onEdit: canEdit ? () {
+                    Navigator.pop(context);
+                    showEditClassDialog(context, item);
+                  } : null,
+                ),
+              );
+            },
             usePopupOnMobile: true,
           ),
         ),
       ],
       mobileInfoRows: [
-        buildInfoRow(Iconsax.document_text, "Desc: ${item.description}", maxLines: 2), // Changed to description
+        buildInfoRow(Iconsax.document_text, 'Desc: ${item.description}', maxLines: 2),
         const SizedBox(height: 8),
-        buildInfoRow(Iconsax.book_1, "Subjects: ${item.subjectCount}"),
+        buildInfoRow(Iconsax.book_1, 'Subjects: ${item.subjectCount}'),
       ],
     );
   }
 }
+
 
 class SubjectListItem extends StatelessWidget {
   final SubjectModel item;
@@ -1160,6 +1379,10 @@ class SubjectListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final canEdit = userProvider.hasPermission('M004', 'edit');
+    final canDelete = userProvider.hasPermission('M004', 'delete');
+
     print('📋 SubjectListItem: Rendering ${item.name}');
 
     return EnhancedListItem(
@@ -1168,27 +1391,41 @@ class SubjectListItem extends StatelessWidget {
       title: item.name,
       subtitle: item.className,
       statusBadge: StatusBadge(isActive: item.isActive),
-      onEdit: () {
-        print('✏️ SubjectListItem: Edit clicked for ${item.name}');
-        showEditSubjectDialog(context, item, allClasses);
-      },
-      onDelete: () {
-        print('🗑️ SubjectListItem: Delete clicked for ${item.name}');
-        showConfirmDeleteDialog(
-          context,
-          item.name,
-          Colors.green,
-              () {
-            print('🗑️ SubjectListItem: Delete confirmed for ${item.name} (ID: ${item.id})');
-            context.read<AcademicsBloc>().add(
-              DeleteSubjectEvent(
-                subjectId: int.parse(item.id),
-                hardDelete: true,
-              ),
-            );
-          },
-        );
-      },
+      onEdit: canEdit ? () {
+        print('🔐 SubjectListItem: Checking EDIT permission for M004');
+        print('✅ SubjectListItem: Edit clicked for ${item.name}');
+        if (userProvider.hasPermission('M004', 'edit')) {
+          print('✅ SubjectListItem: EDIT permission granted');
+          showEditSubjectDialog(context, item, allClasses);
+        } else {
+          print('❌ SubjectListItem: EDIT permission denied');
+          _showPermissionDeniedDialog(context, 'edit subjects');
+        }
+      } : null,
+      onDelete: canDelete ? () {
+        print('🔐 SubjectListItem: Checking DELETE permission for M004');
+        print('⚠️ SubjectListItem: Delete clicked for ${item.name}');
+        if (userProvider.hasPermission('M004', 'delete')) {
+          print('✅ SubjectListItem: DELETE permission granted');
+          showConfirmDeleteDialog(
+            context,
+            item.name,
+            Colors.green,
+                () {
+              print('🗑️ SubjectListItem: Delete confirmed for ${item.name} (ID: ${item.id})');
+              context.read<AcademicsBloc>().add(
+                DeleteSubjectEvent(
+                  subjectId: int.parse(item.id),
+                  hardDelete: true,
+                ),
+              );
+            },
+          );
+        } else {
+          print('❌ SubjectListItem: DELETE permission denied');
+          _showPermissionDeniedDialog(context, 'delete subjects');
+        }
+      } : null,
       onTap: () {
         print('👁️ SubjectListItem: View details clicked for ${item.name}');
         showDetailDialog(
@@ -1224,10 +1461,10 @@ class SubjectListItem extends StatelessWidget {
                 icon: Iconsax.status,
               ),
             ],
-            onEdit: () {
+            onEdit: canEdit ? () {
               Navigator.pop(context);
               showEditSubjectDialog(context, item, allClasses);
-            },
+            } : null,
           ),
         );
       },
@@ -1264,18 +1501,18 @@ class SubjectListItem extends StatelessWidget {
           flex: 1,
           alignment: Alignment.centerRight,
           child: ActionButtons(
-            onEdit: () {
-              print('✏️ SubjectListItem (Web): Edit clicked for ${item.name}');
+            onEdit: canEdit ? () {
+              print('📝 SubjectListItem: Web Edit clicked for ${item.name}');
               showEditSubjectDialog(context, item, allClasses);
-            },
-            onDelete: () {
-              print('🗑️ SubjectListItem (Web): Delete clicked for ${item.name}');
+            } : null,
+            onDelete: canDelete ? () {
+              print('🗑️ SubjectListItem: Web Delete clicked for ${item.name}');
               showConfirmDeleteDialog(
                 context,
                 item.name,
                 Colors.green,
                     () {
-                  print('🗑️ SubjectListItem (Web): Delete confirmed for ${item.name} (ID: ${item.id})');
+                  print('🗑️ SubjectListItem: Web Delete confirmed for ${item.name} (ID: ${item.id})');
                   context.read<AcademicsBloc>().add(
                     DeleteSubjectEvent(
                       subjectId: int.parse(item.id),
@@ -1284,9 +1521,9 @@ class SubjectListItem extends StatelessWidget {
                   );
                 },
               );
-            },
+            } : null,
             onView: () {
-              print('👁️ SubjectListItem (Web): View details clicked for ${item.name}');
+              print('👁️ SubjectListItem: Web View details clicked for ${item.name}');
               showDetailDialog(
                 context,
                 DetailDialogData(
@@ -1320,10 +1557,10 @@ class SubjectListItem extends StatelessWidget {
                       icon: Iconsax.status,
                     ),
                   ],
-                  onEdit: () {
+                  onEdit: canEdit ? () {
                     Navigator.pop(context);
                     showEditSubjectDialog(context, item, allClasses);
-                  },
+                  } : null,
                 ),
               );
             },
@@ -1334,7 +1571,7 @@ class SubjectListItem extends StatelessWidget {
       mobileInfoRows: [
         buildInfoRow(
           Iconsax.document_text,
-          "Chapters: ${item.chapterCount}",
+          'Chapters: ${item.chapterCount}',
         ),
         const SizedBox(height: 8),
         buildInfoRow(
@@ -1348,82 +1585,182 @@ class SubjectListItem extends StatelessWidget {
 }
 
 
+
 // ==================== REPLACED ChapterListItem WIDGET ====================
 class ChapterListItem extends StatelessWidget {
   final ChapterModel item;
   final List<SubjectModel> allSubjects;
+
   const ChapterListItem({super.key, required this.item, required this.allSubjects});
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final canEdit = userProvider.hasPermission('M004', 'edit');
+    final canDelete = userProvider.hasPermission('M004', 'delete');
+
     return EnhancedListItem(
       icon: Iconsax.document_text_1,
       iconColor: Colors.orange,
       title: item.name,
       subtitle: item.subjectName,
-      onEdit: () => showEditChapterDialog(context, item, allSubjects),
-      onDelete: () => showConfirmDeleteDialog( // ADDED onDelete
-        context,
-        item.name,
-        Colors.orange,
-            () => context.read<AcademicsBloc>().add(DeleteChapterEvent(chapterId: int.parse(item.id), hardDelete: true)),
-      ),
-      onTap: () => showDetailDialog(
-        context,
-        DetailDialogData(
-          title: item.name,
-          icon: Iconsax.document_text_1,
-          color: Colors.orange,
-          fields: [
-            DetailField(label: 'Chapter Name', value: item.name, icon: Iconsax.edit),
-            DetailField(label: 'Subject', value: item.subjectName, icon: Iconsax.book_1),
-            DetailField(label: 'Materials', value: item.materialCount.toString(), icon: Iconsax.folder_open),
-          ],
-          onEdit: () {
-            Navigator.pop(context);
-            showEditChapterDialog(context, item, allSubjects);
-          },
-        ),
-      ),
+      onEdit: canEdit ? () {
+        print('🔐 ChapterListItem: Checking EDIT permission for M004');
+        if (userProvider.hasPermission('M004', 'edit')) {
+          print('✅ ChapterListItem: EDIT permission granted');
+          showEditChapterDialog(context, item, allSubjects);
+        } else {
+          print('❌ ChapterListItem: EDIT permission denied');
+          _showPermissionDeniedDialog(context, 'edit chapters');
+        }
+      } : null,
+      onDelete: canDelete ? () {
+        print('🔐 ChapterListItem: Checking DELETE permission for M004');
+        if (userProvider.hasPermission('M004', 'delete')) {
+          print('✅ ChapterListItem: DELETE permission granted');
+          showConfirmDeleteDialog(
+            context,
+            item.name,
+            Colors.orange,
+                () {
+              context.read<AcademicsBloc>().add(DeleteChapterEvent(
+                chapterId: int.parse(item.id),
+                hardDelete: true,
+              ));
+            },
+          );
+        } else {
+          print('❌ ChapterListItem: DELETE permission denied');
+          _showPermissionDeniedDialog(context, 'delete chapters');
+        }
+      } : null,
+      onTap: () {
+        showDetailDialog(
+          context,
+          DetailDialogData(
+            title: item.name,
+            icon: Iconsax.document_text_1,
+            color: Colors.orange,
+            fields: [
+              DetailField(label: 'Chapter Name', value: item.name, icon: Iconsax.edit),
+              DetailField(label: 'Subject', value: item.subjectName, icon: Iconsax.book_1),
+              DetailField(label: 'Materials', value: item.materialCount.toString(), icon: Iconsax.folder_open),
+            ],
+            onEdit: canEdit ? () {
+              Navigator.pop(context);
+              showEditChapterDialog(context, item, allSubjects);
+            } : null,
+          ),
+        );
+      },
       webCells: [
-        WebCell(flex: 4, child: Text(item.name, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15))),
-        WebCell(flex: 3, child: Text(item.subjectName, style: GoogleFonts.inter(fontSize: 14))),
-        WebCell(flex: 2, child: Text(item.materialCount.toString(), style: GoogleFonts.inter(fontSize: 14))),
+        WebCell(
+          flex: 4,
+          child: Text(item.name, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15)),
+        ),
+        WebCell(
+          flex: 3,
+          child: Text(item.subjectName, style: GoogleFonts.inter(fontSize: 14)),
+        ),
+        WebCell(
+          flex: 2,
+          child: Text(item.materialCount.toString(), style: GoogleFonts.inter(fontSize: 14)),
+        ),
         WebCell(
           flex: 1,
           alignment: Alignment.centerRight,
           child: ActionButtons(
-            onEdit: () => showEditChapterDialog(context, item, allSubjects),
-            onDelete: () => showConfirmDeleteDialog( // ADDED onDelete
-              context,
-              item.name,
-              Colors.orange,
-                  () => context.read<AcademicsBloc>().add(DeleteChapterEvent(chapterId: int.parse(item.id), hardDelete: true)),
-            ),
-            onView: () => showDetailDialog(
-              context,
-              DetailDialogData(
-                title: item.name,
-                icon: Iconsax.document_text_1,
-                color: Colors.orange,
-                fields: [
-                  DetailField(label: 'Chapter Name', value: item.name, icon: Iconsax.edit),
-                  DetailField(label: 'Subject', value: item.subjectName, icon: Iconsax.book_1),
-                  DetailField(label: 'Materials', value: item.materialCount.toString(), icon: Iconsax.folder_open),
-                ],
-                onEdit: () {
-                  Navigator.pop(context);
-                  showEditChapterDialog(context, item, allSubjects);
+            onEdit: canEdit ? () => showEditChapterDialog(context, item, allSubjects) : null,
+            onDelete: canDelete ? () {
+              showConfirmDeleteDialog(
+                context,
+                item.name,
+                Colors.orange,
+                    () {
+                  context.read<AcademicsBloc>().add(DeleteChapterEvent(
+                    chapterId: int.parse(item.id),
+                    hardDelete: true,
+                  ));
                 },
-              ),
-            ),
+              );
+            } : null,
+            onView: () {
+              showDetailDialog(
+                context,
+                DetailDialogData(
+                  title: item.name,
+                  icon: Iconsax.document_text_1,
+                  color: Colors.orange,
+                  fields: [
+                    DetailField(label: 'Chapter Name', value: item.name, icon: Iconsax.edit),
+                    DetailField(label: 'Subject', value: item.subjectName, icon: Iconsax.book_1),
+                    DetailField(label: 'Materials', value: item.materialCount.toString(), icon: Iconsax.folder_open),
+                  ],
+                  onEdit: canEdit ? () {
+                    Navigator.pop(context);
+                    showEditChapterDialog(context, item, allSubjects);
+                  } : null,
+                ),
+              );
+            },
             usePopupOnMobile: true,
           ),
         ),
       ],
       mobileInfoRows: [
-        buildInfoRow(Iconsax.folder_open, "Materials: ${item.materialCount}"),
+        buildInfoRow(Iconsax.folder_open, 'Materials: ${item.materialCount}'),
       ],
+    );
+  }
+}
+
+
+
+
+class MaterialGridScreen extends StatelessWidget {
+  final List<MaterialModel> materials;
+  final List<SubjectModel> allSubjects;
+
+  const MaterialGridScreen(
+      {super.key, required this.materials, required this.allSubjects});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Materials'),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          int crossAxisCount = (constraints.maxWidth / 350).floor();
+          if (crossAxisCount < 2) {
+            crossAxisCount = 2;
+          }
+
+          return GridView.builder(
+            padding: const EdgeInsets.all(16),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              //
+              //  <-- THIS IS THE LINE TO CHANGE
+              //
+              // To increase the card height, make this number smaller.
+              // A value of 1.0 is a square. A value less than 1.0 is a rectangle that is taller than it is wide.
+              // Let's try a smaller value for a noticeable height increase.
+              childAspectRatio: 0.65,
+            ),
+            itemCount: materials.length,
+            itemBuilder: (context, index) {
+              return MaterialGridItem(
+                item: materials[index],
+                allSubjects: allSubjects,
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -1437,7 +1774,6 @@ class MaterialGridItem extends StatefulWidget {
   @override
   MaterialGridItemState createState() => MaterialGridItemState();
 }
-
 
 class MaterialGridItemState extends State<MaterialGridItem> {
   bool isHovered = false;
@@ -1568,7 +1904,8 @@ class MaterialGridItemState extends State<MaterialGridItem> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
-          padding: const EdgeInsets.all(20),
+          margin: const EdgeInsets.all(8), // Added margin for proper spacing
+          padding: const EdgeInsets.all(16), // Reduced padding
           decoration: BoxDecoration(
             color: isHovered ? color.withOpacity(0.04) : Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -1581,64 +1918,99 @@ class MaterialGridItemState extends State<MaterialGridItem> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min, // Important: prevent infinite height
             children: [
               // Thumbnail/Icon Section
-              Expanded(
-                flex: 3,
-                child: Center(
-                  child: AspectRatio(
-                    aspectRatio: 1.4,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: color.withOpacity(0.3)),
-                      ),
-                      child: isYouTubeVideo && widget.item.thumbnail != null
-                          ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            CachedNetworkImage(
-                              imageUrl: widget.item.thumbnail!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Center(
-                                child: Icon(Iconsax.video, color: color, size: 30),
-                              ),
-                              errorWidget: (context, url, error) => Center(
-                                child: Icon(Iconsax.video, color: Colors.red, size: 30),
+              AspectRatio(
+                aspectRatio: 1.6,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: color.withOpacity(0.3)),
+                  ),
+                  child: isYouTubeVideo && widget.item.thumbnail != null
+                      ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CachedNetworkImage(
+                          imageUrl: widget.item.thumbnail!,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Center(
+                            child: Icon(Iconsax.video, color: color, size: 30),
+                          ),
+                          errorWidget: (context, url, error) => Center(
+                            child: Icon(Iconsax.video, color: Colors.red, size: 30),
+                          ),
+                        ),
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.9),
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(12),
+                                topRight: Radius.circular(12),
                               ),
                             ),
-                            // Play button overlay
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.withOpacity(0.9),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.play_arrow,
-                                  color: Colors.white,
-                                  size: 32,
-                                ),
+                          ),
+                        ),
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.9),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.play_arrow,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                      : isVideoFile
+                      ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Center(
+                          child: Icon(Iconsax.video, color: color, size: 36),
+                        ),
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.9),
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(12),
+                                topRight: Radius.circular(12),
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      )
-                          : isVideoFile
-                          ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Center(
-                          child: Icon(Iconsax.video, color: color, size: 40),
-                        ),
-                      )
-                          : isImageFile
-                          ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: CachedNetworkImage(
+                      ],
+                    ),
+                  )
+                      : isImageFile
+                      ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CachedNetworkImage(
                           imageUrl: fullDocumentUrl,
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Center(
@@ -1648,88 +2020,161 @@ class MaterialGridItemState extends State<MaterialGridItem> {
                             child: Icon(Iconsax.image, color: Colors.red, size: 30),
                           ),
                         ),
-                      )
-                          : Center(
-                        child: Icon(icon, color: color, size: 40),
-                      ),
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.9),
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(12),
+                                topRight: Radius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                      : Center(
+                    child: Stack(
+                      children: [
+                        Center(child: Icon(icon, color: color, size: 36)),
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.9),
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(12),
+                                topRight: Radius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
+
               // Title and Actions Section
-              Expanded(
-                flex: 1,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            widget.item.name,
-                            style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        ActionButtons(
-                          onEdit: () => showEditMaterialDialog(context, widget.item, widget.allSubjects),
-                          onDelete: () => showConfirmDeleteDialog(
-                            context,
-                            widget.item.name,
-                            color,
-                                () => context.read<AcademicsBloc>().add(
-                              DeleteMaterialEvent(recNo: int.parse(widget.item.id), hardDelete: true),
-                            ),
-                          ),
-                          onView: () => showDetailDialog(
-                            context,
-                            DetailDialogData(
-                              title: widget.item.name,
-                              icon: icon,
-                              color: color,
-                              documentPath: isYouTubeVideo ? firstPath : fullDocumentUrl,
-                              materialPaths: materialPaths,
-                              fields: [
-                                DetailField(label: 'Material Name', value: widget.item.name, icon: Iconsax.edit),
-                                DetailField(label: 'Type', value: widget.item.type, icon: icon),
-                                DetailField(
-                                  label: 'Uploaded On',
-                                  value: '${widget.item.uploadedOn.day}/${widget.item.uploadedOn.month}/${widget.item.uploadedOn.year}',
-                                  icon: Iconsax.calendar,
-                                ),
-                                if (isYouTubeVideo)
-                                  DetailField(label: 'Video Link', value: firstPath ?? '', icon: Iconsax.video),
-                                if (isVideoFile)
-                                  DetailField(label: 'Video File', value: firstPath ?? '', icon: Iconsax.video),
-                                if (isDocument)
-                                  DetailField(label: 'File Name', value: firstPath ?? '', icon: Iconsax.document_text),
-                              ],
-                              onEdit: () {
-                                Navigator.pop(context);
-                                showEditMaterialDialog(context, widget.item, widget.allSubjects);
-                              },
-                            ),
-                          ),
-                          usePopup: true,
-                        ),
-                      ],
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.item.name,
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(Iconsax.calendar, size: 14, color: AppTheme.bodyText),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${widget.item.uploadedOn.day}/${widget.item.uploadedOn.month}/${widget.item.uploadedOn.year}',
-                          style: GoogleFonts.inter(color: AppTheme.bodyText, fontSize: 12),
-                        ),
-                      ],
+                  ),
+                  ActionButtons(
+                    onEdit: Provider.of<UserProvider>(context, listen: false).hasPermission('M004', 'edit')
+                        ? () {
+                      print('🔐 MaterialGridItem: Checking EDIT permission');
+                      showEditMaterialDialog(context, widget.item, widget.allSubjects);
+                    }
+                        : null,
+                    onDelete: Provider.of<UserProvider>(context, listen: false).hasPermission('M004', 'delete')
+                        ? () {
+                      print('🔐 MaterialGridItem: Checking DELETE permission');
+                      final userProvider = Provider.of<UserProvider>(context, listen: false);
+                      if (userProvider.hasPermission('M004', 'delete')) {
+                        showConfirmDeleteDialog(
+                          context,
+                          widget.item.name,
+                          color,
+                              () {
+                            context.read<AcademicsBloc>().add(
+                              DeleteMaterialEvent(
+                                recNo: int.parse(widget.item.id),
+                                hardDelete: true,
+                              ),
+                            );
+                          },
+                        );
+                      } else {
+                        _showPermissionDeniedDialog(context, 'delete materials');
+                      }
+                    }
+                        : null,
+                    onView: () => showDetailDialog(
+                      context,
+                      DetailDialogData(
+                        title: widget.item.name,
+                        icon: icon,
+                        color: color,
+                        documentPath: isYouTubeVideo ? firstPath : fullDocumentUrl,
+                        materialPaths: materialPaths,
+                        fields: [
+                          DetailField(label: 'Material Name', value: widget.item.name, icon: Iconsax.edit),
+                          DetailField(label: 'Type', value: widget.item.type, icon: icon),
+                          DetailField(
+                            label: 'Uploaded On',
+                            value:
+                            '${widget.item.uploadedOn.day}/${widget.item.uploadedOn.month}/${widget.item.uploadedOn.year}',
+                            icon: Iconsax.calendar,
+                          ),
+                          if (isYouTubeVideo) DetailField(label: 'Video Link', value: firstPath ?? '', icon: Iconsax.video),
+                          if (isVideoFile) DetailField(label: 'Video File', value: firstPath ?? '', icon: Iconsax.video),
+                          if (isDocument) DetailField(label: 'File Name', value: firstPath ?? '', icon: Iconsax.document_text),
+                        ],
+                        onEdit: () {
+                          Navigator.pop(context);
+                          showEditMaterialDialog(context, widget.item, widget.allSubjects);
+                        },
+                      ),
                     ),
-                  ],
-                ),
+                    usePopup: true,
+                  ),
+                ],
+              ),
+               Row(
+                children: [
+                  Icon(Iconsax.calendar, size: 12, color: AppTheme.bodyText),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${widget.item.uploadedOn.day}/${widget.item.uploadedOn.month}/${widget.item.uploadedOn.year}',
+                    style: GoogleFonts.inter(color: AppTheme.bodyText, fontSize: 11),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Type Chips Section
+              Wrap(
+                spacing: 6.0,
+                runSpacing: 6.0,
+                children: [
+                  if (isYouTubeVideo || isVideoFile) _buildTypeChip('Video', Iconsax.video, Colors.red),
+                  if (widget.item.worksheetPath.isNotEmpty)
+                    _buildTypeChip('Worksheet', Iconsax.document_text_1, Colors.green),
+                  if (widget.item.extraQuestionsPath.isNotEmpty)
+                    _buildTypeChip('Extra', Iconsax.document_text, Colors.teal),
+                  if (widget.item.solvedQuestionsPath.isNotEmpty)
+                    _buildTypeChip('Solved', Iconsax.document_text, Colors.indigo),
+                  if (widget.item.revisionNotesPath.isNotEmpty) _buildTypeChip('Notes', Iconsax.note_1, Colors.orange),
+                  if (widget.item.lessonPlansPath.isNotEmpty) _buildTypeChip('Lesson', Iconsax.ruler, Colors.purple),
+                  if (widget.item.teachingAidsPath.isNotEmpty)
+                    _buildTypeChip('Aids', Iconsax.clipboard_text, Colors.brown),
+                  if (widget.item.assessmentToolsPath.isNotEmpty)
+                    _buildTypeChip('Assess', Iconsax.award, Colors.cyan),
+                  if (widget.item.homeworkToolsPath.isNotEmpty)
+                    _buildTypeChip('Homework', Iconsax.home, Colors.blueGrey),
+                  if (widget.item.practiceZonePath.isNotEmpty)
+                    _buildTypeChip('Practice', Iconsax.cpu, Colors.deepPurple),
+                  if (widget.item.learningPathPath.isNotEmpty)
+                    _buildTypeChip('Learning', Iconsax.chart_2, Colors.green.shade700),
+                ],
               ),
             ],
           ),
@@ -1737,9 +2182,99 @@ class MaterialGridItemState extends State<MaterialGridItem> {
       ),
     );
   }
+
+  // --- MODIFIED WIDGET ---
+  // The fix is applied here by wrapping the Text widget with Flexible.
+  Widget _buildTypeChip(String text, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        border: Border.all(color: color.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          // Flexible widget prevents the Text from causing an overflow
+          Flexible(
+            child: Text(
+              text,
+              style: GoogleFonts.inter(fontSize: 10, color: color, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis, // Handles text that is still too long
+              softWrap: false, // Prevents wrapping to a new line, prefers ellipsis
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 
+
+// Local skeleton widgets for this file (shimmer effect)
+class _SkeletonBox extends StatefulWidget {
+  final double borderRadius;
+  const _SkeletonBox({this.borderRadius = 8});
+  @override
+  State<_SkeletonBox> createState() => _SkeletonBoxState();
+}
+
+class _SkeletonBoxState extends State<_SkeletonBox> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat();
+  }
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(widget.borderRadius),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return ShaderMask(
+            shaderCallback: (rect) {
+              return LinearGradient(
+                begin: Alignment(-1.0 - 0.3 + 0.6 * _controller.value, 0),
+                end: Alignment(1.0 + 0.3 + 0.6 * _controller.value, 0),
+                colors: [
+                  Colors.grey.shade200,
+                  Colors.grey.shade300,
+                  Colors.grey.shade200,
+                ],
+                stops: const [0.2, 0.5, 0.8],
+              ).createShader(rect);
+            },
+            child: Container(color: Colors.white),
+            blendMode: BlendMode.srcATop,
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SkeletonLine extends StatelessWidget {
+  final double widthFactor;
+  const _SkeletonLine({this.widthFactor = 1});
+  @override
+  Widget build(BuildContext context) {
+    return FractionallySizedBox(
+      widthFactor: widthFactor,
+      child: const _SkeletonBox(borderRadius: 6),
+    );
+  }
+}
 
 
 // ==================== REPLACED EnhancedListItem WIDGET ====================
@@ -1898,7 +2433,7 @@ WebCell({required this.child, this.flex = 1, this.alignment = Alignment.centerLe
 class ActionButtons extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onView;
-  final VoidCallback? onDelete; // ADDED
+  final VoidCallback? onDelete;
   final bool usePopup;
   final bool usePopupOnMobile;
 
@@ -1906,7 +2441,7 @@ class ActionButtons extends StatelessWidget {
     super.key,
     this.onEdit,
     this.onView,
-    this.onDelete, // ADDED
+    this.onDelete,
     this.usePopup = false,
     this.usePopupOnMobile = false,
   });
@@ -1924,90 +2459,127 @@ class ActionButtons extends StatelessWidget {
       );
     }
 
-    if (usePopup) return _buildPopupMenu();
+    if (usePopup) {
+      return _buildPopupMenu();
+    }
+
     return _buildIconButtons();
   }
 
   Widget _buildPopupMenu() {
+    // Build list of available actions
+    final List<PopupMenuEntry<int>> menuItems = [];
+
+    if (onView != null) {
+      menuItems.add(
+        PopupMenuItem<int>(
+          value: 0,
+          child: Row(
+            children: [
+              const Icon(Iconsax.eye, size: 18, color: AppTheme.primaryGreen),
+              const SizedBox(width: 10),
+              Text('View Details', style: GoogleFonts.inter(fontSize: 14)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (onEdit != null) {
+      menuItems.add(
+        PopupMenuItem<int>(
+          value: 1,
+          child: Row(
+            children: [
+              const Icon(Iconsax.edit, size: 18, color: Colors.blue),
+              const SizedBox(width: 10),
+              Text('Edit', style: GoogleFonts.inter(fontSize: 14)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (onDelete != null) {
+      menuItems.add(
+        PopupMenuItem<int>(
+          value: 2,
+          child: Row(
+            children: [
+              const Icon(Iconsax.trash, size: 18, color: Colors.red),
+              const SizedBox(width: 10),
+              Text('Delete', style: GoogleFonts.inter(fontSize: 14, color: Colors.red)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // If no actions available, return empty container
+    if (menuItems.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return PopupMenuButton<int>(
       onSelected: (item) {
         if (item == 0 && onView != null) onView!();
         if (item == 1 && onEdit != null) onEdit!();
-        if (item == 2 && onDelete != null) onDelete!(); // ADDED
+        if (item == 2 && onDelete != null) onDelete!();
       },
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      itemBuilder: (context) => [
-        if (onView != null)
-          PopupMenuItem<int>(
-            value: 0,
-            child: Row(
-              children: [
-                Icon(Iconsax.eye, size: 18, color: AppTheme.primaryGreen),
-                const SizedBox(width: 10),
-                Text('View Details', style: GoogleFonts.inter(fontSize: 14)),
-              ],
-            ),
-          ),
-        if (onEdit != null)
-          PopupMenuItem<int>(
-            value: 1,
-            child: Row(
-              children: [
-                Icon(Iconsax.edit, size: 18, color: Colors.blue),
-                const SizedBox(width: 10),
-                Text('Edit', style: GoogleFonts.inter(fontSize: 14)),
-              ],
-            ),
-          ),
-        if (onDelete != null) // ADDED
-          PopupMenuItem<int>(
-            value: 2,
-            child: Row(
-              children: [
-                Icon(Iconsax.trash, size: 18, color: Colors.red),
-                const SizedBox(width: 10),
-                Text('Delete', style: GoogleFonts.inter(fontSize: 14)),
-              ],
-            ),
-          ),
-      ],
-      icon: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppTheme.borderGrey.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Iconsax.more, color: AppTheme.bodyText, size: 20),
-      ),
+      itemBuilder: (context) => menuItems,
+      icon: Icon(Iconsax.more, size: 20, color: AppTheme.bodyText.withOpacity(0.7)),
     );
   }
 
   Widget _buildIconButtons() {
+    final List<Widget> buttons = [];
+
+    if (onView != null) {
+      buttons.add(
+        IconButton(
+          icon: const Icon(Iconsax.eye, size: 18),
+          color: AppTheme.primaryGreen,
+          tooltip: 'View Details',
+          onPressed: onView,
+        ),
+      );
+    }
+
+    if (onEdit != null) {
+      buttons.add(
+        IconButton(
+          icon: const Icon(Iconsax.edit, size: 18),
+          color: Colors.blue,
+          tooltip: 'Edit',
+          onPressed: onEdit,
+        ),
+      );
+    }
+
+    if (onDelete != null) {
+      buttons.add(
+        IconButton(
+          icon: const Icon(Iconsax.trash, size: 18),
+          color: Colors.red,
+          tooltip: 'Delete',
+          onPressed: onDelete,
+        ),
+      );
+    }
+
+    // If no actions available, return empty container
+    if (buttons.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: [
-        if (onView != null)
-          IconButton(
-            icon: const Icon(Iconsax.eye, size: 20, color: AppTheme.primaryGreen),
-            onPressed: onView,
-            tooltip: 'View Details',
-          ),
-        if (onEdit != null)
-          IconButton(
-            icon: const Icon(Iconsax.edit, size: 20, color: Colors.blue),
-            onPressed: onEdit,
-            tooltip: 'Edit',
-          ),
-        if (onDelete != null) // ADDED
-          IconButton(
-            icon: const Icon(Iconsax.trash, size: 20, color: Colors.red),
-            onPressed: onDelete,
-            tooltip: 'Delete',
-          ),
-      ],
+      children: buttons,
     );
   }
 }
+
 
 Widget buildInfoRow(IconData icon, String text, {int maxLines = 1}) {
 return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2815,7 +3387,7 @@ await ApiService.manageAcademicModule({
 });
 if (context.mounted) {
 Navigator.pop(context);
-context.read<AcademicsBloc>().add(LoadChaptersEvent(schoolRecNo: 1));
+context.read<AcademicsBloc>().add(LoadChaptersEvent());
 context.read<AcademicsBloc>().add(LoadKPIEvent());
 }
 }
@@ -2891,7 +3463,7 @@ await ApiService.manageAcademicModule({
 });
 if (context.mounted) {
 Navigator.pop(context);
-context.read<AcademicsBloc>().add(LoadChaptersEvent(schoolRecNo: 1));
+context.read<AcademicsBloc>().add(LoadChaptersEvent());
 }
 },
 fields: [
@@ -3218,7 +3790,7 @@ void showAddMaterialDialog(BuildContext context, List<ClassModel> allClasses, Li
                   await Future.delayed(const Duration(milliseconds: 500));
                   // Use the captured bloc reference instead of context.read
                   print('🔄 Reloading materials after save...');
-                  academicsBloc.add(LoadMaterialsEvent(schoolRecNo: 1));
+                  academicsBloc.add(LoadMaterialsEvent());
                   academicsBloc.add(LoadKPIEvent());
 
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -3532,11 +4104,73 @@ void showEditMaterialDialog(BuildContext context, MaterialModel item, List<Subje
   // State for tracking if we're adding a new video file
   bool isAddingNewVideo = false;
   String? newVideoFilePath;
+  // Track uploading state for other material types
+  final Map<String, bool> isUploading = {
+    'Worksheet_Path': false,
+    'Extra_Questions_Path': false,
+    'Solved_Questions_Path': false,
+    'Revision_Notes_Path': false,
+    'Lesson_Plans_Path': false,
+    'Teaching_Aids_Path': false,
+    'Assessment_Tools_Path': false,
+    'Homework_Tools_Path': false,
+    'Practice_Zone_Path': false,
+    'Learning_Path_Path': false,
+  };
 
   showDialog(
     context: context,
     builder: (context) => StatefulBuilder(
       builder: (context, setState) {
+        Future<void> pickAndUploadGeneric(String key, TextEditingController controller) async {
+          try {
+            setState(() { isUploading[key] = true; });
+            FilePickerResult? result = await FilePicker.platform.pickFiles(
+              type: FileType.custom,
+              allowedExtensions: ['pdf','doc','docx','ppt','pptx','xls','xlsx','jpg','jpeg','png','gif','bmp','mp4','avi','mov','wmv','flv','webm','zip'],
+              allowMultiple: false,
+            );
+            if (result != null && result.files.isNotEmpty) {
+              final file = result.files.first;
+              File? fileToUpload;
+              if (file.path != null) {
+                fileToUpload = File(file.path!);
+              } else if (file.bytes != null) {
+                final tempDir = Directory.systemTemp;
+                final tempFile = File('${tempDir.path}/${file.name ?? 'temp_upload'}');
+                await tempFile.writeAsBytes(file.bytes!);
+                fileToUpload = tempFile;
+              }
+              if (fileToUpload != null) {
+                final fileForUpload = XFile(fileToUpload.path);
+                final filename = await ApiService.uploadDocument(fileForUpload);
+                if (filename != null && filename.isNotEmpty) {
+                  setState(() { controller.text = filename; });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('File uploaded successfully'), backgroundColor: Colors.green),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('File upload failed'), backgroundColor: Colors.red),
+                  );
+                }
+                if (file.path == null && file.bytes != null) {
+                  try { await fileToUpload.delete(); } catch (_) {}
+                }
+              }
+            }
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red),
+              );
+            }
+          } finally {
+            if (context.mounted) {
+              setState(() { isUploading[key] = false; });
+            }
+          }
+        }
         Future<void> pickAndUploadVideoFile() async {
           try {
             setState(() => isAddingNewVideo = true);
@@ -3700,7 +4334,7 @@ void showEditMaterialDialog(BuildContext context, MaterialModel item, List<Subje
 
             if (context.mounted) {
               Navigator.pop(context);
-              context.read<AcademicsBloc>().add(LoadMaterialsEvent(schoolRecNo: 1));
+              context.read<AcademicsBloc>().add(LoadMaterialsEvent());
             }
           },
           fields: [
@@ -3754,35 +4388,265 @@ void showEditMaterialDialog(BuildContext context, MaterialModel item, List<Subje
               ),
 
             // Displaying all other potential fields with their current values
-            if (worksheetController.text.isNotEmpty)
-              DialogField(controller: worksheetController, label: "Worksheet Path", hint: "/uploads/...", icon: Iconsax.document_text_1),
 
-            if (extraQuestionsController.text.isNotEmpty)
-              DialogField(controller: extraQuestionsController, label: "Extra Questions Path", hint: "/uploads/...", icon: Iconsax.document_text),
+              DialogField(
+                controller: worksheetController,
+                label: "Worksheet Path",
+                hint: "/uploads/...",
+                icon: Iconsax.document_text_1,
+                customWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: worksheetController,
+                      readOnly: true,
+                      style: GoogleFonts.inter(color: AppTheme.darkText),
+                      decoration: _buildDialogInputDecoration("Worksheet Path", Iconsax.document_text_1, hint: "/uploads/...", enabled: false),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: isUploading['Worksheet_Path'] == true ? null : () => pickAndUploadGeneric('Worksheet_Path', worksheetController),
+                      icon: isUploading['Worksheet_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
+                      label: Text(isUploading['Worksheet_Path'] == true ? 'Uploading...' : 'Upload New Worksheet', style: GoogleFonts.inter(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
+                    ),
+                  ],
+                ),
+              ),
 
-            if (solvedQuestionsController.text.isNotEmpty)
-              DialogField(controller: solvedQuestionsController, label: "Solved Questions Path", hint: "/uploads/...", icon: Iconsax.document_text),
 
-            if (notesController.text.isNotEmpty)
-              DialogField(controller: notesController, label: "Revision Notes Path", hint: "/uploads/...", icon: Iconsax.note_1),
+              DialogField(
+                controller: extraQuestionsController,
+                label: "Extra Questions Path",
+                hint: "/uploads/...",
+                icon: Iconsax.document_text,
+                customWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: extraQuestionsController,
+                      readOnly: true,
+                      style: GoogleFonts.inter(color: AppTheme.darkText),
+                      decoration: _buildDialogInputDecoration("Extra Questions Path", Iconsax.document_text, hint: "/uploads/...", enabled: false),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: isUploading['Extra_Questions_Path'] == true ? null : () => pickAndUploadGeneric('Extra_Questions_Path', extraQuestionsController),
+                      icon: isUploading['Extra_Questions_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
+                      label: Text(isUploading['Extra_Questions_Path'] == true ? 'Uploading...' : 'Upload New Extra Questions', style: GoogleFonts.inter(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
+                    ),
+                  ],
+                ),
+              ),
 
-            if (lessonPlansController.text.isNotEmpty)
-              DialogField(controller: lessonPlansController, label: "Lesson Plans Path", hint: "/uploads/...", icon: Iconsax.ruler),
 
-            if (teachingAidsController.text.isNotEmpty)
-              DialogField(controller: teachingAidsController, label: "Teaching Aids Path", hint: "/uploads/...", icon: Iconsax.clipboard_text),
+              DialogField(
+                controller: solvedQuestionsController,
+                label: "Solved Questions Path",
+                hint: "/uploads/...",
+                icon: Iconsax.document_text,
+                customWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: solvedQuestionsController,
+                      readOnly: true,
+                      style: GoogleFonts.inter(color: AppTheme.darkText),
+                      decoration: _buildDialogInputDecoration("Solved Questions Path", Iconsax.document_text, hint: "/uploads/...", enabled: false),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: isUploading['Solved_Questions_Path'] == true ? null : () => pickAndUploadGeneric('Solved_Questions_Path', solvedQuestionsController),
+                      icon: isUploading['Solved_Questions_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
+                      label: Text(isUploading['Solved_Questions_Path'] == true ? 'Uploading...' : 'Upload New Solved Questions', style: GoogleFonts.inter(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
+                    ),
+                  ],
+                ),
+              ),
 
-            if (assessmentToolsController.text.isNotEmpty)
-              DialogField(controller: assessmentToolsController, label: "Assessment Tools Path", hint: "/uploads/...", icon: Iconsax.award),
 
-            if (homeworkToolsController.text.isNotEmpty)
-              DialogField(controller: homeworkToolsController, label: "Homework Tools Path", hint: "/uploads/...", icon: Iconsax.home),
+              DialogField(
+                controller: notesController,
+                label: "Revision Notes Path",
+                hint: "/uploads/...",
+                icon: Iconsax.note_1,
+                customWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: notesController,
+                      readOnly: true,
+                      style: GoogleFonts.inter(color: AppTheme.darkText),
+                      decoration: _buildDialogInputDecoration("Revision Notes Path", Iconsax.note_1, hint: "/uploads/...", enabled: false),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: isUploading['Revision_Notes_Path'] == true ? null : () => pickAndUploadGeneric('Revision_Notes_Path', notesController),
+                      icon: isUploading['Revision_Notes_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
+                      label: Text(isUploading['Revision_Notes_Path'] == true ? 'Uploading...' : 'Upload New Revision Notes', style: GoogleFonts.inter(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
+                    ),
+                  ],
+                ),
+              ),
 
-            if (practiceZoneController.text.isNotEmpty)
-              DialogField(controller: practiceZoneController, label: "Practice Zone Path", hint: "/uploads/...", icon: Iconsax.cpu),
 
-            if (learningPathController.text.isNotEmpty)
-              DialogField(controller: learningPathController, label: "Learning Path Path", hint: "/uploads/...", icon: Iconsax.chart_2),
+              DialogField(
+                controller: lessonPlansController,
+                label: "Lesson Plans Path",
+                hint: "/uploads/...",
+                icon: Iconsax.ruler,
+                customWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: lessonPlansController,
+                      readOnly: true,
+                      style: GoogleFonts.inter(color: AppTheme.darkText),
+                      decoration: _buildDialogInputDecoration("Lesson Plans Path", Iconsax.ruler, hint: "/uploads/...", enabled: false),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: isUploading['Lesson_Plans_Path'] == true ? null : () => pickAndUploadGeneric('Lesson_Plans_Path', lessonPlansController),
+                      icon: isUploading['Lesson_Plans_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
+                      label: Text(isUploading['Lesson_Plans_Path'] == true ? 'Uploading...' : 'Upload New Lesson Plans', style: GoogleFonts.inter(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
+                    ),
+                  ],
+                ),
+              ),
+
+
+              DialogField(
+                controller: teachingAidsController,
+                label: "Teaching Aids Path",
+                hint: "/uploads/...",
+                icon: Iconsax.clipboard_text,
+                customWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: teachingAidsController,
+                      readOnly: true,
+                      style: GoogleFonts.inter(color: AppTheme.darkText),
+                      decoration: _buildDialogInputDecoration("Teaching Aids Path", Iconsax.clipboard_text, hint: "/uploads/...", enabled: false),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: isUploading['Teaching_Aids_Path'] == true ? null : () => pickAndUploadGeneric('Teaching_Aids_Path', teachingAidsController),
+                      icon: isUploading['Teaching_Aids_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
+                      label: Text(isUploading['Teaching_Aids_Path'] == true ? 'Uploading...' : 'Upload New Teaching Aids', style: GoogleFonts.inter(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
+                    ),
+                  ],
+                ),
+              ),
+
+
+              DialogField(
+                controller: assessmentToolsController,
+                label: "Assessment Tools Path",
+                hint: "/uploads/...",
+                icon: Iconsax.award,
+                customWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: assessmentToolsController,
+                      readOnly: true,
+                      style: GoogleFonts.inter(color: AppTheme.darkText),
+                      decoration: _buildDialogInputDecoration("Assessment Tools Path", Iconsax.award, hint: "/uploads/...", enabled: false),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: isUploading['Assessment_Tools_Path'] == true ? null : () => pickAndUploadGeneric('Assessment_Tools_Path', assessmentToolsController),
+                      icon: isUploading['Assessment_Tools_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
+                      label: Text(isUploading['Assessment_Tools_Path'] == true ? 'Uploading...' : 'Upload New Assessment Tools', style: GoogleFonts.inter(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
+                    ),
+                  ],
+                ),
+              ),
+
+
+              DialogField(
+                controller: homeworkToolsController,
+                label: "Homework Tools Path",
+                hint: "/uploads/...",
+                icon: Iconsax.home,
+                customWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: homeworkToolsController,
+                      readOnly: true,
+                      style: GoogleFonts.inter(color: AppTheme.darkText),
+                      decoration: _buildDialogInputDecoration("Homework Tools Path", Iconsax.home, hint: "/uploads/...", enabled: false),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: isUploading['Homework_Tools_Path'] == true ? null : () => pickAndUploadGeneric('Homework_Tools_Path', homeworkToolsController),
+                      icon: isUploading['Homework_Tools_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
+                      label: Text(isUploading['Homework_Tools_Path'] == true ? 'Uploading...' : 'Upload New Homework Tools', style: GoogleFonts.inter(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
+                    ),
+                  ],
+                ),
+              ),
+
+
+              DialogField(
+                controller: practiceZoneController,
+                label: "Practice Zone Path",
+                hint: "/uploads/...",
+                icon: Iconsax.cpu,
+                customWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: practiceZoneController,
+                      readOnly: true,
+                      style: GoogleFonts.inter(color: AppTheme.darkText),
+                      decoration: _buildDialogInputDecoration("Practice Zone Path", Iconsax.cpu, hint: "/uploads/...", enabled: false),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: isUploading['Practice_Zone_Path'] == true ? null : () => pickAndUploadGeneric('Practice_Zone_Path', practiceZoneController),
+                      icon: isUploading['Practice_Zone_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
+                      label: Text(isUploading['Practice_Zone_Path'] == true ? 'Uploading...' : 'Upload New Practice Zone', style: GoogleFonts.inter(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
+                    ),
+                  ],
+                ),
+              ),
+
+
+              DialogField(
+                controller: learningPathController,
+                label: "Learning Path Path",
+                hint: "/uploads/...",
+                icon: Iconsax.chart_2,
+                customWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: learningPathController,
+                      readOnly: true,
+                      style: GoogleFonts.inter(color: AppTheme.darkText),
+                      decoration: _buildDialogInputDecoration("Learning Path Path", Iconsax.chart_2, hint: "/uploads/...", enabled: false),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: isUploading['Learning_Path_Path'] == true ? null : () => pickAndUploadGeneric('Learning_Path_Path', learningPathController),
+                      icon: isUploading['Learning_Path_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
+                      label: Text(isUploading['Learning_Path_Path'] == true ? 'Uploading...' : 'Upload New Learning Path', style: GoogleFonts.inter(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
+                    ),
+                  ],
+                ),
+              ),
           ],
         );
       },

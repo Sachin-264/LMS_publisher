@@ -1,21 +1,47 @@
-
 // lib/service/school_service.dart
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:lms_publisher/screens/School/school_model.dart'; // Import XFile
-
+import 'package:lms_publisher/screens/School/school_model.dart';
+import 'package:lms_publisher/Provider/UserProvider.dart';
+import 'package:lms_publisher/Service/navigation_service.dart'; // Import NavigationService
+import 'package:provider/provider.dart';
 
 class SchoolApiService {
+  // Singleton instance
+  static final SchoolApiService _instance = SchoolApiService._internal();
+
+  factory SchoolApiService() {
+    return _instance;
+  }
+
+  SchoolApiService._internal();
+
   final String _baseUrl = "http://localhost/AquareLMS/";
   final String _imageUploadUrl = "https://www.aquare.co.in/mobileAPI/sachin/photogcp1.php";
+
+  // 🔥 Automatic access to userCode from anywhere!
+  String? get _pubCode {
+    try {
+      final context = NavigationService.context;
+      if (context != null) {
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        return userProvider.userCode;
+      }
+    } catch (e) {
+      print("⚠️ Warning: Could not access UserProvider. Error: $e");
+    }
+    return null;
+  }
 
   Future<Map<String, dynamic>> _get(String endpoint) async {
     final stopwatch = Stopwatch()..start();
     print("🚀 Making GET request to endpoint: $endpoint");
     final url = Uri.parse('$_baseUrl$endpoint');
+
     try {
       final response = await http.get(url, headers: {'Content-Type': 'application/json'});
       print("✅ GET response from $endpoint: ${response.statusCode} in ${stopwatch.elapsedMilliseconds}ms");
@@ -47,6 +73,7 @@ class SchoolApiService {
     final stopwatch = Stopwatch()..start();
     print("🚀 Making POST request to endpoint: $endpoint with body: ${json.encode(body)}");
     final url = Uri.parse('$_baseUrl$endpoint');
+
     try {
       final response = await http.post(
         url,
@@ -78,10 +105,10 @@ class SchoolApiService {
     }
   }
 
-
-  Future<String?> uploadLogo(XFile imageFile) async {
+  Future<String> uploadLogo(XFile imageFile) async {
     print("🚀 [uploadLogo] Starting logo upload for: ${imageFile.path}");
     final stopwatch = Stopwatch()..start();
+
     try {
       final imageBytes = await imageFile.readAsBytes();
       String base64Image = base64Encode(imageBytes);
@@ -109,39 +136,24 @@ class SchoolApiService {
 
       if (response.statusCode == 200) {
         final responseBody = json.decode(response.body);
-
-// --- CHANGED: PARSING LOGIC STARTS HERE ---
-
-// 1. Check for success based on the ACTUAL server response
         final errorObject = responseBody['error'];
+
         if (errorObject != null && errorObject['code'] == 200) {
+          final stationUploads = responseBody['stationUploads'] as List?;
 
-// 2. Extract the list of uploaded files
-          final stationUploads = responseBody['stationUploads'] as List<dynamic>?;
-
-// 3. Make sure the list exists and is not empty
           if (stationUploads != null && stationUploads.isNotEmpty) {
-
-// 4. Get the filename from the first item in the list
             final String uniqueFileName = stationUploads[0]['UniqueFileName'];
-
-// 5. Construct the full, public URL for the image
             print("✅ [uploadLogo] Success! Filename: $uniqueFileName");
-            return uniqueFileName; // Return ONLY the filename
-
+            return uniqueFileName;
           } else {
-// This case handles a 200 OK but no files uploaded, which is an error
             print("❌ [uploadLogo] API indicated success but no image path was returned.");
             throw Exception("Server returned success but no image path was found.");
           }
         } else {
-// This handles cases where the server returns 200 but an error message inside
           final errorMessage = errorObject?['message'] ?? 'Unknown API error';
           print("❌ [uploadLogo] API indicated failure: $errorMessage");
           throw Exception("Server returned failure status: $errorMessage");
         }
-// --- CHANGED: PARSING LOGIC ENDS HERE ---
-
       } else {
         print("❌ [uploadLogo] HTTP Error. Status Code: ${response.statusCode}");
         throw HttpException('Server responded with status code ${response.statusCode}');
@@ -161,15 +173,17 @@ class SchoolApiService {
     }
   }
 
-
-// FIXED: This method now correctly accepts an XFile?
+  // 🔥 Automatically uses _pubCode
   Future<Map<String, dynamic>> addSchool({
     required Map<String, dynamic> schoolMasterData,
     required Map<String, dynamic> subscriptionData,
     XFile? logoFile,
     String? createdBy,
+    String? schoolId,
   }) async {
     print("🚀 Calling addSchool for school: ${schoolMasterData['School_Name']}");
+    print("🔑 Using PubCode: $_pubCode"); // Debug log
+
     if (logoFile != null) {
       print("🖼️ Logo file provided, starting upload process...");
       final uploadedLogoUrl = await uploadLogo(logoFile);
@@ -181,11 +195,13 @@ class SchoolApiService {
     }
 
     final body = {
-      "School_ID": 0,
+      "School_ID": schoolId ?? 0,
       "School_Master_Data": schoolMasterData,
       "Subscription_Data": subscriptionData,
       "Created_By": createdBy ?? 'flutter_app',
+      "PubCode": _pubCode,
     };
+
     print("➡️ Prepared addSchool request body: ${json.encode(body)}");
     return await _post('AddEditSchool.php', body);
   }
@@ -193,7 +209,7 @@ class SchoolApiService {
   Future<List<FeeStructure>> fetchFeeStructures() async {
     print("🚀 Calling fetchFeeStructures");
     final response = await _get('getFeesSt.php');
-    final List<dynamic> data = response['data'] ?? [];
+    final List data = response['data'] ?? [];
     print("ℹ️ Received ${data.length} fee structure entries. Processing...");
 
     var uniqueFees = <String, FeeStructure>{};
@@ -206,17 +222,17 @@ class SchoolApiService {
         );
       }
     }
+
     print("✅ Fetched and processed ${uniqueFees.length} unique fee structures.");
     return uniqueFees.values.toList();
   }
 
   Future<String> addFeeStructure({
-    String?schoolRecNo, // <--- 1. ADD THIS PARAMETER
-    required Map<String, dynamic> feeData
+    String? schoolRecNo,
+    required Map<String, dynamic> feeData,
   }) async {
     print("🚀 Calling addFeeStructure for SchoolRecNo: $schoolRecNo with data: ${json.encode(feeData)}");
 
-// 2. USE THE PARAMETER IN THE BODY
     final body = {
       "SchoolRecNo": schoolRecNo,
       ...feeData
@@ -234,17 +250,10 @@ class SchoolApiService {
     }
   }
 
-
-// In lib/service/school_service.dart
-
-// ... (inside the SchoolApiService class)
-
   Future<List<dynamic>> fetchFeeStructureDetails(String feeId) async {
     print("🚀 Calling fetchFeeStructureDetails for Fee ID: $feeId");
-// Note: This is a GET request as per your documentation.
-// We modify the _get method slightly or create a new one if needed.
-// For simplicity, let's create a direct http.get call here.
     final url = Uri.parse('$_baseUrl/getFeesSt.php?action=details&FeeID=$feeId');
+
     try {
       final response = await http.get(url, headers: {'Content-Type': 'application/json'});
       print("✅ GET response from getFeesSt.php details: ${response.statusCode}");
@@ -267,44 +276,50 @@ class SchoolApiService {
     }
   }
 
-
-
-  Future<Map<String, dynamic>> login(String email, String password) async {
-    print("🚀 Calling login for user: $email");
-// Note: Do not log the password in a real application for security reasons.
-    final response = await _post('Login.php', {'email': email, 'password': password});
-    print("✅ Login successful for user: $email. Response: ${json.encode(response)}");
-    return response;
-  }
-
+  // 🔥 Automatically uses _pubCode
   Future<List<School>> fetchSchools() async {
-    print("🚀 Calling fetchSchools");
-    final response = await _post('GetSchool.php', {'action': 'list'});
-    final List<dynamic> schoolData = response['data'] ?? [];
+    print("🚀 Calling fetchSchools with PubCode: $_pubCode");
+
+    // Convert to integer if possible
+    final pubCodeInt = _pubCode != null ? int.tryParse(_pubCode!) : null;
+
+    final body = {
+      'action': 'list',
+      'PubCode': pubCodeInt ?? 0, // Send as integer, default to 0
+    };
+
+    print("📤 Request body: ${json.encode(body)}");
+
+    final response = await _post('GetSchool.php', body);
+    final List schoolData = response['data'] ?? [];
     print("✅ Fetched ${schoolData.length} schools. Parsing data...");
     final schools = schoolData.map((json) => School.fromListJson(json)).toList();
     print("👍 Successfully parsed ${schools.length} schools.");
     return schools;
   }
+
+
   Future<School> fetchSchoolDetails({required String schoolId}) async {
     print("🚀 Calling fetchSchoolDetails for School ID: $schoolId");
-
-// Assuming _post returns the entire decoded JSON object
-    final response = await _post('GetSchool.php', {'action': 'detail', 'School_ID': int.parse(schoolId)});
+    final response = await _post('GetSchool.php', {
+      'action': 'detail',
+      'School_ID': int.parse(schoolId)
+    });
 
     print("✅ Fetched details for School ID: $schoolId. Parsing data...");
-
-// *** IMPORTANT CHANGE HERE ***
-// Pass the 'data' object from the response to the factory constructor.
     final school = School.fromDetailJson(response['data']);
-
     print("👍 Successfully parsed details for school: ${school.name}");
     return school;
   }
 
   Future<bool> deleteSchool({required String schoolId}) async {
     print("🚀 Calling deleteSchool for School ID: $schoolId");
-    final response = await _post('GetSchool.php', {'action': 'delete', 'School_ID': int.parse(schoolId), 'Deleted_By': 'app_user'});
+    final response = await _post('GetSchool.php', {
+      'action': 'delete',
+      'School_ID': int.parse(schoolId),
+      'Deleted_By': 'app_user'
+    });
+
     print("✅ Delete request for School ID $schoolId returned: ${response['success']}");
     if (!response['success']) {
       print("❌ Delete failed for School ID $schoolId. Reason: ${response['message']}");
@@ -318,9 +333,17 @@ class SchoolApiService {
     required String newEndDate,
   }) async {
     print("🚀 Calling renewSubscription for School ID: $schoolId");
-    print("   - New Subscription ID: $newSubscriptionId");
-    print("   - New End Date: $newEndDate");
-    final response = await _post('GetSchool.php', {'action': 'renew', 'School_ID': int.parse(schoolId), 'New_Subscription_ID': newSubscriptionId, 'New_End_Date': newEndDate, 'Modified_B': 'app_user'});
+    print("  - New Subscription ID: $newSubscriptionId");
+    print("  - New End Date: $newEndDate");
+
+    final response = await _post('GetSchool.php', {
+      'action': 'renew',
+      'School_ID': int.parse(schoolId),
+      'New_Subscription_ID': newSubscriptionId,
+      'New_End_Date': newEndDate,
+      'Modified_By': 'app_user'
+    });
+
     print("✅ Renew subscription for School ID $schoolId returned: ${response['success']}");
     if (!response['success']) {
       print("❌ Subscription renewal failed for School ID $schoolId. Reason: ${response['message']}");
@@ -328,35 +351,40 @@ class SchoolApiService {
     return response['success'];
   }
 
+  // 🔥 Automatically uses _pubCode
   Future<List<SubscriptionPlan>> fetchSubscriptions() async {
+    print("🚀 Calling fetchSubscriptions with PubCode: $_pubCode");
+    final pubCodeInt = _pubCode != null ? int.tryParse(_pubCode!) : null;
+    final body = {
+      'action': 'subdetail',
+      if (_pubCode != null) 'PubCode': pubCodeInt ?? 0,
+    };
+
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/GetSchool.php'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'action': 'subdetail'}),
+        body: jsonEncode(body),
       ).timeout(const Duration(seconds: 30));
 
       print('✅ Fetching subscription plans...');
       print('📡 Request: POST $_baseUrl/GetSchool.php');
-      print('📤 Body: {"action": "subdetail"}');
+      print('📤 Body: ${jsonEncode(body)}');
       print('📥 Response Status: ${response.statusCode}');
       print('📥 Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-
         if (jsonResponse['success'] == true && jsonResponse['data'] != null) {
-          final List<dynamic> data = jsonResponse['data'] as List;
+          final List data = jsonResponse['data'] as List;
           print('✅ Fetched ${data.length} subscription plans. Parsing...');
 
-// Convert each item to SubscriptionPlan using fromJson
           final List<SubscriptionPlan> plans = data.map((item) =>
               SubscriptionPlan.fromJson(item as Map<String, dynamic>)
           ).toList();
 
           print('👍 Successfully parsed ${plans.length} subscription plans.');
 
-// Debug: Print parsed plans
           for (var plan in plans) {
             print('📋 Plan: ${plan.name} (${plan.planType}) - ${plan.displayPrice}');
           }
@@ -374,40 +402,41 @@ class SchoolApiService {
     }
   }
 
-// NEW: Fetches the list of possible school statuses for the filter dropdown
   Future<List<SchoolStatusModel>> fetchSchoolStatuses() async {
     print("🚀 Calling fetchSchoolStatuses");
     final response = await _post('GetSchool.php', {'action': 'statuslist'});
-    final List<dynamic> data = response['data'] ?? [];
+    final List data = response['data'] ?? [];
     print("✅ Fetched ${data.length} statuses. Parsing...");
+
     final statuses = data
         .map((item) => SchoolStatusModel.fromJson(item as Map<String, dynamic>))
         .toList();
+
     print("👍 Successfully parsed ${statuses.length} statuses.");
     return statuses;
   }
 
-// NEW: Updates the status for a given school
-  Future<bool> updateSchoolStatus(
-      {required String schoolId, required String statusId}) async {
-    print(
-        "🚀 Calling updateSchoolStatus for School ID: $schoolId with Status ID: $statusId");
+  Future<bool> updateSchoolStatus({
+    required String schoolId,
+    required String statusId
+  }) async {
+    print("🚀 Calling updateSchoolStatus for School ID: $schoolId with Status ID: $statusId");
+
     final response = await _post('GetSchool.php', {
       'action': 'updatestatus',
       'School_ID': int.parse(schoolId),
       'Status_ID': int.parse(statusId),
     });
-    print(
-        "✅ Update status request for School ID $schoolId returned: ${response['success']}");
+
+    print("✅ Update status request for School ID $schoolId returned: ${response['success']}");
     if (response['success'] == false) {
-      print(
-          "❌ Status update failed for School ID $schoolId. Reason: ${response['message']}");
+      print("❌ Status update failed for School ID $schoolId. Reason: ${response['message']}");
     }
     return response['success'] as bool;
   }
 
-
   Future<Map<String, dynamic>> updateSchool({
+    required int recNo,
     required String schoolId,
     required Map<String, dynamic> schoolMasterData,
     required Map<String, dynamic> subscriptionData,
@@ -415,7 +444,8 @@ class SchoolApiService {
     String? createdBy,
     String? modifiedBy,
   }) async {
-    print("🚀 Calling updateSchool for school ID: $schoolId");
+    print("🚀 Calling updateSchool for RecNo: $recNo, School ID: $schoolId");
+
     if (logoFile != null) {
       print("🖼️ New logo file provided, starting upload process...");
       final uploadedLogoUrl = await uploadLogo(logoFile);
@@ -426,7 +456,7 @@ class SchoolApiService {
     }
 
     final body = {
-      // Key difference for updates: School_ID is at the root
+      "RecNo": recNo,
       "School_ID": int.tryParse(schoolId) ?? 0,
       "School_Master_Data": schoolMasterData,
       "Subscription_Data": subscriptionData,
@@ -435,37 +465,58 @@ class SchoolApiService {
     };
 
     print("➡️ Prepared updateSchool request body: ${json.encode(body)}");
-    // The same endpoint handles both Add and Edit
     return await _post('AddEditSchool.php', body);
   }
-
 
   Future<List<StateModel>> fetchStates() async {
     print("🚀 Calling fetchStates");
     final response = await _post('StateMaster.php', {'action': 'getStates'});
-    final List<dynamic> data = response['data'] ?? [];
+    final List data = response['data'] ?? [];
     print("✅ Fetched ${data.length} states. Parsing...");
-    final states = data.map((item) => StateModel(id: item['State_ID'], name: item['State_Name'])).toList();
+
+    final states = data.map((item) => StateModel(
+        id: item['State_ID'],
+        name: item['State_Name']
+    )).toList();
+
     print("👍 Successfully parsed ${states.length} states.");
     return states;
   }
 
   Future<List<DistrictModel>> fetchDistricts(String stateId) async {
     print("🚀 Calling fetchDistricts for State ID: $stateId");
-    final response = await _post('StateMaster.php', {'action': 'getDistricts', 'State_ID': int.parse(stateId)});
-    final List<dynamic> data = response['data'] ?? [];
+    final response = await _post('StateMaster.php', {
+      'action': 'getDistricts',
+      'State_ID': int.parse(stateId)
+    });
+
+    final List data = response['data'] ?? [];
     print("✅ Fetched ${data.length} districts for State ID: $stateId. Parsing...");
-    final districts = data.map((item) => DistrictModel(id: item['District_ID'], name: item['District_Name'])).toList();
+
+    final districts = data.map((item) => DistrictModel(
+        id: item['District_ID'],
+        name: item['District_Name']
+    )).toList();
+
     print("👍 Successfully parsed ${districts.length} districts.");
     return districts;
   }
 
   Future<List<CityModel>> fetchCities(String districtId) async {
     print("🚀 Calling fetchCities for District ID: $districtId");
-    final response = await _post('StateMaster.php', {'action': 'getCities', 'District_ID': int.parse(districtId)});
-    final List<dynamic> data = response['data'] ?? [];
+    final response = await _post('StateMaster.php', {
+      'action': 'getCities',
+      'District_ID': int.parse(districtId)
+    });
+
+    final List data = response['data'] ?? [];
     print("✅ Fetched ${data.length} cities for District ID: $districtId. Parsing...");
-    final cities = data.map((item) => CityModel(id: item['City_ID'], name: item['City_Name'])).toList();
+
+    final cities = data.map((item) => CityModel(
+        id: item['City_ID'],
+        name: item['City_Name']
+    )).toList();
+
     print("👍 Successfully parsed ${cities.length} cities.");
     return cities;
   }
@@ -473,12 +524,14 @@ class SchoolApiService {
   Future<List<Map<String, String>>> fetchSchoolTypes() async {
     print("🚀 Calling fetchSchoolTypes");
     final response = await _post('getBoard.php', {'action': 'getSchoolTypes'});
-    final List<dynamic> data = response['data'] ?? [];
+    final List data = response['data'] ?? [];
     print("✅ Fetched ${data.length} school types. Parsing...");
+
     final types = data.map((item) => {
       'id': item['SchoolType_ID'].toString(),
       'name': item['SchoolType_Name'].toString(),
     }).toList();
+
     print("👍 Successfully parsed ${types.length} school types.");
     return types;
   }
@@ -486,12 +539,14 @@ class SchoolApiService {
   Future<List<Map<String, String>>> fetchBoardAffiliations() async {
     print("🚀 Calling fetchBoardAffiliations");
     final response = await _post('getBoard.php', {'action': 'getBoardAffliations'});
-    final List<dynamic> data = response['data'] ?? [];
+    final List data = response['data'] ?? [];
     print("✅ Fetched ${data.length} board affiliations. Parsing...");
+
     final affiliations = data.map((item) => {
       'id': item['BoardAffliation_ID'].toString(),
       'name': item['BoardAffliation_Name'].toString(),
     }).toList();
+
     print("👍 Successfully parsed ${affiliations.length} board affiliations.");
     return affiliations;
   }
@@ -499,12 +554,14 @@ class SchoolApiService {
   Future<List<Map<String, String>>> fetchMediumInstructions() async {
     print("🚀 Calling fetchMediumInstructions");
     final response = await _post('getBoard.php', {'action': 'getMediumInstructions'});
-    final List<dynamic> data = response['data'] ?? [];
+    final List data = response['data'] ?? [];
     print("✅ Fetched ${data.length} medium instructions. Parsing...");
+
     final mediums = data.map((item) => {
       'id': item['Medium_ID'].toString(),
       'name': item['Medium_Name'].toString(),
     }).toList();
+
     print("👍 Successfully parsed ${mediums.length} medium instructions.");
     return mediums;
   }
@@ -512,12 +569,14 @@ class SchoolApiService {
   Future<List<Map<String, String>>> fetchManagementTypes() async {
     print("🚀 Calling fetchManagementTypes");
     final response = await _post('getBoard.php', {'action': 'getManagementTypes'});
-    final List<dynamic> data = response['data'] ?? [];
+    final List data = response['data'] ?? [];
     print("✅ Fetched ${data.length} management types. Parsing...");
+
     final types = data.map((item) => {
       'id': item['Management_ID'].toString(),
       'name': item['Management_Name'].toString(),
     }).toList();
+
     print("👍 Successfully parsed ${types.length} management types.");
     return types;
   }

@@ -380,18 +380,18 @@ class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
   String get currentMaterialTypeFilter => _currentMaterialTypeFilter;
 
   Future<void> _onLoadKPI(LoadKPIEvent event, Emitter<AcademicsState> emit) async {
-    print('📊 Loading KPI data...');
+    print("📊 Loading KPI data...");
     emit(AcademicsLoading());
 
     try {
       final response = await ApiService.getAcademicsKPI();
-      print('📊 KPI Response: $response');
+      print("📊 KPI Response: $response");
 
-      if (response['success'] == true &&
-          response['EntityCounts'] != null &&
-          response['EntityCounts'].isNotEmpty) {
-        final data = response['EntityCounts'][0];
-        print('✅ KPI Data loaded successfully: $data');
+      if (response['success'] == true && response['EntityCounts'] != null) {
+        // EntityCounts is an object, not an array - access it directly
+        final data = response['EntityCounts'];
+        print("✅ KPI Data loaded successfully: $data");
+
         emit(KPILoaded(
           totalClasses: data['TotalClasses']?.toString() ?? '0',
           totalSubjects: data['TotalSubjects']?.toString() ?? '0',
@@ -399,14 +399,15 @@ class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
           totalMaterials: data['TotalMaterials']?.toString() ?? '0',
         ));
       } else {
-        print('❌ KPI Failed: Response format incorrect');
+        print("❌ KPI Failed: Response format incorrect");
         emit(AcademicsError('Failed to load KPI data'));
       }
     } catch (e) {
-      print('❌ KPI Error: $e');
+      print("❌ KPI Error: $e");
       emit(AcademicsError('Error loading KPI: $e'));
     }
   }
+
 
   Future<void> _onLoadClasses(LoadClassesEvent event, Emitter<AcademicsState> emit) async {
     print('🏫 Loading Classes...');
@@ -440,10 +441,8 @@ class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
     emit(AcademicsLoading()); // Always emit loading state to force refresh
 
     try {
-      final response = await ApiService.getSubjects(
-        schoolRecNo: event.schoolRecNo ?? 1,
-        classId: event.classId,
-      );
+      print('🔎 [Bloc] LoadSubjectsEvent → ClassID=${event.classId}');
+      final response = await ApiService.getSubjects(classId: event.classId);
       print('📚 Subjects Response: $response');
 
       if ((response['status'] == 'success' || response['success'] == true) &&
@@ -467,11 +466,8 @@ class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
     emit(AcademicsLoading()); // Always emit loading state to force refresh
 
     try {
-      final response = await ApiService.getChapters(
-        schoolRecNo: event.schoolRecNo ?? 1,
-        classId: event.classId,
-        subjectId: event.subjectId,
-      );
+      print('🔎 [Bloc] LoadChaptersEvent → ClassID=${event.classId}, SubjectID=${event.subjectId}');
+      final response = await ApiService.getChapters(classId: event.classId, subjectId: event.subjectId);
       print('📖 Chapters Response: $response');
 
       if ((response['status'] == 'success' || response['success'] == true) &&
@@ -538,8 +534,8 @@ class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
     emit(AcademicsLoading()); // Always emit loading state to force refresh
 
     try {
+      print('🔎 [Bloc] LoadMaterialsEvent → ClassID=${event.classId}, SubjectID=${event.subjectId}, ChapterID=${event.chapterId}');
       final response = await ApiService.getMaterials(
-        schoolRecNo: event.schoolRecNo ?? 1,
         classId: event.classId,
         subjectId: event.subjectId,
         chapterId: event.chapterId,

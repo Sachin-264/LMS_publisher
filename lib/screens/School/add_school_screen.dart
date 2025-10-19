@@ -2,23 +2,23 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Import for input formatters
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
-
-// --- Make sure these paths are correct for your project structure ---
+import 'package:lms_publisher/Provider/UserProvider.dart';
+import 'package:provider/provider.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'school_model.dart';
 import 'package:lms_publisher/screens/School/add_school_bloc.dart';
 import 'package:lms_publisher/service/school_service.dart';
+import 'package:lms_publisher/service/user_right_service.dart';
 
 
 class AddSchoolScreen extends StatefulWidget {
   final String? schoolId;
-
   const AddSchoolScreen({super.key, this.schoolId});
 
   @override
@@ -30,13 +30,13 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   final _formKey = GlobalKey<FormState>();
   late TabController _tabController;
   final SchoolApiService _apiService = SchoolApiService();
+  final UserRightsService _userRightsService = UserRightsService();
   final ImagePicker _picker = ImagePicker();
-
-
-
   bool get _isEditMode => widget.schoolId != null;
   final String _logoBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
   String? _originalCreatedBy;
+  int? _schoolRecNo;  // NEW: Store RecNo for updates
+
 
   // --- Data Lists & Models ---
   List<SubscriptionPlan> _subscriptionPlans = [];
@@ -72,9 +72,12 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   // --- Form Data & Controllers ---
   DateTime _startDate = DateTime.now();
   bool _scholarshipsGrants = false;
-
   bool _isAutoRenewal = true;
   final TextEditingController _paymentRefController = TextEditingController();
+
+  // NEW: Credential Controllers
+  final TextEditingController _userIdController = TextEditingController();
+  final TextEditingController _userPasswordController = TextEditingController();
 
   final Map<String, TextEditingController> _controllers = {
     'schoolName': TextEditingController(),
@@ -116,10 +119,9 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _controllers['establishmentDate']!.text =
-        DateFormat('yyyy-MM-dd').format(DateTime.now());
-
+    // Dynamic tab count: 5 for ADD mode, 4 for EDIT mode
+    _tabController = TabController(length: _isEditMode ? 4 : 5, vsync: this);
+    _controllers['establishmentDate']!.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
     _fetchAllInitialData().then((_) {
       if (_isEditMode) {
         _fetchAndPopulateSchoolDetails();
@@ -135,6 +137,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     _tabController.dispose();
     _controllers.forEach((_, controller) => controller.dispose());
     _paymentRefController.dispose();
+    _userIdController.dispose(); // NEW
+    _userPasswordController.dispose(); // NEW
     super.dispose();
   }
 
@@ -164,9 +168,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Failed to load initial data: $e'),
-              backgroundColor: Colors.red),
+          SnackBar(content: Text('Failed to load initial data: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -175,10 +177,10 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   Future<void> _fetchAndPopulateSchoolDetails() async {
     try {
       final school = await _apiService.fetchSchoolDetails(schoolId: widget.schoolId!);
-
       if (mounted) {
-        // --- Populate Text Controllers ---
         _originalCreatedBy = school.createdBy;
+        _schoolRecNo = int.tryParse(school.recNo ?? '0');  // NEW: Store RecNo
+        print('💾 Stored RecNo: $_schoolRecNo for School ID: ${widget.schoolId}');
         _controllers['schoolName']!.text = school.name;
         _controllers['schoolCode']!.text = school.code ?? '';
         _controllers['schoolShortName']!.text = school.shortName ?? '';
@@ -205,8 +207,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
         _controllers['gstNumber']!.text = school.gst ?? '';
         _controllers['bankAccountDetails']!.text = school.bankAccountDetails ?? '';
         _existingLogoPath = school.logoPath;
-        _originalCreatedBy = school.createdBy;
-        // --- Populate Facility Switches ---
+
         _facilitySwitches['isHostel'] = school.isHostel ?? false;
         _facilitySwitches['isTransport'] = school.isTransport ?? false;
         _facilitySwitches['isLibrary'] = school.isLibrary ?? false;
@@ -215,7 +216,6 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
         _facilitySwitches['isAuditorium'] = school.isAuditorium ?? false;
         _scholarshipsGrants = school.scholarshipsGrants?.toLowerCase() == 'yes';
 
-        // --- Populate Dropdowns (SAFE METHOD) ---
         try { _selectedBoardAffiliation = _boardAffiliations.firstWhere((b) => b['id'] == school.board); } catch (e) { _selectedBoardAffiliation = null; }
         try { _selectedSchoolType = _schoolTypes.firstWhere((st) => st['id'] == school.schoolType); } catch (e) { _selectedSchoolType = null; }
         try { _selectedMediumInstruction = _mediumInstructions.firstWhere((m) => m['id'] == school.medium); } catch (e) { _selectedMediumInstruction = null; }
@@ -224,7 +224,6 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           try { _selectedFeeStructure = _feeStructures.firstWhere((fs) => fs.id == school.feeStructureRef); } catch (e) { _selectedFeeStructure = null; }
         }
 
-        // --- Handle Location Dropdowns (SAFE METHOD) ---
         if (school.stateId != null) {
           try { _selectedState = _states.firstWhere((s) => s.id == school.stateId); } catch (e) { _selectedState = null; }
           if (_selectedState != null) {
@@ -241,31 +240,29 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           }
         }
 
-        // --- Populate Subscription Info (SAFE METHOD) ---
         _paymentRefController.text = school.paymentRefId ?? '';
         _isAutoRenewal = school.isAutoRenewal ?? true;
-        if(school.startDate != null) _startDate = school.startDate!;
-        if(school.subscription != null) {
+        if (school.startDate != null) _startDate = school.startDate!;
+        if (school.subscription != null) {
           try { _selectedSubscription = _subscriptionPlans.firstWhere((p) => p.name == school.subscription); } catch (e) { _selectedSubscription = null; }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load school details: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load school details: $e'), backgroundColor: Colors.red),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-
   Future<void> _refreshFeeStructures() async {
     setState(() => _isLoadingFees = true);
     try {
       final feeStructures = await _apiService.fetchFeeStructures();
-      if (mounted) {
-        setState(() => _feeStructures = feeStructures);
-      }
+      if (mounted) setState(() => _feeStructures = feeStructures);
     } catch (e) {
       // Handle error
     } finally {
@@ -309,103 +306,160 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
 
   Future<void> _pickLogo() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-    if (image != null) {
-      setState(() => _logoFile = image);
-    }
+    if (image != null) setState(() => _logoFile = image);
   }
 
+  // NEW: UPDATED _submitForm with credential integration
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isSaving = true);
 
-      final schoolMasterData = {
-        "School_Code": _controllers['schoolCode']!.text,
-        "School_Name": _controllers['schoolName']!.text,
-        "School_Short_Name": _controllers['schoolShortName']!.text,
-        "SchoolType_ID": _selectedSchoolType?['id'],
-        "Medium_ID": _selectedMediumInstruction?['id'],
-        "BoardAffliation_ID": _selectedBoardAffiliation?['id'],
-        "Affiliation_No": _controllers['affiliationNo']!.text,
-        "Date_of_Establishment": _controllers['establishmentDate']!.text,
-        "Address_Line1": _controllers['addressLine1']!.text,
-        "Address_Line2": _controllers['addressLine2']!.text,
-        "Country": "India",
-        "State_ID": _selectedState?.id,
-        "District_ID": _selectedDistrict?.id,
-        "City_ID": _selectedCity?.id,
-        "Pin_Code": _controllers['pinCode']!.text,
-        "Phone_No": _controllers['phoneNo']!.text,
-        "Mobile_No": _controllers['mobileNo']!.text,
-        "Email": _controllers['email']!.text,
-        "Website": _controllers['website']!.text,
-        "Principal_Name": _controllers['principalName']!.text,
-        "Principal_Contact": _controllers['principalContact']!.text,
-        "Chairman_Name": _controllers['chairmanName']!.text,
-        "Management_ID": _selectedManagementType?['id'],
-        "Branch_Count": int.tryParse(_controllers['branchCount']!.text) ?? 1,
-        "Parent_Organization": _controllers['parentOrganization']!.text,
-        "Classes_Offered": _controllers['classesOffered']!.text,
-        "Sections_Per_Class": int.tryParse(_controllers['sectionsPerClass']!.text) ?? 0,
-        "Student_Capacity": int.tryParse(_controllers['studentCapacity']!.text) ?? 0,
-        "Current_Enrollment": int.tryParse(_controllers['currentEnrollment']!.text) ?? 0,
-        "Teacher_Strength": int.tryParse(_controllers['teacherStrength']!.text) ?? 0,
-        "IsHostel": _facilitySwitches['isHostel'],
-        "IsTransport": _facilitySwitches['isTransport'],
-        "IsLibrary": _facilitySwitches['isLibrary'],
-        "IsComputer_Lab": _facilitySwitches['isComputerLab'],
-        "IsPlayground": _facilitySwitches['isPlayground'],
-        "IsAuditorium": _facilitySwitches['isAuditorium'],
-        "PAN_Number": _controllers['panNumber']!.text,
-        "GST_Number": _controllers['gstNumber']!.text,
-        "Bank_Account_Details": _controllers['bankAccountDetails']!.text,
-        "Fee_Structure_Ref": _selectedFeeStructure?.id,
-        "Scholarships_Grants": _scholarshipsGrants ? 'Yes' : 'No',
-        "Status": true
-      };
+      try {
+        String? returnedUserCode;
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        final currentUserCode = userProvider.userCode;
+        final currentName = userProvider.userName;
+        print("Current User COde : $currentUserCode");
+        
 
-      if (_logoFile == null && _isEditMode) {
-        schoolMasterData['Logo_Path'] = _existingLogoPath;
-      }
+        // Step 1: Insert User Credentials (only for NEW schools)
+        if (!_isEditMode) {
+          final userGroups = await _userRightsService.getUserGroups();
+          final schoolGroup = userGroups.firstWhere(
+                (group) => group.userGroupName.toLowerCase().contains('school'),
+            orElse: () => throw Exception('School user group not found in system'),
+          );
 
-      DateTime endDate;
-      switch (_selectedSubscription?.planType) {
-        case 'Weekly':
-          endDate = _startDate.add(const Duration(days: 7));
-          break;
-        case 'Monthly':
-          endDate = DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
-          break;
-        case 'Yearly':
-          endDate = DateTime(_startDate.year + 1, _startDate.month, _startDate.day);
-          break;
-        default:
-          endDate = _startDate;
-      }
+          final insertUserResponse = await _userRightsService.insertUser({
+            'UserGroupCode': schoolGroup.userGroupCode,
+            'UserName': _controllers['schoolName']!.text,
+            'UserID': _userIdController.text,
+            'UserPassword': _userPasswordController.text,
+            'IsBlocked': false,
+            'AddUser': currentName  ?? 'Admin',
+            'EditUser': currentName ?? 'Admin',
+          });
 
-      final subscriptionData = {
-        "Subscription_ID": _selectedSubscription?.id,
-        "Purchase_Date": DateFormat('yyyy-MM-dd').format(DateTime.now()),
-        "Start_Date": DateFormat('yyyy-MM-dd').format(_startDate),
-        "End_Date": DateFormat('yyyy-MM-dd').format(endDate),
-        "Payment_Ref_ID": _paymentRefController.text,
-        "Is_Auto_Renewal": _isAutoRenewal,
-        "Subscription_Status": "Active",
-      };
+          if (insertUserResponse['success'] == true &&
+              insertUserResponse['data'] != null &&
+              insertUserResponse['data']['UserCode'] != null) {
+            returnedUserCode = insertUserResponse['data']['UserCode'].toString();
+            print("✅ User created successfully with UserCode: $returnedUserCode");
+          } else {
+            throw Exception('Failed to create user credentials');
+          }
+        }
 
-      if (_isEditMode) {
-        // --- FIX: Corrected the BLoC event call ---
-        context.read<AddEditSchoolBloc>().add(UpdateSchool(
-            schoolId: widget.schoolId!,
+        // Step 2: Prepare School Master Data
+        final schoolMasterData = {
+          "School_Code": _controllers['schoolCode']!.text,
+          "School_Name": _controllers['schoolName']!.text,
+          "School_Short_Name": _controllers['schoolShortName']!.text,
+          "SchoolType_ID": _selectedSchoolType?['id'],
+          "Medium_ID": _selectedMediumInstruction?['id'],
+          "BoardAffliation_ID": _selectedBoardAffiliation?['id'],
+          "Affiliation_No": _controllers['affiliationNo']!.text,
+          "Date_of_Establishment": _controllers['establishmentDate']!.text,
+          "Address_Line1": _controllers['addressLine1']!.text,
+          "Address_Line2": _controllers['addressLine2']!.text,
+          "Country": "India",
+          "State_ID": _selectedState?.id,
+          "District_ID": _selectedDistrict?.id,
+          "City_ID": _selectedCity?.id,
+          "Pin_Code": _controllers['pinCode']!.text,
+          "Phone_No": _controllers['phoneNo']!.text,
+          "Mobile_No": _controllers['mobileNo']!.text,
+          "Email": _controllers['email']!.text,
+          "Website": _controllers['website']!.text,
+          "Principal_Name": _controllers['principalName']!.text,
+          "Principal_Contact": _controllers['principalContact']!.text,
+          "Chairman_Name": _controllers['chairmanName']!.text,
+          "Management_ID": _selectedManagementType?['id'],
+          "Branch_Count": int.tryParse(_controllers['branchCount']!.text) ?? 1,
+          "Parent_Organization": _controllers['parentOrganization']!.text,
+          "Classes_Offered": _controllers['classesOffered']!.text,
+          "Sections_Per_Class": int.tryParse(_controllers['sectionsPerClass']!.text) ?? 0,
+          "Student_Capacity": int.tryParse(_controllers['studentCapacity']!.text) ?? 0,
+          "Current_Enrollment": int.tryParse(_controllers['currentEnrollment']!.text) ?? 0,
+          "Teacher_Strength": int.tryParse(_controllers['teacherStrength']!.text) ?? 0,
+          "IsHostel": _facilitySwitches['isHostel'],
+          "IsTransport": _facilitySwitches['isTransport'],
+          "IsLibrary": _facilitySwitches['isLibrary'],
+          "IsComputer_Lab": _facilitySwitches['isComputerLab'],
+          "IsPlayground": _facilitySwitches['isPlayground'],
+          "IsAuditorium": _facilitySwitches['isAuditorium'],
+          "PAN_Number": _controllers['panNumber']!.text,
+          "GST_Number": _controllers['gstNumber']!.text,
+          "Bank_Account_Details": _controllers['bankAccountDetails']!.text,
+          "Fee_Structure_Ref": _selectedFeeStructure?.id,
+          "Scholarships_Grants": _scholarshipsGrants ? 'Yes' : 'No',
+          "Status": true,
+        };
+
+        if (_logoFile == null && _isEditMode) {
+          schoolMasterData['Logo_Path'] = _existingLogoPath;
+        }
+
+        // Step 3: Calculate subscription end date
+        DateTime endDate;
+        switch (_selectedSubscription?.planType) {
+          case 'Weekly':
+            endDate = _startDate.add(const Duration(days: 7));
+            break;
+          case 'Monthly':
+            endDate = DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
+            break;
+          case 'Yearly':
+            endDate = DateTime(_startDate.year + 1, _startDate.month, _startDate.day);
+            break;
+          default:
+            endDate = _startDate;
+        }
+
+        final subscriptionData = {
+          "Subscription_ID": _selectedSubscription?.id,
+          "Purchase_Date": DateFormat('yyyy-MM-dd').format(DateTime.now()),
+          "Start_Date": DateFormat('yyyy-MM-dd').format(_startDate),
+          "End_Date": DateFormat('yyyy-MM-dd').format(endDate),
+          "Payment_Ref_ID": _paymentRefController.text,
+          "Is_Auto_Renewal": _isAutoRenewal,
+          "Subscription_Status": "Active",
+        };
+
+        // Step 4: Trigger BLoC event
+        if (_isEditMode) {
+          if (_schoolRecNo == null || _schoolRecNo == 0) {
+            throw Exception('Cannot update: Missing RecNo. Please reload the school details.');
+          }
+          print('📝 Updating school - RecNo: $_schoolRecNo, SchoolID: ${widget.schoolId}');
+          context.read<AddEditSchoolBloc>().add(UpdateSchool(
+            recNo: _schoolRecNo!,        // NEW: Pass RecNo
+            schoolId: widget.schoolId!,  // Keep SchoolID
             schoolMasterData: schoolMasterData,
             subscriptionData: subscriptionData,
-            logoFile: _logoFile));
-      } else {
-        context.read<AddEditSchoolBloc>().add(AddSchool(
-          schoolMasterData: schoolMasterData,
-          subscriptionData: subscriptionData,
-          logoFile: _logoFile,
-          createdBy: "Admin",
-        ));
+            logoFile: _logoFile,
+            createdBy: _originalCreatedBy,
+          ));
+        } else {
+          print('➕ Creating new school with UserCode: $returnedUserCode');
+          context.read<AddEditSchoolBloc>().add(AddSchool(
+            schoolMasterData: schoolMasterData,
+            subscriptionData: subscriptionData,
+            logoFile: _logoFile,
+            createdBy: currentUserCode ?? "Admin",
+            schoolId: returnedUserCode,
+            pubCode: currentUserCode,
+          ));
+        }
+      } catch (e) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     }
   }
@@ -424,29 +478,87 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     }
   }
 
-  // --- NEW: Method to show the AddFeeStructureDialog ---
   Future<void> _showAddFeeDialog() async {
     final newFeeId = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AddFeeStructureDialog(apiService: _apiService),
     );
-
     if (newFeeId != null && newFeeId.isNotEmpty) {
-      await _refreshFeeStructures(); // Refresh the list from the API
+      await _refreshFeeStructures();
       try {
-        // Find the newly added fee structure from the refreshed list
         final newFee = _feeStructures.firstWhere((fee) => fee.id == newFeeId);
         setState(() {
-          _selectedFeeStructure = newFee; // Auto-select the new fee
+          _selectedFeeStructure = newFee;
         });
       } catch (e) {
-        // This might happen if the new fee isn't in the list immediately
         print("Could not auto-select the newly created fee structure: $e");
       }
     }
   }
 
+  // NEW: Credentials Section Widget
+  Widget _buildCredentialsSection() {
+    return _buildSection(
+      children: [
+        _buildCard(
+          title: 'School Admin Login Credentials',
+          children: [
+            Text(
+              'Create login credentials for the school administrator account',
+              style: GoogleFonts.inter(
+                color: AppTheme.bodyText,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildTextField(
+              label: 'User ID / Login Username',
+              controller: _userIdController,
+              icon: Iconsax.user,
+              required: !_isEditMode,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _userPasswordController,
+              decoration: _buildInputDecoration('Password', Iconsax.lock),
+              obscureText: true,
+              validator: (value) {
+                if (!_isEditMode && (value == null || value.isEmpty)) {
+                  return 'Please enter password';
+                }
+                if (value != null && value.isNotEmpty && value.length < 6) {
+                  return 'Password must be at least 6 characters';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Iconsax.info_circle, size: 16, color: AppTheme.primaryGreen),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'These credentials will be used by the school admin to access the system',
+                      style: GoogleFonts.inter(fontSize: 12, color: AppTheme.darkText),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -456,7 +568,9 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           setState(() => _isSaving = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(_isEditMode ? 'School updated successfully!' : 'School added successfully! ID: ${state.successResponse['School_ID']}'),
+              content: Text(_isEditMode
+                  ? 'School updated successfully!'
+                  : 'School added successfully! ID: ${state.successResponse['School_ID']}'),
               backgroundColor: AppTheme.primaryGreen,
               behavior: SnackBarBehavior.floating,
             ),
@@ -466,7 +580,9 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           setState(() => _isSaving = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(_isEditMode ? 'Failed to update school: ${state.error}' : 'Failed to add school: ${state.error}'),
+              content: Text(_isEditMode
+                  ? 'Failed to update school: ${state.error}'
+                  : 'Failed to add school: ${state.error}'),
               backgroundColor: Colors.redAccent,
               behavior: SnackBarBehavior.floating,
             ),
@@ -484,11 +600,14 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
             icon: const Icon(Iconsax.arrow_left_2, color: AppTheme.darkText),
             onPressed: () => Navigator.of(context).pop(),
           ),
-          title: Text(_isEditMode ? 'Edit School Details' : 'Register New School',
-              style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkText,
-                  fontSize: 22)),
+          title: Text(
+            _isEditMode ? 'Edit School Details' : 'Register New School',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkText,
+              fontSize: 22,
+            ),
+          ),
           bottom: TabBar(
             controller: _tabController,
             isScrollable: false,
@@ -497,10 +616,11 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
             unselectedLabelColor: AppTheme.bodyText,
             labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold),
             unselectedLabelStyle: GoogleFonts.inter(),
-            tabs: const [
+            tabs: [
               Tab(icon: Icon(Iconsax.buildings), text: 'Basic Info'),
               Tab(icon: Icon(Iconsax.location), text: 'Location'),
               Tab(icon: Icon(Iconsax.book), text: 'Details'),
+              if (!_isEditMode)  Tab(icon: Icon(Iconsax.lock), text: 'Credentials'),
               Tab(icon: Icon(Iconsax.crown), text: 'Subscription'),
             ],
           ),
@@ -516,6 +636,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
               _buildSchoolInformationSection(),
               _buildLocationAndContactSection(),
               _buildAcademicAndFacilitiesSection(),
+              if (!_isEditMode) _buildCredentialsSection(),
               _buildSubscriptionSection(),
             ],
           ),
@@ -537,67 +658,66 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
             blurRadius: 10,
           ),
         ],
-        border: const Border(
-            top: BorderSide(color: AppTheme.borderGrey, width: 0.5)),
+        border: const Border(top: BorderSide(color: AppTheme.borderGrey, width: 0.5)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           AnimatedBuilder(
-              animation: _tabController,
-              builder: (context, child) {
-                return Visibility(
-                  visible: _tabController.index > 0,
-                  child: OutlinedButton(
-                    onPressed: _previousPage,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
-                      foregroundColor: AppTheme.darkText,
-                      side: const BorderSide(color: AppTheme.borderGrey),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text('Back'),
+            animation: _tabController,
+            builder: (context, child) {
+              return Visibility(
+                visible: _tabController.index > 0,
+                child: OutlinedButton(
+                  onPressed: _previousPage,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    foregroundColor: AppTheme.darkText,
+                    side: const BorderSide(color: AppTheme.borderGrey),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                );
-              }),
+                  child: const Text('Back'),
+                ),
+              );
+            },
+          ),
           const Spacer(),
           ElevatedButton.icon(
             onPressed: _isSaving ? null : _nextPage,
             icon: _isSaving
                 ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                    color: Colors.white, strokeWidth: 2.5))
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+            )
                 : AnimatedBuilder(
-                animation: _tabController,
-                builder: (context, child) {
-                  return Icon(
-                      _tabController.index == 3
-                          ? Iconsax.save_2
-                          : Iconsax.arrow_right_3,
-                      size: 20);
-                }),
+              animation: _tabController,
+              builder: (context, child) {
+                return Icon(
+                  _tabController.index == 4 ? Iconsax.save_2 : Iconsax.arrow_right_3, // CHANGED from 3 to 4
+                  size: 20,
+                );
+              },
+            ),
             label: AnimatedBuilder(
-                animation: _tabController,
-                builder: (context, child) {
-                  final isLastTab = _tabController.index == 3;
-                  if (isLastTab) {
-                    return Text(_isEditMode ? 'Update School' : 'Save School');
-                  }
-                  return const Text('Next Step');
-                }),
+              animation: _tabController,
+              builder: (context, child) {
+                // Last tab index changes based on mode
+                final lastTabIndex = _isEditMode ? 3 : 4;
+                final isLastTab = _tabController.index == lastTabIndex;
+
+                if (isLastTab) {
+                  return Text(_isEditMode ? 'Update School' : 'Save School');
+                }
+                return const Text('Next Step');
+              },
+            ),
+
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryGreen,
               foregroundColor: Colors.white,
-              padding:
-              const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 2,
             ),
           ),
@@ -920,7 +1040,6 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
       _buildCard(
         title: 'Fees & Miscellaneous',
         children: [
-          // --- CHANGE: Added a Row to hold the dropdown and the add button ---
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -993,12 +1112,10 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           endDate = _startDate.add(const Duration(days: 7));
           break;
         case 'Monthly':
-          endDate =
-              DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
+          endDate = DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
           break;
         case 'Yearly':
-          endDate =
-              DateTime(_startDate.year + 1, _startDate.month, _startDate.day);
+          endDate = DateTime(_startDate.year + 1, _startDate.month, _startDate.day);
           break;
         default:
           endDate = _startDate;
@@ -1155,7 +1272,6 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     );
   }
 
-  // --- CHANGE: Updated to handle numeric-only input ---
   Widget _buildTextField({
     required String label,
     required TextEditingController controller,
@@ -1172,7 +1288,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           ? TextInputType.number
           : (isEmail ? TextInputType.emailAddress : TextInputType.text),
       inputFormatters: isNumeric
-          ? [FilteringTextInputFormatter.digitsOnly] // Only allows numbers
+          ? [FilteringTextInputFormatter.digitsOnly]
           : [],
       decoration: _buildInputDecoration(label, icon),
       validator: (value) {
@@ -1350,7 +1466,6 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   Widget _buildLogoPicker() {
     final hasNewFile = _logoFile != null;
     final hasExistingImage = _existingLogoPath != null && _existingLogoPath!.isNotEmpty;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1395,9 +1510,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   }
 }
 
-
-// --- Add Fee Structure Dialog ---
-
+// Add Fee Structure Dialog (keeping existing implementation)
 class AddFeeStructureDialog extends StatefulWidget {
   final SchoolApiService apiService;
   const AddFeeStructureDialog({super.key, required this.apiService});
@@ -1409,12 +1522,10 @@ class AddFeeStructureDialog extends StatefulWidget {
 class _AddFeeStructureDialogState extends State<AddFeeStructureDialog> {
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
-
   final _feeNameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _fromClassController = TextEditingController();
   final _toClassController = TextEditingController();
-
   String? _selectedFrequency = 'Yearly';
   final List<Map<String, TextEditingController>> _feeDetails = [];
 
@@ -1463,13 +1574,11 @@ class _AddFeeStructureDialogState extends State<AddFeeStructureDialog> {
   Future<void> _saveFeeStructure() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isSaving = true);
-
       final feeDetailsPayload = _feeDetails.map((detail) => {
         "ClassID": int.tryParse(detail['class']!.text) ?? 0,
         "Amount": double.tryParse(detail['amount']!.text) ?? 0.0,
         "DueDate": detail['dueDate']!.text,
       }).toList();
-
       final payload = {
         "FeeName": _feeNameController.text,
         "Description": _descriptionController.text,
@@ -1479,7 +1588,6 @@ class _AddFeeStructureDialogState extends State<AddFeeStructureDialog> {
         "CreatedBy": "flutter_app",
         "FeeDetails": feeDetailsPayload,
       };
-
       try {
         final newFeeId = await widget.apiService.addFeeStructure(feeData: payload);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -1661,7 +1769,6 @@ class _AddFeeStructureDialogState extends State<AddFeeStructureDialog> {
     );
   }
 
-  // --- CHANGE: Updated to handle numeric-only input ---
   Widget _buildTextField({
     required String label,
     required TextEditingController controller,
@@ -1673,7 +1780,7 @@ class _AddFeeStructureDialogState extends State<AddFeeStructureDialog> {
       controller: controller,
       keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
       inputFormatters: isNumeric
-          ? [FilteringTextInputFormatter.digitsOnly] // Only allows numbers
+          ? [FilteringTextInputFormatter.digitsOnly]
           : [],
       decoration: _buildInputDecoration(label, icon),
       validator: (value) {

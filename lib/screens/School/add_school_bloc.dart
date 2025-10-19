@@ -13,32 +13,37 @@ class AddSchool extends AddEditSchoolEvent {
   final Map<String, dynamic> schoolMasterData;
   final Map<String, dynamic> subscriptionData;
   final XFile? logoFile;
-  final String createdBy; // FIXED: Corrected the duplicate declaration
+  final String createdBy;
+  final String? schoolId; // NEW: UserCode from insertUser
+  final String? pubCode; // NEW: Current logged-in user's UserCode
 
-   AddSchool({
+  AddSchool({
     required this.schoolMasterData,
     required this.subscriptionData,
     this.logoFile,
-    required this.createdBy, // FIXED: Now a single required parameter
+    required this.createdBy,
+    this.schoolId, // NEW
+    this.pubCode, // NEW
   });
 }
 
 class UpdateSchool extends AddEditSchoolEvent {
+  final int recNo;
   final String schoolId;
-  final Map<String, dynamic> schoolMasterData;
-  final Map<String, dynamic> subscriptionData;
+  final Map<String, dynamic> schoolMasterData;    // <-- Added type
+  final Map<String, dynamic> subscriptionData;    // <-- Added type
   final XFile? logoFile;
-  final String? createdBy; // CHANGED: Renamed from modifiedBy to createdBy
+  final String? createdBy;
 
   UpdateSchool({
+    required this.recNo,
     required this.schoolId,
     required this.schoolMasterData,
     required this.subscriptionData,
     this.logoFile,
-    this.createdBy, // CHANGED: This will hold the original creator's value
+    this.createdBy,
   });
 }
-
 
 //--- STATES ---
 @immutable
@@ -58,7 +63,6 @@ class AddEditSchoolFailure extends AddEditSchoolState {
   AddEditSchoolFailure(this.error);
 }
 
-
 //--- BLOC ---
 class AddEditSchoolBloc extends Bloc<AddEditSchoolEvent, AddEditSchoolState> {
   final SchoolApiService schoolApiService;
@@ -76,6 +80,8 @@ class AddEditSchoolBloc extends Bloc<AddEditSchoolEvent, AddEditSchoolState> {
         subscriptionData: event.subscriptionData,
         logoFile: event.logoFile,
         createdBy: event.createdBy,
+        schoolId: event.schoolId, // NEW: Pass UserCode
+        // pubCode: event.pubCode, // NEW: Pass PubCode
       );
       emit(AddEditSchoolSuccess(response));
     } catch (e) {
@@ -83,20 +89,24 @@ class AddEditSchoolBloc extends Bloc<AddEditSchoolEvent, AddEditSchoolState> {
     }
   }
 
-  // UPDATED: This handler now passes the `createdBy` value to the service
   Future<void> _onUpdateSchool(UpdateSchool event, Emitter<AddEditSchoolState> emit) async {
     emit(AddEditSchoolLoading());
     try {
+      print('🔄 BLoC: Updating school - RecNo: ${event.recNo}, SchoolID: ${event.schoolId}');
       final response = await schoolApiService.updateSchool(
-        schoolId: event.schoolId,
+        recNo: event.recNo,          // NEW: Pass RecNo
+        schoolId: event.schoolId,    // Keep SchoolID
         schoolMasterData: event.schoolMasterData,
         subscriptionData: event.subscriptionData,
         logoFile: event.logoFile,
-        createdBy: event.createdBy, // CHANGED: Pass createdBy instead of modifiedBy
+        createdBy: event.createdBy,
       );
       emit(AddEditSchoolSuccess(response));
     } catch (e) {
       emit(AddEditSchoolFailure(e.toString()));
     }
   }
+
+
+
 }

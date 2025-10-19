@@ -10,6 +10,10 @@ import 'dart:ui';
 import 'package:lms_publisher/screens/SubscriptionScreen/subscription_model.dart';
 import 'package:intl/intl.dart';
 import 'package:lms_publisher/screens/SubscriptionScreen/add_edit_plan_dialog.dart';
+import 'package:provider/provider.dart';
+import 'package:lms_publisher/Provider/UserProvider.dart';
+import 'package:lms_publisher/Util/beautiful_loader.dart';
+
 
 class SubscriptionsScreen extends StatelessWidget {
   const SubscriptionsScreen({super.key});
@@ -132,8 +136,19 @@ class _SubscriptionDashboardState extends State<SubscriptionDashboard> {
       future: _dashboardDataFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(64.0),
+              child: BeautifulLoader(
+                type: LoaderType.spinner,
+                message: 'Loading dashboard...',
+                color: AppTheme.primaryGreen,
+                size: 60,
+              ),
+            ),
+          );
         }
+
         if (snapshot.hasError) {
           return Center(child: Text('Error: ${snapshot.error}'));
         }
@@ -341,90 +356,113 @@ class _SubscriptionPlansState extends State<SubscriptionPlans> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Plan>>(
-      future: _plansFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(
-              child: Text("Failed to load plans: ${snapshot.error}"));
-        }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return _StyledContainer(
-            child: Center(
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        // Check if user has add permission
+        final canAdd = userProvider.hasPermission('M003', 'add');
+
+        return FutureBuilder<List<Plan>>(
+          future: _plansFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(64.0),
+                  child: BeautifulLoader(
+                    type: LoaderType.dots,
+                    message: 'Loading subscription plans...',
+                    color: AppTheme.primaryGreen,
+                    size: 50,
+                  ),
+                ),
+              );
+            }
+
+            if (snapshot.hasError) {
+              return Center(
+                  child: Text("Failed to load plans: ${snapshot.error}"));
+            }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return _StyledContainer(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Iconsax.document_text,
+                          size: 64, color: AppTheme.bodyText.withOpacity(0.3)),
+                      const SizedBox(height: 16),
+                      Text(
+                        "No subscription plans found",
+                        style:
+                        GoogleFonts.inter(color: AppTheme.bodyText, fontSize: 16),
+                      ),
+                      const SizedBox(height: 24),
+                      // Only show Add button if user has add permission
+                      if (canAdd)
+                        ElevatedButton.icon(
+                          onPressed: () => _showAddEditDialog(),
+                          icon: const Icon(Iconsax.add, size: 20),
+                          label: const Text('Add New Plan'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryGreen,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 16),
+                            elevation: 0,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            final plans = snapshot.data!;
+            return _StyledContainer(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Iconsax.document_text,
-                      size: 64, color: AppTheme.bodyText.withOpacity(0.3)),
-                  const SizedBox(height: 16),
-                  Text(
-                    "No subscription plans found",
-                    style:
-                    GoogleFonts.inter(color: AppTheme.bodyText, fontSize: 16),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 850;
+                      return isMobile
+                          ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Pricing & Plans",
+                              style: GoogleFonts.poppins(
+                                  fontSize: 20, fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 16),
+                          _buildPlanActions(isMobile: true, canAdd: canAdd),
+                        ],
+                      )
+                          : Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("Pricing & Plans",
+                              style: GoogleFonts.poppins(
+                                  fontSize: 20, fontWeight: FontWeight.w700)),
+                          _buildPlanActions(isMobile: false, canAdd: canAdd),
+                        ],
+                      );
+                    },
                   ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () => _showAddEditDialog(),
-                    icon: const Icon(Iconsax.add, size: 20),
-                    label: const Text('Add New Plan'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryGreen,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 16),
-                      elevation: 0,
-                    ),
-                  ),
+                  const Divider(height: 32),
+                  _buildCardView(plans),
                 ],
               ),
-            ),
-          );
-        }
-
-        final plans = snapshot.data!;
-        return _StyledContainer(
-          child: Column(
-            children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isMobile = constraints.maxWidth < 850;
-                  return isMobile
-                      ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Pricing & Plans",
-                          style: GoogleFonts.poppins(
-                              fontSize: 20, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 16),
-                      _buildPlanActions(isMobile: true),
-                    ],
-                  )
-                      : Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("Pricing & Plans",
-                          style: GoogleFonts.poppins(
-                              fontSize: 20, fontWeight: FontWeight.w700)),
-                      _buildPlanActions(isMobile: false),
-                    ],
-                  );
-                },
-              ),
-              const Divider(height: 32),
-              _buildCardView(plans),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildPlanActions({required bool isMobile}) {
+  Widget _buildPlanActions({required bool isMobile, required bool canAdd}) {
+    // Only show the Add button if user has add permission
+    if (!canAdd) return const SizedBox.shrink();
+
     final button = ElevatedButton.icon(
       onPressed: () => _showAddEditDialog(),
       icon: const Icon(Iconsax.add, size: 20),
@@ -443,46 +481,54 @@ class _SubscriptionPlansState extends State<SubscriptionPlans> {
   }
 
   Widget _buildCardView(List<Plan> plans) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 650;
-        final isTablet = constraints.maxWidth < 1000;
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        // Check if user has edit and delete permissions
+        final canEdit = userProvider.hasPermission('M003', 'edit');
+        final canDelete = userProvider.hasPermission('M003', 'delete');
 
-        if (isMobile) {
-          // Mobile: One card per row
-          return ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 16),
-            itemCount: plans.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
-            itemBuilder: (context, index) => _CompactPlanCard(
-              plan: plans[index],
-              onViewDetails: () => _showDetailsDialog(plans[index]),
-              onEdit: () => _showAddEditDialog(plan: plans[index]),
-              onDelete: () => _showDeleteConfirmationDialog(plans[index]),
-            ),
-          );
-        } else {
-          return GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: isTablet ? 2 : 3,
-              childAspectRatio: 0.75,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-            ),
-            itemCount: plans.length,
-            itemBuilder: (context, index) => _ImprovedPlanCard(
-              plan: plans[index],
-              onViewDetails: () => _showDetailsDialog(plans[index]),
-              onEdit: () => _showAddEditDialog(plan: plans[index]),
-              onDelete: () => _showDeleteConfirmationDialog(plans[index]),
-            ),
-          );
-        }
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 650;
+            final isTablet = constraints.maxWidth < 1000;
+
+            if (isMobile) {
+              // Mobile: One card per row
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 16),
+                itemCount: plans.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 16),
+                itemBuilder: (context, index) => _CompactPlanCard(
+                  plan: plans[index],
+                  onViewDetails: () => _showDetailsDialog(plans[index]),
+                  onEdit: canEdit ? () => _showAddEditDialog(plan: plans[index]) : null,
+                  onDelete: canDelete ? () => _showDeleteConfirmationDialog(plans[index]) : null,
+                ),
+              );
+            } else {
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 16),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: isTablet ? 2 : 3,
+                  childAspectRatio: 0.75,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: plans.length,
+                itemBuilder: (context, index) => _ImprovedPlanCard(
+                  plan: plans[index],
+                  onViewDetails: () => _showDetailsDialog(plans[index]),
+                  onEdit: canEdit ? () => _showAddEditDialog(plan: plans[index]) : null,
+                  onDelete: canDelete ? () => _showDeleteConfirmationDialog(plans[index]) : null,
+                ),
+              );
+            }
+          },
+        );
       },
     );
   }
@@ -755,14 +801,14 @@ class _SwitcherButton extends StatelessWidget {
 class _ImprovedPlanCard extends StatefulWidget {
   final Plan plan;
   final VoidCallback onViewDetails;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const _ImprovedPlanCard({
     required this.plan,
     required this.onViewDetails,
-    required this.onEdit,
-    required this.onDelete,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -837,32 +883,37 @@ class _ImprovedPlanCardState extends State<_ImprovedPlanCard> {
                           ],
                         ),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Iconsax.edit_2, size: 18),
-                            onPressed: widget.onEdit,
-                            tooltip: 'Edit Plan',
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: AppTheme.primaryGreen,
-                              padding: const EdgeInsets.all(8),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Iconsax.trash, size: 18),
-                            onPressed: widget.onDelete,
-                            tooltip: 'Delete Plan',
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.red.shade50,
-                              foregroundColor: Colors.red.shade600,
-                              padding: const EdgeInsets.all(8),
-                            ),
-                          ),
-                        ],
-                      ),
+                      // Only show action buttons if user has permissions
+                      if (widget.onEdit != null || widget.onDelete != null)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (widget.onEdit != null)
+                              IconButton(
+                                icon: const Icon(Iconsax.edit_2, size: 18),
+                                onPressed: widget.onEdit,
+                                tooltip: 'Edit Plan',
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: AppTheme.primaryGreen,
+                                  padding: const EdgeInsets.all(8),
+                                ),
+                              ),
+                            if (widget.onEdit != null && widget.onDelete != null)
+                              const SizedBox(width: 8),
+                            if (widget.onDelete != null)
+                              IconButton(
+                                icon: const Icon(Iconsax.trash, size: 18),
+                                onPressed: widget.onDelete,
+                                tooltip: 'Delete Plan',
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.red.shade50,
+                                  foregroundColor: Colors.red.shade600,
+                                  padding: const EdgeInsets.all(8),
+                                ),
+                              ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -1040,14 +1091,14 @@ class _ImprovedPlanCardState extends State<_ImprovedPlanCard> {
 class _CompactPlanCard extends StatefulWidget {
   final Plan plan;
   final VoidCallback onViewDetails;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const _CompactPlanCard({
     required this.plan,
     required this.onViewDetails,
-    required this.onEdit,
-    required this.onDelete,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -1140,40 +1191,45 @@ class _CompactPlanCardState extends State<_CompactPlanCard> {
                         ],
                       ),
                     ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Iconsax.edit_2, size: 16),
-                          onPressed: widget.onEdit,
-                          tooltip: 'Edit',
-                          constraints: const BoxConstraints(
-                            minWidth: 36,
-                            minHeight: 36,
-                          ),
-                          padding: EdgeInsets.zero,
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: AppTheme.primaryGreen,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        IconButton(
-                          icon: const Icon(Iconsax.trash, size: 16),
-                          onPressed: widget.onDelete,
-                          tooltip: 'Delete',
-                          constraints: const BoxConstraints(
-                            minWidth: 36,
-                            minHeight: 36,
-                          ),
-                          padding: EdgeInsets.zero,
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.red.shade50,
-                            foregroundColor: Colors.red.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
+                    // Only show action buttons if user has permissions
+                    if (widget.onEdit != null || widget.onDelete != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (widget.onEdit != null)
+                            IconButton(
+                              icon: const Icon(Iconsax.edit_2, size: 16),
+                              onPressed: widget.onEdit,
+                              tooltip: 'Edit',
+                              constraints: const BoxConstraints(
+                                minWidth: 36,
+                                minHeight: 36,
+                              ),
+                              padding: EdgeInsets.zero,
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: AppTheme.primaryGreen,
+                              ),
+                            ),
+                          if (widget.onEdit != null && widget.onDelete != null)
+                            const SizedBox(width: 6),
+                          if (widget.onDelete != null)
+                            IconButton(
+                              icon: const Icon(Iconsax.trash, size: 16),
+                              onPressed: widget.onDelete,
+                              tooltip: 'Delete',
+                              constraints: const BoxConstraints(
+                                minWidth: 36,
+                                minHeight: 36,
+                              ),
+                              padding: EdgeInsets.zero,
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.red.shade50,
+                                foregroundColor: Colors.red.shade600,
+                              ),
+                            ),
+                        ],
+                      ),
                   ],
                 ),
                 const SizedBox(height: 12),
