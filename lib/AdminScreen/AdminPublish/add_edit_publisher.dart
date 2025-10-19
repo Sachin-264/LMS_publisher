@@ -14,6 +14,7 @@ import 'package:lms_publisher/Util/custom_snackbar.dart';
 
 class AddEditPublisherDialog extends StatefulWidget {
   final int? publisherRecNo;
+
   const AddEditPublisherDialog({super.key, this.publisherRecNo});
 
   @override
@@ -33,6 +34,11 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
   bool _isLoading = true;
   bool _isSaving = false;
   bool get _isEditMode => widget.publisherRecNo != null;
+
+  // UserID Verification State
+  bool _isVerifyingUserID = false;
+  bool? _userIdVerified;
+  String? _userIdVerificationMessage;
 
   XFile? _selectedLogoFile;
   Uint8List? _selectedLogoBytes;
@@ -62,6 +68,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     'Magazine',
     'Others'
   ];
+
   final List<String> _paymentTerms = [
     'Prepaid',
     'Postpaid',
@@ -69,11 +76,13 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     '60 Days Credit',
     '90 Days Credit'
   ];
+
   final List<String> _distributionTypes = [
     'Direct',
     'Through Distributor',
     'Both'
   ];
+
   final List<String> _areasCovered = ['National', 'International', 'Both'];
 
   final Map<String, TextEditingController> _controllers = {
@@ -86,7 +95,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     'faxNumber': TextEditingController(),
     'addressLine1': TextEditingController(),
     'addressLine2': TextEditingController(),
-    'country': TextEditingController(text: 'India'), // DEFAULT VALUE
+    'country': TextEditingController(text: 'India'),
     'pinZipCode': TextEditingController(),
     'website': TextEditingController(),
     'gstNumber': TextEditingController(),
@@ -108,6 +117,11 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     _fadeAnimation =
         CurvedAnimation(parent: _animationController, curve: Curves.easeOut);
     _loadData();
+
+    // Add listeners to update completion status
+    _controllers.forEach((key, controller) {
+      controller.addListener(_updateCompletionStatus);
+    });
   }
 
   @override
@@ -119,12 +133,53 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     super.dispose();
   }
 
+  // Calculate section completion status
+  void _updateCompletionStatus() {
+    setState(() {});
+  }
+
+  bool _isBasicInfoComplete() {
+    return _controllers['publisherName']!.text.trim().isNotEmpty &&
+        _selectedPublisherType != null &&
+        _selectedYear != null;
+  }
+
+  bool _isContactInfoComplete() {
+    return _controllers['contactPersonName']!.text.trim().isNotEmpty &&
+        _controllers['emailID']!.text.trim().isNotEmpty &&
+        _controllers['phoneNumber']!.text.trim().isNotEmpty;
+  }
+
+  bool _isAddressComplete() {
+    return _controllers['addressLine1']!.text.trim().isNotEmpty &&
+        _selectedStateID != null &&
+        _selectedDistrictID != null &&
+        _selectedCityID != null;
+  }
+
+  bool _isCredentialsComplete() {
+    if (_isEditMode) return true;
+    return _controllers['userID']!.text.trim().isNotEmpty &&
+        _controllers['userPassword']!.text.trim().isNotEmpty &&
+        _userIdVerified == false; // UserID must be verified as NOT existing
+  }
+
+  double _calculateOverallProgress() {
+    int completedSections = 0;
+    int totalSections = _isEditMode ? 3 : 4;
+
+    if (_isBasicInfoComplete()) completedSections++;
+    if (_isContactInfoComplete()) completedSections++;
+    if (_isAddressComplete()) completedSections++;
+    if (!_isEditMode && _isCredentialsComplete()) completedSections++;
+
+    return completedSections / totalSections;
+  }
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      // Load location data first
       await _loadLocationData();
-
       if (_isEditMode) {
         final details =
         await _apiService.getPublisherDetails(widget.publisherRecNo!);
@@ -143,10 +198,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
   Future<void> _loadLocationData() async {
     setState(() => _loadingLocations = true);
     try {
-      // Load states first
       final statesData = await _apiService.getStates();
-
-      // Convert to proper format with correct field names
       final statesList = (statesData as List).map((state) {
         return {
           'StateID': int.parse(state['State_ID'].toString()),
@@ -158,7 +210,6 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
         _states = statesList;
         _loadingLocations = false;
       });
-
       print('[AddEditPublisher] Loaded ${_states.length} states');
     } catch (e) {
       setState(() => _loadingLocations = false);
@@ -172,8 +223,6 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
   Future<void> _loadDistrictsForState(int stateID) async {
     try {
       final districtsData = await _apiService.getDistricts(stateID);
-
-      // Convert to proper format
       final districtsList = (districtsData as List).map((district) {
         return {
           'DistrictID': int.parse(district['District_ID'].toString()),
@@ -185,8 +234,8 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
       setState(() {
         _districts = districtsList;
       });
-
-      print('[AddEditPublisher] Loaded ${_districts.length} districts for state $stateID');
+      print(
+          '[AddEditPublisher] Loaded ${_districts.length} districts for state $stateID');
     } catch (e) {
       if (mounted) {
         CustomSnackbar.showError(context, 'Failed to load districts');
@@ -198,8 +247,6 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
   Future<void> _loadCitiesForDistrict(int districtID) async {
     try {
       final citiesData = await _apiService.getCities(districtID);
-
-      // Convert to proper format
       final citiesList = (citiesData as List).map((city) {
         return {
           'CityID': int.parse(city['City_ID'].toString()),
@@ -211,8 +258,8 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
       setState(() {
         _cities = citiesList;
       });
-
-      print('[AddEditPublisher] Loaded ${_cities.length} cities for district $districtID');
+      print(
+          '[AddEditPublisher] Loaded ${_cities.length} cities for district $districtID');
     } catch (e) {
       if (mounted) {
         CustomSnackbar.showError(context, 'Failed to load cities');
@@ -221,6 +268,44 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     }
   }
 
+  // Verify UserID existence
+  Future<void> _verifyUserID() async {
+    final userId = _controllers['userID']!.text.trim();
+
+    if (userId.isEmpty) {
+      CustomSnackbar.showWarning(context, 'Please enter a UserID first');
+      return;
+    }
+
+    setState(() {
+      _isVerifyingUserID = true;
+      _userIdVerified = null;
+      _userIdVerificationMessage = null;
+    });
+
+    try {
+      final exists = await _userRightsService.checkUserIdExists(userId);
+
+      setState(() {
+        _userIdVerified = exists;
+        if (exists) {
+          _userIdVerificationMessage = 'UserID already exists! Please choose another.';
+          CustomSnackbar.showError(context, _userIdVerificationMessage!);
+        } else {
+          _userIdVerificationMessage = 'UserID is available!';
+          CustomSnackbar.showSuccess(context, _userIdVerificationMessage!);
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _userIdVerified = null;
+        _userIdVerificationMessage = 'Error checking UserID: $e';
+      });
+      CustomSnackbar.showError(context, _userIdVerificationMessage!);
+    } finally {
+      setState(() => _isVerifyingUserID = false);
+    }
+  }
 
   void _populateForm(PublisherDetail details) {
     _controllers['publisherName']!.text = details.publisherName;
@@ -248,16 +333,13 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     _controllers['numberOfTitles']!.text =
         details.numberOfTitles?.toString() ?? '';
     _controllers['userID']!.text = details.userID ?? '';
-
     _selectedStateID = details.stateID;
     _selectedDistrictID = details.districtID;
     _selectedCityID = details.cityID;
     _selectedDistributionType = details.distributionType;
     _selectedAreasCovered = details.areasCovered;
-
     _existingLogoFileName = details.logoFileName;
 
-    // Load dependent dropdowns
     if (_selectedStateID != null) {
       _loadDistrictsForState(_selectedStateID!);
     }
@@ -287,11 +369,23 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
   Future<void> _saveForm() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Check UserID verification for new publishers
+    if (!_isEditMode) {
+      if (_userIdVerified == null) {
+        CustomSnackbar.showError(context, 'Please verify the UserID first');
+        return;
+      }
+      if (_userIdVerified == true) {
+        CustomSnackbar.showError(context, 'UserID already exists! Choose another UserID');
+        return;
+      }
+    }
+
     setState(() => _isSaving = true);
+
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final currentUserCode = userProvider.userCode;
-
       if (currentUserCode == null) throw Exception('User not logged in');
 
       String? uploadedFileName = _existingLogoFileName;
@@ -464,11 +558,12 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                           'Basic Information',
                           Iconsax.info_circle,
                           Colors.blue,
+                          _isBasicInfoComplete(),
                           [
                             _buildModernTextField('Publisher Name',
                                 'publisherName', Iconsax.building,
                                 isRequired: true),
-                            _buildModernDropdown<String>(
+                            _buildModernDropdown(
                               label: 'Publisher Type',
                               icon: Iconsax.category,
                               value: _selectedPublisherType,
@@ -486,6 +581,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                           'Contact Information',
                           Iconsax.call,
                           Colors.green,
+                          _isContactInfoComplete(),
                           [
                             _buildModernTextField('Contact Person',
                                 'contactPersonName', Iconsax.user),
@@ -508,6 +604,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                           'Address',
                           Iconsax.location,
                           Colors.purple,
+                          _isAddressComplete(),
                           [
                             _buildModernTextField('Address Line 1',
                                 'addressLine1', Iconsax.location),
@@ -516,15 +613,20 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                             _buildModernDropdown<Map<String, dynamic>>(
                               label: 'State',
                               icon: Iconsax.map,
-                              value: _states.isNotEmpty && _selectedStateID != null
+                              value: _states.isNotEmpty &&
+                                  _selectedStateID != null
                                   ? _states.firstWhere(
-                                      (s) => s['StateID'] == _selectedStateID,
-                                  orElse: () => <String, dynamic>{})
+                                      (s) =>
+                                  s['StateID'] == _selectedStateID,
+                                  orElse: () => {})
                                   : null,
-                              items: _states.where((s) => s.isNotEmpty).toList(), // FILTER EMPTY MAPS
-                              itemLabel: (state) => state['StateName'] ?? 'Unknown',
+                              items: _states
+                                  .where((s) => s.isNotEmpty)
+                                  .toList(),
+                              itemLabel: (state) =>
+                              state['StateName'] ?? 'Unknown',
                               onChanged: (value) {
-                                if (value != null && value.isNotEmpty) { // CHECK IF NOT EMPTY
+                                if (value != null && value.isNotEmpty) {
                                   setState(() {
                                     _selectedStateID = value['StateID'];
                                     _selectedDistrictID = null;
@@ -533,12 +635,12 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                                     _cities = [];
                                   });
                                   if (_selectedStateID != null) {
-                                    _loadDistrictsForState(_selectedStateID!);
+                                    _loadDistrictsForState(
+                                        _selectedStateID!);
                                   }
                                 }
                               },
                             ),
-
                             _buildModernDropdown<Map<String, dynamic>>(
                               label: 'District',
                               icon: Iconsax.location,
@@ -568,41 +670,44 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                             ),
                             _buildModernDropdown<Map<String, dynamic>>(
                               label: 'City',
-                              icon: Iconsax.location,
+                              icon: Iconsax.building_4,
                               value: _cities.isNotEmpty &&
                                   _selectedCityID != null
                                   ? _cities.firstWhere(
-                                      (c) =>
-                                  c['CityID'] == _selectedCityID,
+                                      (c) => c['CityID'] == _selectedCityID,
                                   orElse: () => {})
                                   : null,
                               items: _cities,
                               itemLabel: (city) =>
                               city['CityName'] ?? '',
-                              onChanged: (value) => setState(
-                                      () => _selectedCityID = value?['CityID']),
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedCityID = value?['CityID'];
+                                });
+                              },
                             ),
                             _buildModernTextField(
                                 'Country', 'country', Iconsax.global),
-                            _buildModernTextField(
-                                'PIN/Zip', 'pinZipCode', Iconsax.map),
+                            _buildModernTextField('PIN/ZIP Code',
+                                'pinZipCode', Iconsax.code),
                           ],
                         ),
                         const SizedBox(height: 24),
                         _buildSection(
-                          'Business Information',
-                          Iconsax.dollar_circle,
+                          'Business Details',
+                          Iconsax.document,
                           Colors.orange,
+                          false,
                           [
                             _buildModernTextField(
-                                'Website', 'website', Iconsax.global),
-                            _buildModernTextField('GST Number',
-                                'gstNumber', Iconsax.document_text),
+                                'Website', 'website', Iconsax.link),
+                            _buildModernTextField(
+                                'GST Number', 'gstNumber', Iconsax.card),
                             _buildModernTextField(
                                 'PAN Number', 'panNumber', Iconsax.card),
-                            _buildModernTextField('Bank Details',
+                            _buildModernTextField('Bank Account Details',
                                 'bankAccountDetails', Iconsax.bank),
-                            _buildModernDropdown<String>(
+                            _buildModernDropdown(
                               label: 'Payment Terms',
                               icon: Iconsax.money,
                               value: _selectedPaymentTerms,
@@ -611,16 +716,16 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                               onChanged: (value) => setState(
                                       () => _selectedPaymentTerms = value),
                             ),
-                            _buildModernDropdown<String>(
+                            _buildModernDropdown(
                               label: 'Distribution Type',
-                              icon: Iconsax.box,
+                              icon: Iconsax.truck_fast,
                               value: _selectedDistributionType,
                               items: _distributionTypes,
                               itemLabel: (type) => type,
                               onChanged: (value) => setState(() =>
                               _selectedDistributionType = value),
                             ),
-                            _buildModernDropdown<String>(
+                            _buildModernDropdown(
                               label: 'Areas Covered',
                               icon: Iconsax.global,
                               value: _selectedAreasCovered,
@@ -629,18 +734,8 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                               onChanged: (value) => setState(
                                       () => _selectedAreasCovered = value),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        _buildSection(
-                          'Publishing Details',
-                          Iconsax.book,
-                          Colors.teal,
-                          [
-                            _buildModernTextField(
-                                'Languages',
-                                'languagesPublished',
-                                Iconsax.language_square),
+                            _buildModernTextField('Languages Published',
+                                'languagesPublished', Iconsax.translate),
                             _buildModernTextField('Number of Titles',
                                 'numberOfTitles', Iconsax.book_1),
                           ],
@@ -651,7 +746,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                 ),
               ),
             ),
-            _buildModernFooter(),
+            _buildActionButtons(),
           ],
         ),
       ),
@@ -659,222 +754,16 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
   }
 
   Widget _buildModernHeader() {
+    final progress = _calculateOverallProgress();
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: AppTheme.primaryGradient,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(28),
           topRight: Radius.circular(28),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primaryGreen.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.25),
-              borderRadius: BorderRadius.circular(12),
-              border:
-              Border.all(color: Colors.white.withOpacity(0.3), width: 2),
-            ),
-            child: Icon(_isEditMode ? Iconsax.edit : Iconsax.add,
-                color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _isEditMode ? 'Edit Publisher' : 'Add New Publisher',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                Text(
-                  _isEditMode
-                      ? 'Update publisher information'
-                      : 'Create a new publisher profile',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: Colors.white.withOpacity(0.95),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.close_rounded,
-                  color: Colors.white, size: 24),
-              onPressed: () => Navigator.pop(context),
-              padding: const EdgeInsets.all(8),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModernFooter() {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1.5)),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          OutlinedButton(
-            onPressed: () => Navigator.pop(context),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              side: BorderSide(color: Colors.grey[300]!),
-            ),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.darkText,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            onPressed: _isSaving ? null : _saveForm,
-            icon: Icon(
-                _isSaving
-                    ? Icons.hourglass_empty
-                    : (_isEditMode ? Iconsax.tick_circle : Iconsax.add_circle),
-                size: 20),
-            label: Text(
-              _isSaving
-                  ? 'Saving...'
-                  : (_isEditMode ? 'Update Publisher' : 'Create Publisher'),
-              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryGreen,
-              foregroundColor: Colors.white,
-              padding:
-              const EdgeInsets.symmetric(horizontal: 36, vertical: 16),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLogoSection() {
-    return Center(
-      child: GestureDetector(
-        onTap: _pickLogo,
-        child: Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.white, Colors.grey[100]!],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-                color: AppTheme.primaryGreen.withOpacity(0.4), width: 3),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primaryGreen.withOpacity(0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: _selectedLogoBytes != null
-              ? ClipRRect(
-            borderRadius: BorderRadius.circular(17),
-            child: Image.memory(_selectedLogoBytes!, fit: BoxFit.cover),
-          )
-              : _existingLogoFileName != null
-              ? ClipRRect(
-            borderRadius: BorderRadius.circular(17),
-            child: Image.network(
-              _apiService.getLogoUrl(_existingLogoFileName!),
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Iconsax.gallery_add,
-                      size: 40, color: AppTheme.primaryGreen),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Upload Logo',
-                    style: GoogleFonts.inter(
-                        fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-          )
-              : Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Iconsax.gallery_add,
-                  size: 40, color: AppTheme.primaryGreen),
-              const SizedBox(height: 8),
-              Text(
-                'Upload Logo',
-                style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCredentialsSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryGreen.withOpacity(0.08),
-            AppTheme.accentGreen.withOpacity(0.08),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: AppTheme.primaryGreen.withOpacity(0.3), width: 2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -882,43 +771,258 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  gradient: AppTheme.primaryGradient,
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child:
-                const Icon(Iconsax.shield_tick, size: 20, color: Colors.white),
+                child: Icon(
+                  _isEditMode ? Iconsax.edit : Iconsax.add_circle,
+                  color: Colors.white,
+                  size: 28,
+                ),
               ),
-              const SizedBox(width: 12),
-              Text(
-                'Login Credentials',
-                style: GoogleFonts.poppins(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.primaryGreen,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isEditMode ? 'Edit Publisher' : 'Add New Publisher',
+                      style: GoogleFonts.poppins(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _isEditMode
+                          ? 'Update publisher information'
+                          : 'Fill in the details below',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, color: Colors.white),
+                iconSize: 28,
               ),
             ],
           ),
           const SizedBox(height: 16),
-          _buildModernTextField('User ID', 'userID', Iconsax.user,
-              isRequired: true),
-          _buildModernTextField('Password', 'userPassword', Iconsax.key,
-              isPassword: true, isRequired: true),
+          // Progress Bar
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Completion Progress',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.9),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    '${(progress * 100).toInt()}%',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8,
+                  backgroundColor: Colors.white.withOpacity(0.3),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSection(
-      String title, IconData icon, Color color, List<Widget> children) {
+  Widget _buildLogoSection() {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.2)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Publisher Logo',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.darkText,
+            ),
+          ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: _pickLogo,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.primaryGreen, width: 2),
+              ),
+              child: _selectedLogoBytes != null
+                  ? ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.memory(_selectedLogoBytes!, fit: BoxFit.cover),
+              )
+                  : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Iconsax.gallery_add,
+                      size: 48, color: AppTheme.primaryGreen),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tap to upload',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCredentialsSection() {
+    return _buildSection(
+      'Login Credentials',
+      Iconsax.key,
+      Colors.red,
+      _isCredentialsComplete(),
+      [
+        Row(
+          children: [
+            Expanded(
+              child: _buildModernTextField(
+                'UserID',
+                'userID',
+                Iconsax.user,
+                isRequired: true,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              height: 56,
+              child: ElevatedButton.icon(
+                onPressed: _isVerifyingUserID ? null : _verifyUserID,
+                icon: _isVerifyingUserID
+                    ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+                    : Icon(
+                  _userIdVerified == null
+                      ? Iconsax.tick_circle
+                      : _userIdVerified!
+                      ? Iconsax.close_circle
+                      : Iconsax.tick_circle,
+                  size: 20,
+                ),
+                label: Text(_isVerifyingUserID ? 'Checking...' : 'Verify'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _userIdVerified == null
+                      ? AppTheme.primaryGreen
+                      : _userIdVerified!
+                      ? Colors.red
+                      : Colors.green,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_userIdVerificationMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, left: 4),
+            child: Row(
+              children: [
+                Icon(
+                  _userIdVerified == true
+                      ? Icons.error_outline
+                      : Icons.check_circle_outline,
+                  size: 16,
+                  color: _userIdVerified == true ? Colors.red : Colors.green,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _userIdVerificationMessage!,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: _userIdVerified == true ? Colors.red : Colors.green,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        _buildModernTextField(
+          'Password',
+          'userPassword',
+          Iconsax.lock,
+          isPassword: true,
+          isRequired: true,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSection(
+      String title,
+      IconData icon,
+      Color color,
+      bool isComplete,
+      List<Widget> children,
+      ) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isComplete ? Colors.green.withOpacity(0.5) : color.withOpacity(0.2),
+          width: isComplete ? 2 : 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.08),
@@ -935,20 +1039,51 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
+                  color: isComplete
+                      ? Colors.green.withOpacity(0.15)
+                      : color.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, size: 20, color: color),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.darkText,
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: isComplete ? Colors.green : color,
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+              ),
+              if (isComplete)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, size: 16, color: Colors.green),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Complete',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -1047,8 +1182,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
         }
             : null,
         dropdownColor: Colors.white,
-        icon:
-        Icon(Iconsax.arrow_down_1, size: 20, color: AppTheme.primaryGreen),
+        icon: Icon(Iconsax.arrow_down_1, size: 20, color: AppTheme.primaryGreen),
         isExpanded: true,
       ),
     );
@@ -1108,11 +1242,89 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
             _selectedYear?.toString() ?? 'Select Year',
             style: GoogleFonts.inter(
               fontSize: 14,
-              color:
-              _selectedYear != null ? Colors.black87 : Colors.grey[600],
+              color: _selectedYear != null ? Colors.black87 : Colors.grey[600],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => Navigator.pop(context),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                side: BorderSide(color: AppTheme.primaryGreen),
+              ),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primaryGreen,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 2,
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _saveForm,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                backgroundColor: AppTheme.primaryGreen,
+                disabledBackgroundColor: Colors.grey[300],
+              ),
+              child: _isSaving
+                  ? const ButtonLoader()
+                  : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _isEditMode ? Iconsax.tick_circle : Iconsax.add_circle,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isEditMode ? 'Update Publisher' : 'Create Publisher',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

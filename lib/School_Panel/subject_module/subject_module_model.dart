@@ -13,6 +13,21 @@ int _parseInt(dynamic value, {int defaultValue = 0}) {
 }
 
 // ============================================================================
+// NEW HELPER FUNCTION FOR SAFE STRING PARSING
+// This prevents int/0 from being assigned to String? fields.
+// ============================================================================
+String? _parseString(dynamic value) {
+  if (value == null) return null;
+  String strValue = value.toString();
+  // Treat "0", "null" (case-insensitive), or empty string as null
+  if (strValue.toLowerCase() == 'null' || strValue == '0' || strValue.isEmpty) {
+    return null;
+  }
+  return strValue;
+}
+
+
+// ============================================================================
 // AVAILABLE CLASS MODEL (From Publisher)
 // ============================================================================
 class AvailableClassModel {
@@ -203,19 +218,20 @@ class AvailableChapterModel {
       classDescription: json['ClassDescription']?.toString() ?? '',
       classDisplayOrder: _parseInt(json['ClassDisplayOrder']),
       materialRecNo: _parseInt(json['Material_RecNo']),
-      materialID: json['Material_ID'],
-      videoLink: json['Video_Link'],
-      worksheetPath: json['Worksheet_Path'],
-      extraQuestionsPath: json['Extra_Questions_Path'],
-      solvedQuestionsPath: json['Solved_Questions_Path'],
-      revisionNotesPath: json['Revision_Notes_Path'],
-      lessonPlansPath: json['Lesson_Plans_Path'],
-      teachingAidsPath: json['Teaching_Aids_Path'],
-      assessmentToolsPath: json['Assessment_Tools_Path'],
-      homeworkToolsPath: json['Homework_Tools_Path'],
-      practiceZonePath: json['Practice_Zone_Path'],
-      learningPathPath: json['Learning_Path_Path'],
-      uploadedOn: json['Uploaded_On'],
+      // FIX: Use _parseString for all String? fields that might be receiving int
+      materialID: _parseString(json['Material_ID']),
+      videoLink: _parseString(json['Video_Link']),
+      worksheetPath: _parseString(json['Worksheet_Path']),
+      extraQuestionsPath: _parseString(json['Extra_Questions_Path']),
+      solvedQuestionsPath: _parseString(json['Solved_Questions_Path']),
+      revisionNotesPath: _parseString(json['Revision_Notes_Path']),
+      lessonPlansPath: _parseString(json['Lesson_Plans_Path']),
+      teachingAidsPath: _parseString(json['Teaching_Aids_Path']),
+      assessmentToolsPath: _parseString(json['Assessment_Tools_Path']),
+      homeworkToolsPath: _parseString(json['Homework_Tools_Path']),
+      practiceZonePath: _parseString(json['Practice_Zone_Path']),
+      learningPathPath: _parseString(json['Learning_Path_Path']),
+      uploadedOn: _parseString(json['Uploaded_On']),
       hasMaterial: _parseInt(json['HasMaterial']),
       isAddedBySchool: _parseInt(json['IsAddedBySchool']),
     );
@@ -566,9 +582,10 @@ class SchoolChapterModel {
       firstAddedDate: json['FirstAddedDate'],
       lastModifiedDate: json['LastModifiedDate'],
       materialRecNo: _parseInt(json['Material_RecNo']),
-      videoLink: json['Video_Link'],
-      worksheetPath: json['Worksheet_Path'],
-      revisionNotesPath: json['Revision_Notes_Path'],
+      // FIX: Use _parseString for all String? fields that might be receiving int
+      videoLink: _parseString(json['Video_Link']),
+      worksheetPath: _parseString(json['Worksheet_Path']),
+      revisionNotesPath: _parseString(json['Revision_Notes_Path']),
       hasMaterial: _parseInt(json['HasMaterial']),
       allotments: allotmentsList,
     );

@@ -15,7 +15,12 @@ import 'school_model.dart';
 import 'package:lms_publisher/screens/School/add_school_bloc.dart';
 import 'package:lms_publisher/service/school_service.dart';
 import 'package:lms_publisher/service/user_right_service.dart';
+import 'package:lms_publisher/Util/custom_snackbar.dart';
+import 'package:lms_publisher/Util/beautiful_loader.dart';
 
+// Total number of tabs
+const int kTotalTabs = 4; // Edit mode tabs
+const int kTotalTabsAdd = 5; // Add mode tabs (includes credentials)
 
 class AddSchoolScreen extends StatefulWidget {
   final String? schoolId;
@@ -35,18 +40,30 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   bool get _isEditMode => widget.schoolId != null;
   final String _logoBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
   String? _originalCreatedBy;
-  int? _schoolRecNo;  // NEW: Store RecNo for updates
+  int? _schoolRecNo;
 
+  // NEW: Tab completion tracking
+  final Map<int, bool> _tabsCompleted = {
+    0: false,
+    1: false,
+    2: false,
+    3: false,
+    4: false,
+  };
+
+  // NEW: UserID verification state
+  bool _isUserIdVerified = false;
+  bool _isVerifyingUserId = false;
 
   // --- Data Lists & Models ---
   List<SubscriptionPlan> _subscriptionPlans = [];
   List<StateModel> _states = [];
   List<DistrictModel> _districts = [];
   List<CityModel> _cities = [];
-  List<Map<String, String>> _schoolTypes = [];
-  List<Map<String, String>> _boardAffiliations = [];
-  List<Map<String, String>> _mediumInstructions = [];
-  List<Map<String, String>> _managementTypes = [];
+  List<Map<String, dynamic>> _schoolTypes = [];
+  List<Map<String, dynamic>> _boardAffiliations = [];
+  List<Map<String, dynamic>> _mediumInstructions = [];
+  List<Map<String, dynamic>> _managementTypes = [];
   List<FeeStructure> _feeStructures = [];
 
   // --- Loading State Flags ---
@@ -61,10 +78,10 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   StateModel? _selectedState;
   DistrictModel? _selectedDistrict;
   CityModel? _selectedCity;
-  Map<String, String>? _selectedSchoolType;
-  Map<String, String>? _selectedBoardAffiliation;
-  Map<String, String>? _selectedMediumInstruction;
-  Map<String, String>? _selectedManagementType;
+  Map<String, dynamic>? _selectedSchoolType;
+  Map<String, dynamic>? _selectedBoardAffiliation;
+  Map<String, dynamic>? _selectedMediumInstruction;
+  Map<String, dynamic>? _selectedManagementType;
   FeeStructure? _selectedFeeStructure;
   XFile? _logoFile;
   String? _existingLogoPath;
@@ -74,8 +91,6 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   bool _scholarshipsGrants = false;
   bool _isAutoRenewal = true;
   final TextEditingController _paymentRefController = TextEditingController();
-
-  // NEW: Credential Controllers
   final TextEditingController _userIdController = TextEditingController();
   final TextEditingController _userPasswordController = TextEditingController();
 
@@ -119,8 +134,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   @override
   void initState() {
     super.initState();
-    // Dynamic tab count: 5 for ADD mode, 4 for EDIT mode
     _tabController = TabController(length: _isEditMode ? 4 : 5, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _controllers['establishmentDate']!.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
     _fetchAllInitialData().then((_) {
       if (_isEditMode) {
@@ -134,12 +149,136 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _controllers.forEach((_, controller) => controller.dispose());
     _paymentRefController.dispose();
-    _userIdController.dispose(); // NEW
-    _userPasswordController.dispose(); // NEW
+    _userIdController.dispose();
+    _userPasswordController.dispose();
     super.dispose();
+  }
+
+  // NEW: Tab change listener to validate completion
+  void _onTabChanged() {
+    _validateCurrentTab();
+  }
+
+  // NEW: Validate current tab completion
+  void _validateCurrentTab() {
+    bool isCompleted = false;
+    final currentIndex = _tabController.index;
+
+    switch (currentIndex) {
+      case 0: // Basic Info
+        isCompleted = _controllers['schoolName']!.text.isNotEmpty &&
+            _controllers['schoolCode']!.text.isNotEmpty &&
+            _selectedSchoolType != null &&
+            _selectedBoardAffiliation != null;
+        break;
+      case 1: // Location
+        isCompleted = _controllers['addressLine1']!.text.isNotEmpty &&
+            _selectedState != null &&
+            _selectedDistrict != null &&
+            _selectedCity != null &&
+            _controllers['email']!.text.isNotEmpty &&
+            _controllers['mobileNo']!.text.isNotEmpty;
+        break;
+      case 2: // Details
+        isCompleted = _controllers['classesOffered']!.text.isNotEmpty &&
+            _selectedFeeStructure != null;
+        break;
+      case 3: // Credentials (only in add mode)
+        if (!_isEditMode) {
+          isCompleted = _userIdController.text.isNotEmpty &&
+              _userPasswordController.text.isNotEmpty &&
+              _isUserIdVerified;
+        }
+        break;
+      case 4: // Subscription
+        isCompleted = _selectedSubscription != null &&
+            _paymentRefController.text.isNotEmpty;
+        break;
+    }
+
+    setState(() {
+      _tabsCompleted[currentIndex] = isCompleted;
+    });
+  }
+
+  // NEW: Verify UserID
+  Future<void> _verifyUserId() async {
+    if (_userIdController.text.isEmpty) {
+      CustomSnackbar.showError(
+        context,
+           'Please enter a User ID first',
+      );
+      return;
+    }
+
+    setState(() => _isVerifyingUserId = true);
+
+    try {
+      final exists = await _userRightsService.checkUserIdExists(_userIdController.text);
+
+      setState(() {
+        _isVerifyingUserId = false;
+        _isUserIdVerified = !exists;
+      });
+
+      if (exists) {
+        CustomSnackbar.showError(
+          context,
+             'User ID already exists. Please choose a different one.',
+        );
+      } else {
+        CustomSnackbar.showSuccess(
+          context,
+             'User ID is available!',
+        );
+      }
+      _validateCurrentTab();
+    } catch (e) {
+      setState(() => _isVerifyingUserId = false);
+      CustomSnackbar.showError(
+        context,
+           'Error verifying User ID: $e',
+      );
+    }
+  }
+
+  // NEW: Progress indicator widget
+  Widget buildProgressIndicator() {
+    final completedCount = _tabsCompleted.values.where((completed) => completed).length;
+    final totalTabs = _isEditMode ? kTotalTabs : kTotalTabsAdd;
+    final progress = completedCount / totalTabs;
+    final percentage = (progress * 100).toInt();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 100,
+          height: 8,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: AppTheme.lightGrey,
+              valueColor: const AlwaysStoppedAnimation(AppTheme.primaryGreen),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$percentage%',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.primaryGreen,
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _fetchAllInitialData() async {
@@ -158,18 +297,16 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
         setState(() {
           _subscriptionPlans = results[0] as List<SubscriptionPlan>;
           _states = results[1] as List<StateModel>;
-          _schoolTypes = results[2] as List<Map<String, String>>;
-          _boardAffiliations = results[3] as List<Map<String, String>>;
-          _mediumInstructions = results[4] as List<Map<String, String>>;
-          _managementTypes = results[5] as List<Map<String, String>>;
+          _schoolTypes = results[2] as List<Map<String, dynamic>>;
+          _boardAffiliations = results[3] as List<Map<String, dynamic>>;
+          _mediumInstructions = results[4] as List<Map<String, dynamic>>;
+          _managementTypes = results[5] as List<Map<String, dynamic>>;
           _feeStructures = results[6] as List<FeeStructure>;
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load initial data: $e'), backgroundColor: Colors.red),
-        );
+        CustomSnackbar.showError(context,    'Failed to load initial data: $e');
       }
     }
   }
@@ -179,8 +316,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
       final school = await _apiService.fetchSchoolDetails(schoolId: widget.schoolId!);
       if (mounted) {
         _originalCreatedBy = school.createdBy;
-        _schoolRecNo = int.tryParse(school.recNo ?? '0');  // NEW: Store RecNo
-        print('💾 Stored RecNo: $_schoolRecNo for School ID: ${widget.schoolId}');
+        _schoolRecNo = int.tryParse(school.recNo ?? '0');
+
         _controllers['schoolName']!.text = school.name;
         _controllers['schoolCode']!.text = school.code ?? '';
         _controllers['schoolShortName']!.text = school.shortName ?? '';
@@ -220,6 +357,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
         try { _selectedSchoolType = _schoolTypes.firstWhere((st) => st['id'] == school.schoolType); } catch (e) { _selectedSchoolType = null; }
         try { _selectedMediumInstruction = _mediumInstructions.firstWhere((m) => m['id'] == school.medium); } catch (e) { _selectedMediumInstruction = null; }
         try { _selectedManagementType = _managementTypes.firstWhere((m) => m['id'] == school.managementType); } catch (e) { _selectedManagementType = null; }
+
         if (school.feeStructureRef != null) {
           try { _selectedFeeStructure = _feeStructures.firstWhere((fs) => fs.id == school.feeStructureRef); } catch (e) { _selectedFeeStructure = null; }
         }
@@ -249,9 +387,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load school details: $e'), backgroundColor: Colors.red),
-        );
+        CustomSnackbar.showError(context,    'Failed to load school details: $e');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -309,21 +445,30 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     if (image != null) setState(() => _logoFile = image);
   }
 
-  // NEW: UPDATED _submitForm with credential integration
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      setState(() => _isSaving = true);
+      OverlayLoader.show(
+        context,
+        message: _isEditMode ? 'Updating school...' : 'Creating school...',
+        type: LoaderType.spinner,
+      );
 
+      setState(() => _isSaving = true);
       try {
         String? returnedUserCode;
         final userProvider = Provider.of<UserProvider>(context, listen: false);
         final currentUserCode = userProvider.userCode;
         final currentName = userProvider.userName;
-        print("Current User COde : $currentUserCode");
-        
 
         // Step 1: Insert User Credentials (only for NEW schools)
         if (!_isEditMode) {
+          if (!_isUserIdVerified) {
+            OverlayLoader.hide();
+            CustomSnackbar.showError(context,    'Please verify the User ID before submitting');
+            setState(() => _isSaving = false);
+            return;
+          }
+
           final userGroups = await _userRightsService.getUserGroups();
           final schoolGroup = userGroups.firstWhere(
                 (group) => group.userGroupName.toLowerCase().contains('school'),
@@ -336,7 +481,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
             'UserID': _userIdController.text,
             'UserPassword': _userPasswordController.text,
             'IsBlocked': false,
-            'AddUser': currentName  ?? 'Admin',
+            'AddUser': currentName ?? 'Admin',
             'EditUser': currentName ?? 'Admin',
           });
 
@@ -344,7 +489,6 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
               insertUserResponse['data'] != null &&
               insertUserResponse['data']['UserCode'] != null) {
             returnedUserCode = insertUserResponse['data']['UserCode'].toString();
-            print("✅ User created successfully with UserCode: $returnedUserCode");
           } else {
             throw Exception('Failed to create user credentials');
           }
@@ -431,17 +575,16 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           if (_schoolRecNo == null || _schoolRecNo == 0) {
             throw Exception('Cannot update: Missing RecNo. Please reload the school details.');
           }
-          print('📝 Updating school - RecNo: $_schoolRecNo, SchoolID: ${widget.schoolId}');
+
           context.read<AddEditSchoolBloc>().add(UpdateSchool(
-            recNo: _schoolRecNo!,        // NEW: Pass RecNo
-            schoolId: widget.schoolId!,  // Keep SchoolID
+            recNo: _schoolRecNo!,
+            schoolId: widget.schoolId!,
             schoolMasterData: schoolMasterData,
             subscriptionData: subscriptionData,
             logoFile: _logoFile,
             createdBy: _originalCreatedBy,
           ));
         } else {
-          print('➕ Creating new school with UserCode: $returnedUserCode');
           context.read<AddEditSchoolBloc>().add(AddSchool(
             schoolMasterData: schoolMasterData,
             subscriptionData: subscriptionData,
@@ -453,18 +596,14 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
         }
       } catch (e) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        OverlayLoader.hide();
+        CustomSnackbar.showError(context,    'Error: ${e.toString()}');
       }
     }
   }
 
   void _nextPage() {
+    _validateCurrentTab();
     if (_tabController.index < _tabController.length - 1) {
       _tabController.animateTo(_tabController.index + 1);
     } else {
@@ -497,7 +636,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     }
   }
 
-  // NEW: Credentials Section Widget
+  // UPDATED: Credentials Section with Verify Button
   Widget _buildCredentialsSection() {
     return _buildSection(
       children: [
@@ -512,17 +651,57 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
               ),
             ),
             const SizedBox(height: 16),
-            _buildTextField(
-              label: 'User ID / Login Username',
-              controller: _userIdController,
-              icon: Iconsax.user,
-              required: !_isEditMode,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildTextField(
+                    label: 'User ID / Login Username',
+                    controller: _userIdController,
+                    icon: Iconsax.user,
+                    required: !_isEditMode,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: ElevatedButton.icon(
+                    onPressed: _isVerifyingUserId ? null : _verifyUserId,
+                    icon: _isVerifyingUserId
+                        ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                        : Icon(
+                      _isUserIdVerified ? Iconsax.tick_circle : Iconsax.verify,
+                      size: 18,
+                    ),
+                    label: Text(_isUserIdVerified ? 'Verified' : 'Verify'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isUserIdVerified
+                          ? AppTheme.primaryGreen
+                          : AppTheme.accentGreen, // FIXED: Use accentGreen instead of primaryBlue
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _userPasswordController,
               decoration: _buildInputDecoration('Password', Iconsax.lock),
               obscureText: true,
+              enabled: _isUserIdVerified,
+              onChanged: (value) => _validateCurrentTab(),
               validator: (value) {
                 if (!_isEditMode && (value == null || value.isEmpty)) {
                   return 'Please enter password';
@@ -543,11 +722,13 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
               ),
               child: Row(
                 children: [
-                  Icon(Iconsax.info_circle, size: 16, color: AppTheme.primaryGreen),
+                  const Icon(Iconsax.info_circle, size: 16, color: AppTheme.primaryGreen),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'These credentials will be used by the school admin to access the system',
+                      _isUserIdVerified
+                          ? 'User ID verified! You can now set the password.'
+                          : 'Please verify the User ID before setting a password.',
                       style: GoogleFonts.inter(fontSize: 12, color: AppTheme.darkText),
                     ),
                   ),
@@ -566,26 +747,22 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
       listener: (context, state) {
         if (state is AddEditSchoolSuccess) {
           setState(() => _isSaving = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_isEditMode
-                  ? 'School updated successfully!'
-                  : 'School added successfully! ID: ${state.successResponse['School_ID']}'),
-              backgroundColor: AppTheme.primaryGreen,
-              behavior: SnackBarBehavior.floating,
-            ),
+          OverlayLoader.hide();
+          CustomSnackbar.showSuccess(
+            context,
+               _isEditMode
+                ? 'School updated successfully!'
+                : 'School added successfully! ID: ${state.successResponse['School_ID']}',
           );
           Navigator.of(context).pop(true);
         } else if (state is AddEditSchoolFailure) {
           setState(() => _isSaving = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_isEditMode
-                  ? 'Failed to update school: ${state.error}'
-                  : 'Failed to add school: ${state.error}'),
-              backgroundColor: Colors.redAccent,
-              behavior: SnackBarBehavior.floating,
-            ),
+          OverlayLoader.hide();
+          CustomSnackbar.showError(
+            context,
+               _isEditMode
+                ? 'Failed to update school: ${state.error}'
+                : 'Failed to add school: ${state.error}',
           );
         } else if (state is AddEditSchoolLoading) {
           setState(() => _isSaving = true);
@@ -608,6 +785,14 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
               fontSize: 22,
             ),
           ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: buildProgressIndicator(),
+              ),
+            ),
+          ],
           bottom: TabBar(
             controller: _tabController,
             isScrollable: false,
@@ -617,11 +802,32 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
             labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold),
             unselectedLabelStyle: GoogleFonts.inter(),
             tabs: [
-              Tab(icon: Icon(Iconsax.buildings), text: 'Basic Info'),
-              Tab(icon: Icon(Iconsax.location), text: 'Location'),
-              Tab(icon: Icon(Iconsax.book), text: 'Details'),
-              if (!_isEditMode)  Tab(icon: Icon(Iconsax.lock), text: 'Credentials'),
-              Tab(icon: Icon(Iconsax.crown), text: 'Subscription'),
+              _buildTabWithCompletionIcon(
+                icon: Iconsax.buildings,
+                text: 'Basic Info',
+                isCompleted: _tabsCompleted[0] ?? false,
+              ),
+              _buildTabWithCompletionIcon(
+                icon: Iconsax.location,
+                text: 'Location',
+                isCompleted: _tabsCompleted[1] ?? false,
+              ),
+              _buildTabWithCompletionIcon(
+                icon: Iconsax.book,
+                text: 'Details',
+                isCompleted: _tabsCompleted[2] ?? false,
+              ),
+              if (!_isEditMode)
+                _buildTabWithCompletionIcon(
+                  icon: Iconsax.lock,
+                  text: 'Credentials',
+                  isCompleted: _tabsCompleted[3] ?? false,
+                ),
+              _buildTabWithCompletionIcon(
+                icon: Iconsax.crown,
+                text: 'Subscription',
+                isCompleted: _tabsCompleted[_isEditMode ? 3 : 4] ?? false,
+              ),
             ],
           ),
         ),
@@ -645,6 +851,49 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
       ),
     );
   }
+
+  // Build tab with completion icon
+  Widget _buildTabWithCompletionIcon({
+    required IconData icon,
+    required String text,
+    required bool isCompleted,
+  }) {
+    return Tab(
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon),
+              const SizedBox(height: 4),
+              Text(text),
+            ],
+          ),
+          if (isCompleted)
+            Positioned(
+              top: -2,
+              right: -2,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: const Icon(
+                  Iconsax.tick_circle_copy,
+                  size: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildBottomNavigationBar() {
     return Container(
@@ -693,8 +942,9 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
                 : AnimatedBuilder(
               animation: _tabController,
               builder: (context, child) {
+                final lastTabIndex = _isEditMode ? 3 : 4;
                 return Icon(
-                  _tabController.index == 4 ? Iconsax.save_2 : Iconsax.arrow_right_3, // CHANGED from 3 to 4
+                  _tabController.index == lastTabIndex ? Iconsax.save_2 : Iconsax.arrow_right_3,
                   size: 20,
                 );
               },
@@ -702,17 +952,14 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
             label: AnimatedBuilder(
               animation: _tabController,
               builder: (context, child) {
-                // Last tab index changes based on mode
                 final lastTabIndex = _isEditMode ? 3 : 4;
                 final isLastTab = _tabController.index == lastTabIndex;
-
                 if (isLastTab) {
                   return Text(_isEditMode ? 'Update School' : 'Save School');
                 }
                 return const Text('Next Step');
               },
             ),
-
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryGreen,
               foregroundColor: Colors.white,
@@ -787,11 +1034,14 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
                 label: 'School Short Name',
                 controller: _controllers['schoolShortName']!,
                 icon: Iconsax.text),
-            _buildDropdown<Map<String, String>>(
+            _buildDropdown<Map<String, dynamic>>(
               label: 'School Type',
               value: _selectedSchoolType,
               items: _schoolTypes,
-              onChanged: (value) => setState(() => _selectedSchoolType = value),
+              onChanged: (value) {
+                setState(() => _selectedSchoolType = value);
+                _validateCurrentTab();
+              },
               itemToString: (item) => item['name']!,
               isLoading: _isLoading,
               icon: Iconsax.category,
@@ -803,12 +1053,14 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
         title: 'Affiliation & Establishment',
         children: [
           _buildResponsiveRow(children: [
-            _buildDropdown<Map<String, String>>(
+            _buildDropdown<Map<String, dynamic>>(
               label: 'Board Affiliation',
               value: _selectedBoardAffiliation,
               items: _boardAffiliations,
-              onChanged: (value) =>
-                  setState(() => _selectedBoardAffiliation = value),
+              onChanged: (value) {
+                setState(() => _selectedBoardAffiliation = value);
+                _validateCurrentTab();
+              },
               itemToString: (item) => item['name']!,
               isLoading: _isLoading,
               icon: Iconsax.verify,
@@ -820,7 +1072,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           ]),
           const SizedBox(height: 16),
           _buildResponsiveRow(children: [
-            _buildDropdown<Map<String, String>>(
+            _buildDropdown<Map<String, dynamic>>(
               label: 'Medium of Instruction',
               value: _selectedMediumInstruction,
               items: _mediumInstructions,
@@ -862,7 +1114,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
                 label: 'Chairman Name',
                 controller: _controllers['chairmanName']!,
                 icon: Iconsax.user_octagon),
-            _buildDropdown<Map<String, String>>(
+            _buildDropdown<Map<String, dynamic>>(
               label: 'Management Type',
               value: _selectedManagementType,
               items: _managementTypes,
@@ -930,6 +1182,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
               onChanged: (value) {
                 setState(() => _selectedState = value);
                 if (value != null) _fetchDistricts(value.id);
+                _validateCurrentTab();
               },
               itemToString: (state) => state.name,
               isLoading: _isLoading,
@@ -941,6 +1194,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
               onChanged: (value) {
                 setState(() => _selectedDistrict = value);
                 if (value != null) _fetchCities(value.id);
+                _validateCurrentTab();
               },
               itemToString: (district) => district.name,
               isLoading: _isLoadingDistricts,
@@ -953,7 +1207,10 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
               label: 'City',
               value: _selectedCity,
               items: _cities,
-              onChanged: (value) => setState(() => _selectedCity = value),
+              onChanged: (value) {
+                setState(() => _selectedCity = value);
+                _validateCurrentTab();
+              },
               itemToString: (city) => city.name,
               isLoading: _isLoadingCities,
               disabled: _selectedDistrict == null,
@@ -1048,8 +1305,10 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
                   label: 'Fee Structure',
                   value: _selectedFeeStructure,
                   items: _feeStructures,
-                  onChanged: (value) =>
-                      setState(() => _selectedFeeStructure = value),
+                  onChanged: (value) {
+                    setState(() => _selectedFeeStructure = value);
+                    _validateCurrentTab();
+                  },
                   itemToString: (fee) => fee.name,
                   isLoading: _isLoadingFees,
                   icon: Iconsax.wallet_money,
@@ -1135,6 +1394,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
                   _selectedSubscription = value;
                   _startDate = DateTime.now();
                 });
+                _validateCurrentTab();
               },
               itemToString: (plan) => '${plan.name} (${plan.planType})',
               isLoading: _isLoading,
@@ -1291,6 +1551,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           ? [FilteringTextInputFormatter.digitsOnly]
           : [],
       decoration: _buildInputDecoration(label, icon),
+      onChanged: (value) => _validateCurrentTab(),
       validator: (value) {
         if (required && (value == null || value.isEmpty)) {
           return '$label is required';
@@ -1590,13 +1851,10 @@ class _AddFeeStructureDialogState extends State<AddFeeStructureDialog> {
       };
       try {
         final newFeeId = await widget.apiService.addFeeStructure(feeData: payload);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Fee structure created successfully!'),
-            backgroundColor: Colors.green));
+        CustomSnackbar.showSuccess(context,    'Fee structure created successfully!');
         Navigator.of(context).pop(newFeeId);
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Failed to save: $e'), backgroundColor: Colors.red));
+        CustomSnackbar.showError(context,    'Failed to save: $e');
       } finally {
         if (mounted) {
           setState(() => _isSaving = false);

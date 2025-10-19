@@ -35,6 +35,91 @@ class UserRightsService {
     }
   }
 
+  // Add these methods to your UserRightsService class
+
+  /// Check if UserID exists in the database
+  Future<bool> checkUserIdExists(String userId) async {
+    try {
+      print("🔍 Checking if UserID exists: $userId");
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/UserRights.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'Operation': 'CHECK_USERID',
+          'UserID': userId,
+        }),
+      );
+
+      print("✅ Check UserID response: ${response.statusCode}");
+      print("📦 Response body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+
+        if (data['success'] == true && data['data'] != null) {
+          final resultSet = data['data']['resultSet_0'];
+          if (resultSet != null && resultSet.isNotEmpty) {
+            final userIdExists = resultSet[0]['UserIDExists'] == 'True';
+            print("✅ UserID exists: $userIdExists");
+            return userIdExists;
+          }
+        }
+        return false;
+      }
+
+      throw Exception('Failed to check UserID: ${response.statusCode}');
+    } catch (e) {
+      print("❌ Error checking UserID: $e");
+      throw Exception('Error checking UserID: $e');
+    }
+  }
+
+  /// Reset password using UserID
+  Future<void> resetPasswordByUserId({
+    required String userId,
+    required String newPassword,
+  }) async {
+    try {
+      print("🔄 Resetting password for UserID: $userId");
+
+      // Generate salt and encrypt password
+      final salt = _generateSalt();
+      final encryptedPassword = _encryptPassword(newPassword, salt);
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/UserRights.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'Operation': 'UPDATE_CREDENTIALS',
+          'UserID': userId,
+          'NewPassword': newPassword,  // Will be encrypted by PHP
+          'ModifiedBy': 'system_reset',
+        }),
+      );
+
+      print("✅ Reset password response: ${response.statusCode}");
+      print("📦 Response body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+
+        if (data['success'] == true) {
+          print("✅ Password reset successful");
+          return;
+        } else {
+          throw Exception(data['message'] ?? 'Failed to reset password');
+        }
+      }
+
+      throw Exception('Server error: ${response.statusCode}');
+    } catch (e) {
+      print("❌ Error resetting password: $e");
+      throw Exception('Error resetting password: $e');
+    }
+  }
+
+
   // Login with username and password
   Future<LoginResponse> login({
     required String userId,

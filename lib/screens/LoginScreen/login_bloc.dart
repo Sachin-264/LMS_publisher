@@ -1,9 +1,9 @@
 // lib/screens/LoginScreen/login_bloc.dart
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/Service/user_right_service.dart';
-
 
 // Events
 abstract class LoginEvent extends Equatable {
@@ -39,7 +39,7 @@ class RoleSelected extends LoginEvent {
 
 class LoginSubmitted extends LoginEvent {}
 
-class LogoutRequested extends LoginEvent {} // New event for logout
+class LogoutRequested extends LoginEvent {}
 
 // States
 abstract class LoginState extends Equatable {
@@ -98,23 +98,23 @@ class LoginFailure extends LoginState {
   List<Object?> get props => [error];
 }
 
-class LogoutSuccess extends LoginState {} // New state for logout
+class LogoutSuccess extends LoginState {}
 
 // BLoC
 class LoginBloc extends Bloc<LoginEvent, LoginState> {
   final UserRightsService userRightsService;
-  final UserProvider userProvider; // Add UserProvider
+  final UserProvider userProvider;
 
   LoginBloc({
     required this.userRightsService,
-    required this.userProvider, // Add UserProvider to constructor
+    required this.userProvider,
   }) : super(LoginInitial()) {
     on<LoadUserGroups>(_onLoadUserGroups);
     on<UserIdChanged>(_onUserIdChanged);
     on<PasswordChanged>(_onPasswordChanged);
     on<RoleSelected>(_onRoleSelected);
     on<LoginSubmitted>(_onLoginSubmitted);
-    on<LogoutRequested>(_onLogoutRequested); // Add logout handler
+    on<LogoutRequested>(_onLogoutRequested);
   }
 
   Future<void> _onLoadUserGroups(
@@ -164,39 +164,52 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
       LoginSubmitted event,
       Emitter<LoginState> emit,
       ) async {
-    if (state is! UserGroupsLoaded) return;
+    // ✅ FIXED: Removed state check - allow login from any state
+    final String userId;
+    final String password;
 
-    final currentState = state as UserGroupsLoaded;
+    // Get credentials from current state
+    if (state is UserGroupsLoaded) {
+      final currentState = state as UserGroupsLoaded;
+      userId = currentState.userId;
+      password = currentState.password;
+    } else {
+      emit(LoginFailure('Please wait while loading...'));
+      return;
+    }
 
-    if (currentState.userId.isEmpty ||
-        currentState.password.isEmpty ||
-        currentState.selectedRole == null) {
+    // Validate inputs
+    if (userId.isEmpty || password.isEmpty) {
       emit(LoginFailure('Please fill all fields'));
-      emit(currentState);
+      if (state is UserGroupsLoaded) {
+        emit(state as UserGroupsLoaded); // Restore state
+      }
       return;
     }
 
     emit(LoginLoading());
-
     try {
       final response = await userRightsService.login(
-        userId: currentState.userId,
-        password: currentState.password,
+        userId: userId,
+        password: password,
       );
 
       // Store the user data in the UserProvider
       userProvider.initializeUser(response);
-
       emit(LoginSuccess(response));
     } catch (e) {
-      final groups = await userRightsService.getUserGroups();
-      emit(LoginFailure(e.toString()));
-      emit(UserGroupsLoaded(
-        userGroups: groups,
-        userId: currentState.userId,
-        password: currentState.password,
-        selectedRole: currentState.selectedRole,
-      ));
+      // Reload groups and restore input
+      try {
+        final groups = await userRightsService.getUserGroups();
+        emit(LoginFailure(e.toString()));
+        emit(UserGroupsLoaded(
+          userGroups: groups,
+          userId: userId,
+          password: password,
+        ));
+      } catch (_) {
+        emit(LoginFailure(e.toString()));
+      }
     }
   }
 

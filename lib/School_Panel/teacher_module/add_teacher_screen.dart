@@ -7,15 +7,17 @@ import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:lms_publisher/School_Panel/teacher_module/teacher_model.dart';
 import 'package:lms_publisher/School_Panel/teacher_module/teacher_service.dart';
+import 'package:lms_publisher/Service/user_right_service.dart'; // ✅ ADD THIS
 import '../../Theme/apptheme.dart';
 import 'teacher_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io' show Platform, File;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../Util/custom_snackbar.dart'; // ✅ ADD THIS
+import '../../Util/beautiful_loader.dart'; // ✅ ADD THIS
 
-
-// Total number of tabs in the form
 const int _kTotalTabs = 6;
+
 
 class AddTeacherScreen extends StatefulWidget {
   final TeacherModel? teacher;
@@ -39,10 +41,23 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
     5: GlobalKey<FormState>(),
   };
 
+  final Map<int, bool> _tabsCompleted = {
+    0: false,
+    1: false,
+    2: false,
+    3: false,
+    4: false,
+    5: false,
+  };
+
   late TabController _tabController;
   final TeacherApiService apiService = TeacherApiService();
+  final UserRightsService userRightsService = UserRightsService();
 
   bool get isEditMode => widget.teacher != null;
+
+  bool _isVerifyingUserId = false;
+  bool? _userIdVerified;
 
   // Photo Upload
   XFile? _selectedPhoto;
@@ -161,14 +176,78 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
     super.initState();
     _tabController = TabController(length: _kTotalTabs, vsync: this);
 
-    // ✅ Load states on init
+    // ✅ NEW: Listen to tab changes to update UI
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() {});
+      }
+    });
+
     _loadPermanentStates();
     _loadCurrentStates();
 
     if (isEditMode) {
       _loadTeacherData();
+      // ✅ Mark all tabs as completed in edit mode
+      _tabsCompleted.forEach((key, value) {
+        _tabsCompleted[key] = true;
+      });
     }
   }
+
+  // ✅ NEW: Verify UserID availability
+  Future<void> _verifyUserId() async {
+    final userId = _userNameController.text.trim();
+
+    if (userId.isEmpty) {
+      CustomSnackbar.showWarning(
+        context,
+        'Please enter a User ID first',
+        title: 'Missing Input',
+      );
+      return;
+    }
+
+    setState(() {
+      _isVerifyingUserId = true;
+      _userIdVerified = null;
+    });
+
+    try {
+      final exists = await userRightsService.checkUserIdExists(userId);
+
+      setState(() {
+        _userIdVerified = !exists; // true if available, false if taken
+        _isVerifyingUserId = false;
+      });
+
+      if (!exists) {
+        CustomSnackbar.showSuccess(
+          context,
+          'User ID "$userId" is available!',
+          title: 'Available',
+        );
+      } else {
+        CustomSnackbar.showError(
+          context,
+          'User ID "$userId" is already taken. Please choose another.',
+          title: 'Not Available',
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isVerifyingUserId = false;
+        _userIdVerified = null;
+      });
+      CustomSnackbar.showError(
+        context,
+        'Failed to verify User ID: ${e.toString()}',
+        title: 'Verification Failed',
+      );
+    }
+  }
+
+
 
   Future<void> _pickAndUploadPhoto() async {
     try {
@@ -187,8 +266,17 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
         _isUploadingPhoto = true;
       });
 
-      // Upload photo
+      // ✅ Show BeautifulLoader
+      OverlayLoader.show(
+        context,
+        message: 'Uploading photo...',
+        type: LoaderType.spinner,
+      );
+
       final photoPath = await apiService.uploadTeacherPhoto(image);
+
+      // ✅ Hide loader
+      OverlayLoader.hide();
 
       if (photoPath != null && photoPath.isNotEmpty) {
         setState(() {
@@ -197,32 +285,34 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
         });
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Photo uploaded successfully!'),
-              backgroundColor: AppTheme.accentGreen,
-              duration: Duration(seconds: 2),
-            ),
+          // ✅ Show success with CustomSnackbar
+          CustomSnackbar.showSuccess(
+            context,
+            'Photo uploaded successfully!',
+            title: 'Success',
           );
         }
       }
     } catch (e) {
+      // ✅ Hide loader on error
+      OverlayLoader.hide();
+
       setState(() {
         _isUploadingPhoto = false;
         _selectedPhoto = null;
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Failed to upload photo: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
+        // ✅ Show error with CustomSnackbar
+        CustomSnackbar.showError(
+          context,
+          'Failed to upload photo: $e',
+          title: 'Upload Failed',
         );
       }
     }
   }
+
 
 
   // ✅ NEW: Load Permanent Address States
@@ -365,6 +455,43 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
       }
     }
   }
+
+  // ✅ NEW: Validate current tab and mark as complete
+  bool _validateAndMarkTab(int tabIndex) {
+    final formKey = _formKeys[tabIndex];
+
+    // Special check for photo requirement in Basic Info tab (tab 0)
+    if (tabIndex == 0 && !isEditMode) {
+      if (_uploadedPhotoPath == null && _selectedPhoto == null) {
+        CustomSnackbar.showError(
+          context,
+          'Please upload a teacher photo before proceeding',
+          title: 'Photo Required',
+        );
+        return false;
+      }
+    }
+
+    // Validate form fields
+    if (formKey?.currentState?.validate() ?? false) {
+      setState(() {
+        _tabsCompleted[tabIndex] = true;
+      });
+      return true;
+    } else {
+      CustomSnackbar.showWarning(
+        context,
+        'Please fill all required fields correctly in this section',
+        title: 'Incomplete Form',
+      );
+      return false;
+    }
+  }
+
+  // ✅ NEW: Calculate completion percentage
+
+
+
 
 
   Widget _buildPhotoUploadWidget() {
@@ -652,12 +779,10 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
       body: BlocListener<TeacherBloc, TeacherState>(
         listener: (context, state) {
           if (state is TeacherOperationSuccessState) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppTheme.accentGreen,
-                duration: const Duration(seconds: 2),
-              ),
+            CustomSnackbar.showSuccess(
+              context,
+              state.message,
+              title: isEditMode ? 'Updated' : 'Added',
             );
             Future.delayed(const Duration(milliseconds: 500), () {
               if (mounted && Navigator.canPop(context)) {
@@ -665,12 +790,10 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
               }
             });
           } else if (state is TeacherErrorState) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error: ${state.error}'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
-              ),
+            CustomSnackbar.showError(
+              context,
+              state.error,
+              title: 'Error',
             );
           }
         },
@@ -713,28 +836,143 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
           fontSize: 22,
         ),
       ),
+      actions: [
+        // ADD THIS PROGRESS INDICATOR
+        Padding(
+          padding: const EdgeInsets.only(right: 16),
+          child: Center(
+            child: buildProgressIndicator(),
+          ),
+        ),
+      ],
       bottom: TabBar(
         controller: _tabController,
-        isScrollable: false,
+        isScrollable: true,
         indicatorColor: AppTheme.primaryGreen,
         labelColor: AppTheme.primaryGreen,
         unselectedLabelColor: AppTheme.bodyText,
-        labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold),
-        unselectedLabelStyle: GoogleFonts.inter(),
-        tabs: const [
-          Tab(icon: Icon(Iconsax.user), text: 'Basic Info'),
-          Tab(icon: Icon(Iconsax.call), text: 'Contact'),
-          Tab(icon: Icon(Iconsax.briefcase), text: 'Employment'),
-          Tab(icon: Icon(Iconsax.document_text_1), text: 'Documents'),
-          Tab(icon: Icon(Iconsax.wallet_money), text: 'Finance'),
-          Tab(icon: Icon(Iconsax.info_circle), text: 'Other'),
+        labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12),
+        unselectedLabelStyle: GoogleFonts.inter(fontSize: 12),
+        tabs: [
+          // ✅ Each tab now shows completion checkmark
+          Tab(
+            icon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Iconsax.user, size: 18),
+                if (_tabsCompleted[0] == true) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Iconsax.tick_circle, size: 14, color: AppTheme.primaryGreen),
+                ],
+              ],
+            ),
+            text: 'Basic Info',
+          ),
+          Tab(
+            icon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Iconsax.call, size: 18),
+                if (_tabsCompleted[1] == true) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Iconsax.tick_circle, size: 14, color: AppTheme.primaryGreen),
+                ],
+              ],
+            ),
+            text: 'Contact',
+          ),
+          Tab(
+            icon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Iconsax.briefcase, size: 18),
+                if (_tabsCompleted[2] == true) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Iconsax.tick_circle, size: 14, color: AppTheme.primaryGreen),
+                ],
+              ],
+            ),
+            text: 'Employment',
+          ),
+          Tab(
+            icon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Iconsax.document_text_1, size: 18),
+                if (_tabsCompleted[3] == true) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Iconsax.tick_circle, size: 14, color: AppTheme.primaryGreen),
+                ],
+              ],
+            ),
+            text: 'Documents',
+          ),
+          Tab(
+            icon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Iconsax.wallet_money, size: 18),
+                if (_tabsCompleted[4] == true) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Iconsax.tick_circle, size: 14, color: AppTheme.primaryGreen),
+                ],
+              ],
+            ),
+            text: 'Finance',
+          ),
+          Tab(
+            icon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Iconsax.info_circle, size: 18),
+                if (_tabsCompleted[5] == true) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Iconsax.tick_circle, size: 14, color: AppTheme.primaryGreen),
+                ],
+              ],
+            ),
+            text: 'Other',
+          ),
         ],
-        onTap: (index) {
-          setState(() {});
-        },
       ),
     );
   }
+
+  // Progress indicator showing completion percentage
+  Widget buildProgressIndicator() {
+    final completedCount = _tabsCompleted.values.where((completed) => completed).length;
+    final progress = completedCount / _kTotalTabs;
+    final percentage = (progress * 100).toInt();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 100,
+          height: 8,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: AppTheme.lightGrey,
+              valueColor: AlwaysStoppedAnimation(AppTheme.primaryGreen),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$percentage%',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.primaryGreen,
+          ),
+        ),
+      ],
+    );
+  }
+
+
 
   // ==================== TAB 1: BASIC INFORMATION ====================
   Widget _buildBasicInfoTab() {
@@ -1406,7 +1644,7 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Form(
-        key: _formKeys[5],
+        key: _formKeys[5], // ✅ Form key for tab 5
         child: Column(
           children: [
             _buildInputCard(
@@ -1451,27 +1689,199 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
               ],
             ),
             const SizedBox(height: 24),
+
+            // ✅ Login Details Card with UserID Verification
             _buildInputCard(
               children: [
                 _buildSectionHeader('Login Details & Status', Iconsax.lock),
                 const SizedBox(height: 20),
-                _buildResponsiveRow([
-                  _buildTextField(
-                    'User Name',
-                    _userNameController,
-                    'Enter username for login',
-                    isRequired: !isEditMode,
-                    readOnly: isEditMode, // ✅ Non-editable in edit mode
-                  ),
-                  _buildTextField(
-                    'Password',
-                    _passwordController,
-                    isEditMode ? 'Leave blank to keep current' : 'Enter password',
-                    obscureText: true,
-                    isRequired: !isEditMode,
-                    readOnly: isEditMode, // ✅ Non-editable in edit mode
-                  ),
-                ]),
+
+                // ✅ UserID field with Verify button
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        text: 'User ID',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.darkText,
+                        ),
+                        children: [
+                          if (!isEditMode)
+                            const TextSpan(
+                              text: ' *',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _userNameController,
+                            readOnly: isEditMode,
+                            style: GoogleFonts.inter(
+                              color: AppTheme.darkText,
+                              fontSize: 14,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Enter username for login',
+                              hintStyle: GoogleFonts.inter(
+                                color: AppTheme.bodyText.withOpacity(0.6),
+                                fontSize: 14,
+                              ),
+                              filled: true,
+                              fillColor: isEditMode ? AppTheme.lightGrey : Colors.white,
+                              suffixIcon: _userIdVerified != null
+                                  ? Icon(
+                                _userIdVerified!
+                                    ? Iconsax.tick_circle
+                                    : Iconsax.close_circle,
+                                color: _userIdVerified!
+                                    ? AppTheme.primaryGreen
+                                    : Colors.red,
+                              )
+                                  : null,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppTheme.borderGrey),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: _userIdVerified == false
+                                      ? Colors.red
+                                      : AppTheme.borderGrey,
+                                  width: _userIdVerified == false ? 2 : 1,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppTheme.primaryGreen,
+                                  width: 2,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                            ),
+                            onChanged: (_) {
+                              // Reset verification when user types
+                              if (_userIdVerified != null) {
+                                setState(() => _userIdVerified = null);
+                              }
+                            },
+                            validator: (value) {
+                              if (!isEditMode && (value == null || value.isEmpty)) {
+                                return 'This field is required';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+
+                        // ✅ Verify Button (only in add mode)
+                        if (!isEditMode) ...[
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            onPressed: _isVerifyingUserId ? null : _verifyUserId,
+                            icon: _isVerifyingUserId
+                                ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                                : const Icon(Iconsax.shield_tick, size: 18),
+                            label: Text(
+                              'Verify',
+                              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.accentGreen,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+
+                    // ✅ Verification Status Messages
+                    if (_userIdVerified == false) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Iconsax.close_circle,
+                            size: 16,
+                            color: Colors.red,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'This User ID is already taken. Please choose another.',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: Colors.red,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else if (_userIdVerified == true) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Iconsax.tick_circle,
+                            size: 16,
+                            color: AppTheme.primaryGreen,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'This User ID is available!',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: AppTheme.primaryGreen,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Password field
+                _buildTextField(
+                  'Password',
+                  _passwordController,
+                  isEditMode ? 'Leave blank to keep current' : 'Enter password',
+                  obscureText: true,
+                  isRequired: !isEditMode,
+                  readOnly: isEditMode,
+                ),
+
                 const SizedBox(height: 12),
                 _buildStatusSwitchListTile(),
               ],
@@ -1481,6 +1891,7 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
       ),
     );
   }
+
 
   // ==================== HELPER WIDGETS ====================
   Widget _buildInputCard({required List<Widget> children}) {
@@ -1868,6 +2279,7 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          // Back button (only show if not on first tab)
           AnimatedBuilder(
             animation: _tabController,
             builder: (context, child) {
@@ -1895,6 +2307,8 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
             },
           ),
           if (_tabController.index > 0) const SizedBox(width: 12),
+
+          // Next/Submit button
           Expanded(
             child: ElevatedButton.icon(
               onPressed: _handleNextOrSubmit,
@@ -1926,28 +2340,36 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
     );
   }
 
+
   // ==================== SUBMIT LOGIC ====================
+// ✅ UPDATED: Handle Next/Submit with validation
   void _handleNextOrSubmit() {
-    final currentFormKey = _formKeys[_tabController.index];
-    if (currentFormKey?.currentState?.validate() ?? false) {
-      if (_tabController.index < _kTotalTabs - 1) {
-        _tabController.animateTo(_tabController.index + 1);
-      } else {
-        _showConfirmationDialog();
-      }
+    final currentIndex = _tabController.index;
+
+    // ✅ Validate current tab before proceeding
+    if (!_validateAndMarkTab(currentIndex)) {
+      return; // Don't proceed if validation fails
+    }
+
+    // If last tab, submit; otherwise move to next
+    if (currentIndex < _kTotalTabs - 1) {
+      _tabController.animateTo(currentIndex + 1);
+      setState(() {});
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Please fill all required fields correctly',
-            style: GoogleFonts.inter(),
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // ✅ Final validation before submit
+      if (!isEditMode && _userIdVerified != true) {
+        CustomSnackbar.showWarning(
+          context,
+          'Please verify the User ID before submitting',
+          title: 'Verification Required',
+        );
+        return;
+      }
+
+      _showConfirmationDialog();
     }
   }
+
 
 
 // ✅ FIXED: Copy Permanent Address to Current Address
@@ -2006,15 +2428,21 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Confirm $action Teacher', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+          title: Text(
+            'Confirm $action Teacher',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          ),
           content: Text(
-            'Are you sure you want to $action this teacher?',
+            'Are you sure you want to $action this teacher? Please verify all information is correct.',
             style: GoogleFonts.inter(fontSize: 14),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: Text('Cancel', style: GoogleFonts.inter(color: AppTheme.bodyText)),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(color: AppTheme.bodyText),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -2025,14 +2453,21 @@ class _AddTeacherScreenState extends State<AddTeacherScreen>
                 backgroundColor: AppTheme.primaryGreen,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              child: Text('Confirm $action', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+              child: Text(
+                'Confirm $action',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+              ),
             ),
           ],
         );
       },
     );
   }
+
 
   // ✅ Hash password function
   String _hashPassword(String password) {

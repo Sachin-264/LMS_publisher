@@ -9,8 +9,15 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:lms_publisher/School_Panel/student_module/student_model.dart';
 import 'package:lms_publisher/School_Panel/student_module/student_service.dart';
+import 'package:provider/provider.dart'; // ✅ ADD THIS
 import '../../Theme/apptheme.dart';
 import 'student_bloc.dart';
+import '../../Util/custom_snackbar.dart';
+import '../../Util/beautiful_loader.dart';
+import '../../Provider/ConnectivityProvider.dart'; // ✅ ADD THIS
+import '../../Service/user_right_service.dart';
+
+
 
 // Total number of tabs in the form
 const int _kTotalTabs = 6;
@@ -215,6 +222,19 @@ class _AddStudentScreenState extends State<AddStudentScreen>
     'Other',
   ];
 
+  // ==================== NEW STATE VARIABLES FOR ENHANCEMENTS ====================
+
+// Tab completion tracking
+  final Set<int> _completedTabs = {};
+
+// UserID verification states
+  bool _isStudentUserIdVerified = false;
+  bool _isParentUserIdVerified = false;
+  bool _isVerifyingStudentUserId = false;
+  bool _isVerifyingParentUserId = false;
+
+
+
 
 
   @override
@@ -222,17 +242,30 @@ class _AddStudentScreenState extends State<AddStudentScreen>
     super.initState();
     _tabController = TabController(length: _kTotalTabs, vsync: this);
 
+    // ✅ ADD THIS: Listen to tab changes
+    _tabController.addListener(_onTabChanged);
+
     fetchClasses();
 
-    // ✅ UPDATED: Load states first, then load student data
     if (isEditMode) {
       _initializeEditMode();
+      // ✅ ADD THIS: Mark user IDs as verified in edit mode
+      _isStudentUserIdVerified = true;
+      _isParentUserIdVerified = true;
     } else {
-      // Load states for add mode
       loadPermanentStates();
       loadCurrentStates();
     }
   }
+
+  // ✅ NEW METHOD: Track tab changes
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) {
+      setState(() {});
+    }
+  }
+
+
 
 // ✅ NEW: Initialize edit mode properly
   Future<void> _initializeEditMode() async {
@@ -245,6 +278,145 @@ class _AddStudentScreenState extends State<AddStudentScreen>
     // Then load student data (which will trigger district/city loading)
     _loadStudentData();
   }
+
+  // ==================== USERID VERIFICATION METHODS ====================
+
+  /// Verify if Student UserID is available
+  Future<void> _verifyStudentUserId() async {
+    final connectivityProvider = Provider.of<ConnectivityProvider>(context, listen: false);
+
+    if (_studentUsernameController.text.trim().isEmpty) {
+      CustomSnackbar.showError(
+        context,
+        'Please enter a Student User ID first',
+        title: 'Validation Error',
+      );
+      return;
+    }
+
+    if (!connectivityProvider.isOnline) {
+      CustomSnackbar.showError(
+        context,
+        'Cannot verify User ID while offline. Please connect to internet.',
+        title: 'No Internet Connection',
+      );
+      return;
+    }
+
+    setState(() {
+      _isVerifyingStudentUserId = true;
+    });
+
+    try {
+      final userRightsService = UserRightsService();
+      final exists = await userRightsService.checkUserIdExists(
+        _studentUsernameController.text.trim(),
+      );
+
+      setState(() {
+        _isVerifyingStudentUserId = false;
+      });
+
+      if (exists) {
+        CustomSnackbar.showError(
+          context,
+          'This Student User ID is already taken. Please choose a different one.',
+          title: '⚠️ User ID Unavailable',
+        );
+        setState(() {
+          _isStudentUserIdVerified = false;
+        });
+      } else {
+        CustomSnackbar.showSuccess(
+          context,
+          'Great! This Student User ID is available and can be used.',
+          title: '✅ User ID Available',
+        );
+        setState(() {
+          _isStudentUserIdVerified = true;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isVerifyingStudentUserId = false;
+      });
+
+      CustomSnackbar.showError(
+        context,
+        'Failed to verify User ID. Please try again.',
+        title: 'Verification Failed',
+      );
+    }
+  }
+
+  /// Verify if Parent UserID is available
+  Future<void> _verifyParentUserId() async {
+    final connectivityProvider = Provider.of<ConnectivityProvider>(context, listen: false);
+
+    if (_parentUsernameController.text.trim().isEmpty) {
+      CustomSnackbar.showError(
+        context,
+        'Please enter a Parent User ID first',
+        title: 'Validation Error',
+      );
+      return;
+    }
+
+    if (!connectivityProvider.isOnline) {
+      CustomSnackbar.showError(
+        context,
+        'Cannot verify User ID while offline. Please connect to internet.',
+        title: 'No Internet Connection',
+      );
+      return;
+    }
+
+    setState(() {
+      _isVerifyingParentUserId = true;
+    });
+
+    try {
+      final userRightsService = UserRightsService();
+      final exists = await userRightsService.checkUserIdExists(
+        _parentUsernameController.text.trim(),
+      );
+
+      setState(() {
+        _isVerifyingParentUserId = false;
+      });
+
+      if (exists) {
+        CustomSnackbar.showError(
+          context,
+          'This Parent User ID is already taken. Please choose a different one.',
+          title: '⚠️ User ID Unavailable',
+        );
+        setState(() {
+          _isParentUserIdVerified = false;
+        });
+      } else {
+        CustomSnackbar.showSuccess(
+          context,
+          'Great! This Parent User ID is available and can be used.',
+          title: '✅ User ID Available',
+        );
+        setState(() {
+          _isParentUserIdVerified = true;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isVerifyingParentUserId = false;
+      });
+
+      CustomSnackbar.showError(
+        context,
+        'Failed to verify User ID. Please try again.',
+        title: 'Verification Failed',
+      );
+    }
+  }
+
 
 
   // ==================== FETCH LOCATION DATA METHODS ====================
@@ -679,8 +851,11 @@ class _AddStudentScreenState extends State<AddStudentScreen>
 
   @override
   void dispose() {
+    // ✅ Remove tab listener
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
-    // Dispose all controllers
+
+    // Dispose all text controllers - EXACT NAMES FROM YOUR FILE
     _studentIdController.dispose();
     _admissionNumberController.dispose();
     _firstNameController.dispose();
@@ -707,6 +882,7 @@ class _AddStudentScreenState extends State<AddStudentScreen>
     _motherMobileController.dispose();
     _guardianNameController.dispose();
     _guardianMobileController.dispose();
+    academicYearController.dispose();
     _admissionDateController.dispose();
     _admissionClassController.dispose();
     _currentClassController.dispose();
@@ -728,9 +904,11 @@ class _AddStudentScreenState extends State<AddStudentScreen>
     _studentPasswordController.dispose();
     _parentUsernameController.dispose();
     _parentPasswordController.dispose();
-    academicYearController.dispose();
+
     super.dispose();
   }
+
+
 
   Widget _buildPhotoUploadWidget() {
     final hasPhoto = _uploadedPhotoPath != null || _selectedPhoto != null;
@@ -870,12 +1048,10 @@ class _AddStudentScreenState extends State<AddStudentScreen>
         listener: (context, state) {
           if (state is StudentOperationSuccessState) {
             // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppTheme.accentGreen,
-                duration: const Duration(seconds: 2),
-              ),
+            CustomSnackbar.showSuccess(
+              context,
+              state.message,
+              title: isEditMode ? 'Update Successful' : 'Student Enrolled',
             );
 
             // Pop the screen after a short delay
@@ -885,12 +1061,10 @@ class _AddStudentScreenState extends State<AddStudentScreen>
               }
             });
           } else if (state is StudentErrorState) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error: ${state.error}'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
-              ),
+            CustomSnackbar.showError(
+              context,
+              state.error,
+              title: 'Operation Failed',
             );
           }
         },
@@ -921,45 +1095,158 @@ class _AddStudentScreenState extends State<AddStudentScreen>
 
 
   PreferredSizeWidget _buildAppBar() {
+    final connectivityProvider = Provider.of<ConnectivityProvider>(context);
+
     return AppBar(
-      backgroundColor: AppTheme.background, // Use AppTheme.background for light background
-      elevation: 0, // Set elevation to 0 like AddSchoolScreen
+      backgroundColor: AppTheme.background,
+      elevation: 0,
       leading: IconButton(
         icon: const Icon(Iconsax.arrow_left, color: AppTheme.darkText),
         onPressed: () => Navigator.pop(context),
       ),
-      title: Text(
-        isEditMode ? 'Edit Student Details' : 'Enroll New Student',
-        style: GoogleFonts.poppins(
-          color: AppTheme.darkText,
-          fontWeight: FontWeight.w700,
-          fontSize: 22,
-        ),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isEditMode ? 'Edit Student Details' : 'Enroll New Student',
+            style: GoogleFonts.poppins(
+              color: AppTheme.darkText,
+              fontWeight: FontWeight.w700,
+              fontSize: 22,
+            ),
+          ),
+          // ✅ NEW: Network Status Indicator
+          if (!connectivityProvider.isOnline)
+            Row(
+              children: [
+                const Icon(Icons.wifi_off, size: 14, color: Colors.red),
+                const SizedBox(width: 4),
+                Text(
+                  'Offline Mode',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: Colors.red,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+        ],
       ),
-      // TabBar is now in the AppBar's bottom property
+      actions: [
+        // ✅ NEW: Progress Indicator
+        Padding(
+          padding: const EdgeInsets.only(right: 16),
+          child: Center(
+            child: _buildProgressIndicator(),
+          ),
+        ),
+      ],
       bottom: TabBar(
         controller: _tabController,
-        isScrollable: false, // Match AddSchoolScreen behavior
+        isScrollable: false,
         indicatorColor: AppTheme.primaryGreen,
         labelColor: AppTheme.primaryGreen,
         unselectedLabelColor: AppTheme.bodyText,
-        labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold),
-        unselectedLabelStyle: GoogleFonts.inter(),
-        tabs: const [
-          Tab(icon: Icon(Iconsax.user), text: 'Basic Info'),
-          Tab(icon: Icon(Iconsax.call), text: 'Contact'),
-          Tab(icon: Icon(Iconsax.user_tag), text: 'Parents'),
-          Tab(icon: Icon(Iconsax.book_1), text: 'Academic'),
-          Tab(icon: Icon(Iconsax.document_text_1), text: 'Documents'),
-          Tab(icon: Icon(Iconsax.info_circle), text: 'Other'),
+        labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12),
+        unselectedLabelStyle: GoogleFonts.inter(fontSize: 12),
+        tabs: [
+          _buildTabWithCheckmark(0, Iconsax.user, 'Basic'),
+          _buildTabWithCheckmark(1, Iconsax.call, 'Contact'),
+          _buildTabWithCheckmark(2, Iconsax.user_tag, 'Parents'),
+          _buildTabWithCheckmark(3, Iconsax.book_1, 'Academic'),
+          _buildTabWithCheckmark(4, Iconsax.document_text_1, 'Docs'),
+          _buildTabWithCheckmark(5, Iconsax.info_circle, 'Other'),
         ],
         onTap: (index) {
-          // Keep the tab controller synchronized with the state
           setState(() {});
         },
       ),
     );
   }
+
+
+  // ✅ NEW METHOD: Build tab with completion checkmark
+  Widget _buildTabWithCheckmark(int tabIndex, IconData icon, String label) {
+    final isCompleted = _completedTabs.contains(tabIndex);
+
+    return Tab(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon),
+              const SizedBox(height: 4),
+              Text(label),
+            ],
+          ),
+          // ✅ Animated checkmark when tab is completed
+          if (isCompleted)
+            Positioned(
+              top: -4,
+              right: -4,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryGreen.withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.check,
+                  size: 12,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+// ✅ NEW METHOD: Build progress indicator showing completion percentage
+  Widget _buildProgressIndicator() {
+    final progress = _completedTabs.length / _kTotalTabs;
+    final percentage = (progress * 100).toInt();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 100,
+          height: 8,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: AppTheme.lightGrey,
+              valueColor: AlwaysStoppedAnimation(AppTheme.primaryGreen),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$percentage%',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.primaryGreen,
+          ),
+        ),
+      ],
+    );
+  }
+
 
   // --- Tab Content Widgets ---
 
@@ -1907,8 +2194,13 @@ class _AddStudentScreenState extends State<AddStudentScreen>
               maxLines: 3,
             ),
             const SizedBox(height: 24),
+// Find this part in your _buildOtherInfoTab method (around line 2800+)
+// Replace ONLY the login credentials section (from "Login Credentials & Status" to the end)
+
             _buildSectionHeader('Login Credentials & Status', Iconsax.lock),
             const SizedBox(height: 20),
+
+// ============ STUDENT LOGIN SECTION ============
             Text(
               'Student Login',
               style: GoogleFonts.poppins(
@@ -1918,22 +2210,107 @@ class _AddStudentScreenState extends State<AddStudentScreen>
               ),
             ),
             const SizedBox(height: 12),
-            _buildResponsiveRow([
-              _buildTextField(
-                'Username',
-                _studentUsernameController,
-                'Enter student username (for portal access)',
-                readOnly: isEditMode,
+
+// ✅ NEW: Student Username with Verify Button
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: _buildTextField(
+                    'Username',
+                    _studentUsernameController,
+                    'Enter student username',
+                    readOnly: isEditMode,
+                    onChanged: (_) {
+                      setState(() {
+                        _isStudentUserIdVerified = false;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Padding(
+                  padding: const EdgeInsets.only(top: 28),
+                  child: _isVerifyingStudentUserId
+                      ? SizedBox(
+                    width: 100,
+                    height: 48,
+                    child: Center(
+                      child: BeautifulLoader(
+                        type: LoaderType.dots,
+                        size: 30,
+                        color: AppTheme.primaryGreen,
+                      ),
+                    ),
+                  )
+                      : ElevatedButton.icon(
+                    onPressed: isEditMode ? null : _verifyStudentUserId,
+                    icon: Icon(
+                      _isStudentUserIdVerified
+                          ? Icons.check_circle
+                          : Icons.verified_user_outlined,
+                      size: 18,
+                    ),
+                    label: Text(_isStudentUserIdVerified ? 'Verified' : 'Verify'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isStudentUserIdVerified
+                          ? AppTheme.primaryGreen
+                          : AppTheme.primaryGreen.withOpacity(0.8),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+// ✅ Student Password (disabled until verified)
+            _buildTextField(
+              'Password',
+              _studentPasswordController,
+              _isStudentUserIdVerified ? 'Set password' : 'Verify User ID first',
+              obscureText: true,
+              readOnly: isEditMode || !_isStudentUserIdVerified,
+            ),
+
+// ✅ NEW: Warning message when not verified
+            if (!_isStudentUserIdVerified && !isEditMode)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange.shade700, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Please verify the User ID before setting a password',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: Colors.orange.shade900,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              _buildTextField(
-                'Password',
-                _studentPasswordController,
-                'Set password',
-                obscureText: true,
-                readOnly: isEditMode,
-              ),
-            ]),
+
             const SizedBox(height: 20),
+
+// ============ PARENT LOGIN SECTION ============
             Text(
               'Parent Login',
               style: GoogleFonts.poppins(
@@ -1943,21 +2320,104 @@ class _AddStudentScreenState extends State<AddStudentScreen>
               ),
             ),
             const SizedBox(height: 12),
-            _buildResponsiveRow([
-              _buildTextField(
-                'Username',
-                _parentUsernameController,
-                'Enter parent/guardian username',
-                readOnly: isEditMode,
+
+// ✅ NEW: Parent Username with Verify Button
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: _buildTextField(
+                    'Username',
+                    _parentUsernameController,
+                    'Enter parent username',
+                    readOnly: isEditMode,
+                    onChanged: (_) {
+                      setState(() {
+                        _isParentUserIdVerified = false;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Padding(
+                  padding: const EdgeInsets.only(top: 28),
+                  child: _isVerifyingParentUserId
+                      ? SizedBox(
+                    width: 100,
+                    height: 48,
+                    child: Center(
+                      child: BeautifulLoader(
+                        type: LoaderType.dots,
+                        size: 30,
+                        color: AppTheme.primaryGreen,
+                      ),
+                    ),
+                  )
+                      : ElevatedButton.icon(
+                    onPressed: isEditMode ? null : _verifyParentUserId,
+                    icon: Icon(
+                      _isParentUserIdVerified
+                          ? Icons.check_circle
+                          : Icons.verified_user_outlined,
+                      size: 18,
+                    ),
+                    label: Text(_isParentUserIdVerified ? 'Verified' : 'Verify'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isParentUserIdVerified
+                          ? AppTheme.primaryGreen
+                          : AppTheme.primaryGreen.withOpacity(0.8),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+// ✅ Parent Password (disabled until verified)
+            _buildTextField(
+              'Password',
+              _parentPasswordController,
+              _isParentUserIdVerified ? 'Set password' : 'Verify User ID first',
+              obscureText: true,
+              readOnly: isEditMode || !_isParentUserIdVerified,
+            ),
+
+// ✅ NEW: Warning message when not verified
+            if (!_isParentUserIdVerified && !isEditMode)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange.shade700, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Please verify the User ID before setting a password',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: Colors.orange.shade900,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              _buildTextField(
-                'Password',
-                _parentPasswordController,
-                'Set temporary password',
-                obscureText: true,
-                readOnly: isEditMode,
-              ),
-            ]),
+
             const SizedBox(height: 24),
             _buildCheckboxListTile(
               title: 'Active Status',
@@ -1967,6 +2427,7 @@ class _AddStudentScreenState extends State<AddStudentScreen>
                 setState(() => _isActive = value ?? true);
               },
             ),
+
           ],
         ),
       ),
@@ -2436,33 +2897,58 @@ class _AddStudentScreenState extends State<AddStudentScreen>
     );
   }
 
-  // ==================== SUBMIT / NEXT HANDLER ====================
-  void _handleNextOrSubmit() {
-    final currentKey = _formKeys[_tabController.index];
+  // ==================== NAVIGATION & SUBMISSION ====================
 
+  void _handleNextOrSubmit() {
+    final connectivityProvider = Provider.of<ConnectivityProvider>(context, listen: false);
+
+    // Validate current tab
+    final currentKey = _formKeys[_tabController.index];
     if (currentKey == null || !currentKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Please complete all required fields on the current step before proceeding.',
-            style: GoogleFonts.inter(),
-          ),
-          backgroundColor: Colors.red,
-        ),
+      CustomSnackbar.showError(
+        context,
+        'Please complete all required fields on the current step before proceeding.',
+        title: 'Validation Failed',
       );
       return;
     }
 
-    // If validation passes
+    // ✅ Mark current tab as completed
+    setState(() {
+      _completedTabs.add(_tabController.index);
+    });
+
+    // Check if this is the last tab
     if (_tabController.index < _kTotalTabs - 1) {
-      // Move to the next tab (Next)
+      // Move to next tab
       _tabController.animateTo(_tabController.index + 1);
-      setState(() {}); // Force rebuild to update button text/state
+
+      // ✅ Show success snackbar
+      CustomSnackbar.showSuccess(
+        context,
+        'Section completed! Moving to next step.',
+        title: '✅ Progress Saved',
+      );
+
+      setState(() {}); // Force UI update
     } else {
-      // Last tab: Show Confirmation and then Submit
+      // Last tab - check network before submission
+      if (!connectivityProvider.isOnline) {
+        CustomSnackbar.showError(
+          context,
+          'Cannot submit while offline. Please connect to internet first.',
+          title: 'No Internet Connection',
+        );
+        return;
+      }
+
+      // Show confirmation dialog
       _showConfirmationDialog();
     }
   }
+
+
+
 
   // ==================== CONFIRMATION DIALOG ====================
   void _showConfirmationDialog() {

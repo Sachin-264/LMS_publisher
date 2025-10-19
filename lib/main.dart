@@ -1,7 +1,10 @@
 // lib/main.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:lms_publisher/AdminScreen/AdminPublish/Publisher_bloc.dart';
+import 'package:lms_publisher/Provider/ConnectivityProvider.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/School_Panel/student_module/student_bloc.dart';
 import 'package:lms_publisher/School_Panel/student_module/student_service.dart';
@@ -22,6 +25,8 @@ import 'package:lms_publisher/School_Panel/school_panel_dashboard_bloc.dart';
 import 'package:lms_publisher/School_Panel/subject_module/subject_module_api_service.dart';
 import 'package:lms_publisher/School_Panel/subject_module/subject_module_bloc.dart';
 import 'package:provider/provider.dart';
+import 'Util/custom_snackbar.dart';
+import 'Theme/apptheme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,8 +38,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => UserProvider(),
+    return MultiProvider(
+      providers: [
+        // User Provider
+        ChangeNotifierProvider(
+          create: (context) => UserProvider(),
+        ),
+        // Connectivity Provider (App-wide network monitoring)
+        ChangeNotifierProvider(
+          create: (context) => ConnectivityProvider(),
+        ),
+      ],
       child: MultiRepositoryProvider(
         providers: [
           // Authentication Service
@@ -73,7 +87,7 @@ class MyApp extends StatelessWidget {
               create: (context) => LoginBloc(
                 userRightsService: context.read(),
                 userProvider: context.read(),
-              )..add(LoadUserGroups()),
+              ),
             ),
             // Dashboard BLoC
             BlocProvider(
@@ -102,33 +116,83 @@ class MyApp extends StatelessWidget {
             // Subject Module BLoC
             BlocProvider(
               create: (context) => SubjectModuleBloc(
-                context.read<SubjectModuleApiService>(),
+                context.read(),
               ),
             ),
             // Student BLoC
             BlocProvider(
               create: (context) => StudentBloc(
-                apiService: RepositoryProvider.of<StudentApiService>(context),
+                apiService: RepositoryProvider.of(context),
               ),
             ),
             // Teacher BLoC
             BlocProvider(
               create: (context) => TeacherBloc(
-                apiService: RepositoryProvider.of<TeacherApiService>(context),
+                apiService: RepositoryProvider.of(context),
               ),
             ),
           ],
-          child: MaterialApp(
-            debugShowCheckedModeBanner: false,
-            title: 'LMS Publisher',
-            navigatorKey: NavigationService.navigatorKey,
-            home: Consumer<UserProvider>(
-              builder: (context, userProvider, child) {
-                return userProvider.isLoggedIn
-                    ? const HomeScreen()
-                    : const ResponsiveLoginScreen();
-              },
-            ),
+          child: Consumer<ConnectivityProvider>(
+            builder: (context, connectivity, child) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                title: 'LMS Publisher',
+                navigatorKey: NavigationService.navigatorKey,
+                builder: (context, widget) {
+                  return Stack(
+                    children: [
+                      widget!,
+                      // Global connectivity banner
+                      if (!connectivity.isOnline)
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: Material(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              color: Colors.red.shade600,
+                              child: SafeArea(
+                                bottom: false,
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.wifi_off,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'No Internet Connection',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+                home: Consumer<UserProvider>(
+                  builder: (context, userProvider, child) {
+                    return userProvider.isLoggedIn
+                        ? const HomeScreen()
+                        : const ResponsiveLoginScreen();
+                  },
+                ),
+              );
+            },
           ),
         ),
       ),
