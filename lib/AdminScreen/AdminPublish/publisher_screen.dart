@@ -906,7 +906,10 @@ class _PublisherListItemState extends State<PublisherListItem> {
   void _showHardDeleteDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => _ImprovedDeleteConfirmationDialog(publisher: widget.publisher),
+      builder: (dialogContext) => BlocProvider.value(
+        value: context.read<PublisherBloc>(),
+        child: _ImprovedDeleteConfirmationDialog(publisher: widget.publisher),
+      ),
     );
   }
 }

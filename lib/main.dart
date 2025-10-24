@@ -28,6 +28,16 @@ import 'package:provider/provider.dart';
 import 'Util/custom_snackbar.dart';
 import 'Theme/apptheme.dart';
 
+// ✅ Import additional screens needed for routing
+import 'package:lms_publisher/screens/School/School_manage.dart';
+import 'package:lms_publisher/School_Panel/student_module/student_manage.dart';
+import 'package:lms_publisher/School_Panel/teacher_module/teacher_manage.dart';
+import 'package:lms_publisher/screens/SubscriptionScreen/subscription_dart.dart';
+import 'package:lms_publisher/screens/AcademicsScreen/academics_screen.dart';
+import 'package:lms_publisher/AdminScreen/AdminPublish/publisher_screen.dart';
+import 'package:lms_publisher/School_Panel/School_panel_dashboard.dart';
+import 'package:lms_publisher/School_Panel/subject_module/subject_module_screen.dart';
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
@@ -187,7 +197,7 @@ class MyApp extends StatelessWidget {
                 home: Consumer<UserProvider>(
                   builder: (context, userProvider, child) {
                     return userProvider.isLoggedIn
-                        ? const HomeScreen()
+                        ? _getDefaultHomePage(userProvider)
                         : const ResponsiveLoginScreen();
                   },
                 ),
@@ -197,5 +207,58 @@ class MyApp extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // ✅ NEW: Function to get the default homepage based on lowest sequence number
+  Widget _getDefaultHomePage(UserProvider userProvider) {
+    // Get all visible menus
+    final visibleMenus = userProvider.getVisibleMenus();
+
+    if (visibleMenus.isEmpty) {
+      // Fallback to HomeScreen if no menus are available
+      return const HomeScreen();
+    }
+
+    // Sort menus by sequence number (sNo) and get the first one
+    visibleMenus.sort((a, b) {
+      final aNum = int.tryParse(a.sNo) ?? 999999;
+      final bNum = int.tryParse(b.sNo) ?? 999999;
+      return aNum.compareTo(bNum);
+    });
+
+    final firstMenu = visibleMenus.first;
+
+    // Route to the appropriate screen based on menuCode
+    return _getScreenByMenuCode(firstMenu.menuCode);
+  }
+
+  // ✅ NEW: Helper function to map menuCode to Widget
+  Widget _getScreenByMenuCode(String menuCode) {
+    switch (menuCode) {
+      case 'M001':
+        return const HomeScreen();
+      case 'M002':
+        return const SchoolsScreen();
+      case 'M007':
+        return const StudentsScreen();
+      case 'M008':
+        return const TeachersScreen();
+      case 'M003':
+        return const SubscriptionsScreen();
+      case 'M004':
+        return const AcademicsScreen();
+      case 'M005':
+        return const PublisherScreen();
+      case 'M009':
+        return const SchoolPanelDashboard();
+      case 'M010':
+        return const SubjectModuleScreen(
+          schoolRecNo: 1,
+          academicYear: '2025-26',
+        );
+      default:
+      // Fallback to Dashboard if menuCode doesn't match
+        return const HomeScreen();
+    }
   }
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // Import flutter/material.dart for SystemMouseCursors
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
@@ -8,6 +8,7 @@ import 'package:lms_publisher/School_Panel/School_panel_dashboard.dart';
 import 'package:lms_publisher/School_Panel/student_module/student_manage.dart';
 import 'package:lms_publisher/School_Panel/teacher_module/teacher_manage.dart';
 import 'package:lms_publisher/School_Panel/subject_module/subject_module_screen.dart';
+import 'package:lms_publisher/StudentPannel/MySubject/my_subject_screen.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/screens/AcademicsScreen/academics_screen.dart';
 import 'package:lms_publisher/screens/HomePage/HomePage.dart';
@@ -27,6 +28,7 @@ enum AppScreen {
   publishers,
   schoolPanel,
   subjectModule,
+  mySubjects,
   settings
 }
 
@@ -37,29 +39,24 @@ final ValueNotifier<bool> isMobileMenuOpen = ValueNotifier(false);
 class MainLayout extends StatefulWidget {
   final Widget child;
   final AppScreen activeScreen;
-
   const MainLayout({
     super.key,
     required this.child,
     required this.activeScreen,
   });
-
   @override
   State<MainLayout> createState() => _MainLayoutState();
 }
 
 class _MainLayoutState extends State<MainLayout> {
   late ScrollController _scrollController;
-
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
-
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >= 0 &&
           _scrollController.position.pixels % 100 < 1) {
-        print('📜 Scroll: ${_scrollController.position.pixels.toStringAsFixed(0)} / ${_scrollController.position.maxScrollExtent.toStringAsFixed(0)}');
       }
     });
   }
@@ -75,7 +72,6 @@ class _MainLayoutState extends State<MainLayout> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     final isMobile = screenWidth < 600;
-
     final padding = MediaQuery.of(context).padding;
     print('🔔 Top Notch: ${padding.top}, 📱 Screen: $screenWidth x $screenHeight');
 
@@ -113,24 +109,31 @@ class _MainLayoutState extends State<MainLayout> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _Header(isMobile: isMobile),
-                            SizedBox(height: isMobile ? 12 : AppTheme.defaultPadding * 1.5),
+                            SizedBox(
+                                height:
+                                isMobile ? 12 : AppTheme.defaultPadding * 1.5),
 
                             // ✅ FIXED: Proper scrolling with debugging
                             Expanded(
                               child: LayoutBuilder(
                                 builder: (context, constraints) {
-                                  print('📐 Available scroll area height: ${constraints.maxHeight}');
+
 
                                   return NotificationListener<ScrollNotification>(
-                                    onNotification: (ScrollNotification notification) {
+                                    onNotification:
+                                        (ScrollNotification notification) {
                                       if (notification is ScrollStartNotification) {
-                                        print('🟢 Scroll Started');
-                                      } else if (notification is ScrollEndNotification) {
-                                        final percent = (_scrollController.position.pixels /
-                                            _scrollController.position.maxScrollExtent * 100).toStringAsFixed(0);
-                                        print('🔴 Scroll Ended at: $percent%');
-                                      } else if (notification is OverscrollNotification) {
-                                        print('⚠️ Overscroll: ${notification.overscroll.toStringAsFixed(0)}');
+
+                                      } else if (notification
+                                      is ScrollEndNotification) {
+                                        final percent = (_scrollController
+                                            .position.pixels /
+                                            _scrollController
+                                                .position.maxScrollExtent *
+                                            100)
+                                            .toStringAsFixed(0);
+                                      } else if (notification
+                                      is OverscrollNotification) {
                                       }
                                       return false;
                                     },
@@ -140,11 +143,15 @@ class _MainLayoutState extends State<MainLayout> {
                                       child: Builder(
                                         builder: (context) {
                                           // ✅ Measure child height after build
-                                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                                            final RenderBox? box = context.findRenderObject() as RenderBox?;
+                                          WidgetsBinding.instance
+                                              .addPostFrameCallback((_) {
+                                            final RenderBox? box = context
+                                                .findRenderObject() as RenderBox?;
                                             if (box != null && box.hasSize) {
-                                              print('🎯 Child Content Height: ${box.size.height.toStringAsFixed(0)}');
-                                              print('🎯 Child Content Width: ${box.size.width.toStringAsFixed(0)}');
+                                              print(
+                                                  '🎯 Child Content Height: ${box.size.height.toStringAsFixed(0)}');
+                                              print(
+                                                  '🎯 Child Content Width: ${box.size.width.toStringAsFixed(0)}');
                                             }
                                           });
 
@@ -191,7 +198,6 @@ class _MainLayoutState extends State<MainLayout> {
   }
 }
 
-
 // ✅ Mobile Menu Item Widget
 class _MobileMenuItem extends StatelessWidget {
   final IconData icon;
@@ -200,7 +206,6 @@ class _MobileMenuItem extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? textColor;
   final Color? iconColor;
-
   const _MobileMenuItem({
     required this.icon,
     required this.text,
@@ -209,12 +214,12 @@ class _MobileMenuItem extends StatelessWidget {
     this.textColor,
     this.iconColor,
   });
-
   @override
   Widget build(BuildContext context) {
-    final effectiveTextColor = textColor ?? (isActive ? AppTheme.primaryGreen : AppTheme.bodyText);
-    final effectiveIconColor = iconColor ?? (isActive ? AppTheme.primaryGreen : AppTheme.bodyText);
-
+    final effectiveTextColor =
+        textColor ?? (isActive ? AppTheme.primaryGreen : AppTheme.bodyText);
+    final effectiveIconColor =
+        iconColor ?? (isActive ? AppTheme.primaryGreen : AppTheme.bodyText);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -227,7 +232,8 @@ class _MobileMenuItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              border: isActive ? Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)) : null,
+              border:
+              isActive ? Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)) : null,
             ),
             child: Row(
               children: [
@@ -264,9 +270,7 @@ class _MobileMenuItem extends StatelessWidget {
 // ✅ UPDATED: Header with Hamburger Menu
 class _Header extends StatelessWidget {
   final bool isMobile;
-
   const _Header({required this.isMobile});
-
   @override
   Widget build(BuildContext context) {
     return Consumer<UserProvider>(
@@ -275,7 +279,6 @@ class _Header extends StatelessWidget {
           builder: (context, constraints) {
             bool isCompact = constraints.maxWidth < 650;
             String userName = userProvider.userName ?? 'Admin User';
-
             return Row(
               children: [
                 // ✅ Hamburger Menu Button (Mobile Only)
@@ -435,16 +438,13 @@ class _Header extends StatelessWidget {
 }
 
 // ==================== MODERN COLLAPSIBLE SIDEBAR ====================
-
 class _ModernCollapsibleSidebar extends StatelessWidget {
   final bool isCollapsed;
   final AppScreen activeScreen;
-
   const _ModernCollapsibleSidebar({
     required this.isCollapsed,
     required this.activeScreen,
   });
-
   @override
   Widget build(BuildContext context) {
     // 🆕 ADDED: Consumer wrapper for UserProvider access
@@ -572,37 +572,43 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                         ),
                       ],
 
-                      // Students Menu Item (New Module)
-                      _CollapsibleMenuItem(
-                        icon: Iconsax.profile_2user,
-                        text: 'Students',
-                        isActive: activeScreen == AppScreen.students,
-                        isCollapsed: isCollapsed,
-                        onTap: () {
-                          if (activeScreen != AppScreen.students) {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (_) => const StudentsScreen()),
-                            );
-                          }
-                        },
-                      ),
+                      // Students Menu Item (New Module) - M007
+                      // ✅ UPDATED: Wrapped with M007 access check
+                      if (userProvider.hasMenuAccess('M007')) ...[
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.profile_2user,
+                          text: 'Students',
+                          isActive: activeScreen == AppScreen.students,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.students) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (_) => const StudentsScreen()),
+                              );
+                            }
+                          },
+                        ),
+                      ],
 
-                      // Teachers Menu Item (New Module)
-                      _CollapsibleMenuItem(
-                        icon: Iconsax.teacher,
-                        text: 'Teachers',
-                        isActive: activeScreen == AppScreen.teachers,
-                        isCollapsed: isCollapsed,
-                        onTap: () {
-                          if (activeScreen != AppScreen.teachers) {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (_) => const TeachersScreen()),
-                            );
-                          }
-                        },
-                      ),
+                      // Teachers Menu Item (New Module) - M008
+                      // ✅ UPDATED: Wrapped with M008 access check
+                      if (userProvider.hasMenuAccess('M008')) ...[
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.teacher,
+                          text: 'Teachers',
+                          isActive: activeScreen == AppScreen.teachers,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.teachers) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (_) => const TeachersScreen()),
+                              );
+                            }
+                          },
+                        ),
+                      ],
 
                       // Subscriptions - M003
                       if (userProvider.hasMenuAccess('M003')) ...[
@@ -615,7 +621,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.subscriptions) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (_) => const SubscriptionsScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => const SubscriptionsScreen()),
                               );
                             }
                           },
@@ -633,7 +640,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.academics) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (_) => const AcademicsScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => const AcademicsScreen()),
                               );
                             }
                           },
@@ -651,49 +659,75 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.publishers) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (_) => const PublisherScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => const PublisherScreen()),
                               );
                             }
                           },
                         ),
                       ],
 
-                      // School Panel
-                      _CollapsibleMenuItem(
-                        icon: Iconsax.monitor,
-                        text: 'School Panel',
-                        isActive: activeScreen == AppScreen.schoolPanel,
-                        isCollapsed: isCollapsed,
-                        onTap: () {
-                          if (activeScreen != AppScreen.schoolPanel) {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (_) => const SchoolPanelDashboard()),
-                            );
-                          }
-                        },
-                      ),
+                      // School Panel - M009
+                      // ✅ UPDATED: Wrapped with M009 access check
+                      if (userProvider.hasMenuAccess('M009')) ...[
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.monitor,
+                          text: 'School Panel',
+                          isActive: activeScreen == AppScreen.schoolPanel,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.schoolPanel) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const SchoolPanelDashboard()),
+                              );
+                            }
+                          },
+                        ),
+                      ],
 
-                      // Subject Module
-                      _CollapsibleMenuItem(
-                        icon: Iconsax.book_square,
-                        text: 'Subject Module',
-                        isActive: activeScreen == AppScreen.subjectModule,
-                        isCollapsed: isCollapsed,
-                        onTap: () {
-                          if (activeScreen != AppScreen.subjectModule) {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SubjectModuleScreen(
-                                  schoolRecNo: 1,
-                                  academicYear: '2025-26',
+                      // Subject Module - M010
+                      // ✅ UPDATED: Wrapped with M010 access check
+                      if (userProvider.hasMenuAccess('M010')) ...[
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.book_square,
+                          text: 'Subject Module',
+                          isActive: activeScreen == AppScreen.subjectModule,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.subjectModule) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SubjectModuleScreen(
+                                    schoolRecNo: 1,
+                                    academicYear: '2025-26',
+                                  ),
                                 ),
-                              ),
-                            );
-                          }
-                        },
-                      ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                      // My Subjects - M00 (Student Panel)
+                      if (userProvider.hasMenuAccess('M011')) ...[
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.book_1,
+                          text: 'My Subjects',
+                          isActive: activeScreen == AppScreen.mySubjects,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.mySubjects) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (_) => const MySubjectsScreen()),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+
 
                       const Spacer(),
 
@@ -739,7 +773,6 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
 }
 
 // ==================== COLLAPSIBLE MENU ITEM ====================
-
 class _CollapsibleMenuItem extends StatefulWidget {
   final IconData icon;
   final String text;
@@ -748,7 +781,6 @@ class _CollapsibleMenuItem extends StatefulWidget {
   final VoidCallback? onTap;
   final Color? textColor;
   final Color? iconColor;
-
   const _CollapsibleMenuItem({
     required this.icon,
     required this.text,
@@ -758,7 +790,6 @@ class _CollapsibleMenuItem extends StatefulWidget {
     this.textColor,
     this.iconColor,
   });
-
   @override
   _CollapsibleMenuItemState createState() => _CollapsibleMenuItemState();
 }
@@ -768,7 +799,6 @@ class _CollapsibleMenuItemState extends State<_CollapsibleMenuItem>
   bool _isHovered = false;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
-
   @override
   void initState() {
     super.initState();
@@ -793,7 +823,6 @@ class _CollapsibleMenuItemState extends State<_CollapsibleMenuItem>
         (widget.isActive ? AppTheme.primaryGreen : AppTheme.bodyText);
     final effectiveIconColor = widget.iconColor ??
         (widget.isActive ? AppTheme.primaryGreen : AppTheme.bodyText);
-
     Widget menuItem = MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -818,7 +847,8 @@ class _CollapsibleMenuItemState extends State<_CollapsibleMenuItem>
                       : (_isHovered
                       ? AppTheme.borderGrey.withOpacity(0.2)
                       : Colors.transparent),
-                  borderRadius: BorderRadius.circular(widget.isCollapsed ? 12 : 16),
+                  borderRadius:
+                  BorderRadius.circular(widget.isCollapsed ? 12 : 16),
                   border: widget.isActive
                       ? Border.all(color: AppTheme.primaryGreen.withOpacity(0.2))
                       : null,
@@ -882,12 +912,9 @@ class _CollapsibleMenuItemState extends State<_CollapsibleMenuItem>
 }
 
 // ==================== SIDEBAR TOGGLE BUTTON ====================
-
 class _SidebarToggleButton extends StatelessWidget {
   final bool isCollapsed;
-
   const _SidebarToggleButton({required this.isCollapsed});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -938,7 +965,6 @@ class _SidebarToggleButton extends StatelessWidget {
 // ✅ ADD THIS: Smooth Page Transition Helper
 class SmoothPageRoute<T> extends PageRouteBuilder<T> {
   final Widget page;
-
   SmoothPageRoute({required this.page})
       : super(
     pageBuilder: (context, animation, secondaryAnimation) => page,
@@ -950,7 +976,6 @@ class SmoothPageRoute<T> extends PageRouteBuilder<T> {
         parent: animation,
         curve: Curves.easeInOutCubic,
       );
-
       return FadeTransition(
         opacity: curvedAnimation,
         child: SlideTransition(
@@ -969,9 +994,7 @@ class SmoothPageRoute<T> extends PageRouteBuilder<T> {
 // ✅ CLEAN & PROFESSIONAL Mobile Drawer
 class _MobileDrawer extends StatelessWidget {
   final AppScreen activeScreen;
-
   const _MobileDrawer({required this.activeScreen});
-
   void _navigateTo(BuildContext context, Widget screen) {
     Navigator.pop(context);
     Future.delayed(const Duration(milliseconds: 250), () {
@@ -1128,7 +1151,8 @@ class _MobileDrawer extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
@@ -1206,19 +1230,25 @@ class _MobileDrawer extends StatelessWidget {
                         onTap: () => _navigateTo(context, const SchoolsScreen()),
                       ),
 
-                    _SimpleMenuItem(
-                      icon: Iconsax.profile_2user,
-                      title: 'Students',
-                      isActive: activeScreen == AppScreen.students,
-                      onTap: () => _navigateTo(context, const StudentsScreen()),
-                    ),
+                    // Students - M007
+                    // ✅ UPDATED: Wrapped with M007 access check
+                    if (userProvider.hasMenuAccess('M007'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.profile_2user,
+                        title: 'Students',
+                        isActive: activeScreen == AppScreen.students,
+                        onTap: () => _navigateTo(context, const StudentsScreen()),
+                      ),
 
-                    _SimpleMenuItem(
-                      icon: Iconsax.teacher,
-                      title: 'Teachers',
-                      isActive: activeScreen == AppScreen.teachers,
-                      onTap: () => _navigateTo(context, const TeachersScreen()),
-                    ),
+                    // Teachers - M008
+                    // ✅ UPDATED: Wrapped with M008 access check
+                    if (userProvider.hasMenuAccess('M008'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.teacher,
+                        title: 'Teachers',
+                        isActive: activeScreen == AppScreen.teachers,
+                        onTap: () => _navigateTo(context, const TeachersScreen()),
+                      ),
 
                     if (userProvider.hasMenuAccess('M003'))
                       _SimpleMenuItem(
@@ -1244,25 +1274,40 @@ class _MobileDrawer extends StatelessWidget {
                         onTap: () => _navigateTo(context, const PublisherScreen()),
                       ),
 
-                    _SimpleMenuItem(
-                      icon: Iconsax.monitor,
-                      title: 'School Panel',
-                      isActive: activeScreen == AppScreen.schoolPanel,
-                      onTap: () => _navigateTo(context, const SchoolPanelDashboard()),
-                    ),
+                    // School Panel - M009
+                    // ✅ UPDATED: Wrapped with M009 access check
+                    if (userProvider.hasMenuAccess('M009'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.monitor,
+                        title: 'School Panel',
+                        isActive: activeScreen == AppScreen.schoolPanel,
+                        onTap: () => _navigateTo(context, const SchoolPanelDashboard()),
+                      ),
 
-                    _SimpleMenuItem(
-                      icon: Iconsax.book_square,
-                      title: 'Subject Module',
-                      isActive: activeScreen == AppScreen.subjectModule,
-                      onTap: () => _navigateTo(
-                        context,
-                        const SubjectModuleScreen(
-                          schoolRecNo: 1,
-                          academicYear: '2025-26',
+                    // Subject Module - M010
+                    // ✅ UPDATED: Wrapped with M010 access check
+                    if (userProvider.hasMenuAccess('M010'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.book_square,
+                        title: 'Subject Module',
+                        isActive: activeScreen == AppScreen.subjectModule,
+                        onTap: () => _navigateTo(
+                          context,
+                          const SubjectModuleScreen(
+                            schoolRecNo: 1,
+                            academicYear: '2025-26',
+                          ),
                         ),
                       ),
-                    ),
+                    if (userProvider.hasMenuAccess('M011'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.book_1,
+                        title: 'My Subjects',
+                        isActive: activeScreen == AppScreen.mySubjects,
+                        onTap: () => _navigateTo(context, const MySubjectsScreen()),
+                      ),
+
+
 
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -1382,7 +1427,6 @@ class _MobileDrawer extends StatelessWidget {
   }
 }
 
-
 // ✅ Simple Clean Menu Item
 class _SimpleMenuItem extends StatelessWidget {
   final IconData icon;
@@ -1390,7 +1434,6 @@ class _SimpleMenuItem extends StatelessWidget {
   final bool isActive;
   final VoidCallback? onTap;
   final Color? textColor;
-
   const _SimpleMenuItem({
     required this.icon,
     required this.title,
@@ -1398,7 +1441,6 @@ class _SimpleMenuItem extends StatelessWidget {
     this.onTap,
     this.textColor,
   });
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -1455,13 +1497,10 @@ class _SimpleMenuItem extends StatelessWidget {
   }
 }
 
-
 // ✅ Section Header Widget
 class _SectionHeader extends StatelessWidget {
   final String title;
-
   const _SectionHeader({required this.title});
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -1488,7 +1527,6 @@ class _ModernMenuItem extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? textColor;
   final Gradient? gradient;
-
   const _ModernMenuItem({
     required this.icon,
     required this.text,
@@ -1498,7 +1536,6 @@ class _ModernMenuItem extends StatelessWidget {
     this.textColor,
     this.gradient,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1553,7 +1590,6 @@ class _ModernMenuItem extends StatelessWidget {
                     size: 22,
                   ),
                 ),
-
                 const SizedBox(width: 14),
 
                 // Text content
@@ -1565,7 +1601,9 @@ class _ModernMenuItem extends StatelessWidget {
                         text,
                         style: GoogleFonts.inter(
                           color: textColor ??
-                              (isActive ? AppTheme.primaryGreen : AppTheme.darkText),
+                              (isActive
+                                  ? AppTheme.primaryGreen
+                                  : AppTheme.darkText),
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
                         ),
@@ -1612,6 +1650,3 @@ class _ModernMenuItem extends StatelessWidget {
     );
   }
 }
-
-
-

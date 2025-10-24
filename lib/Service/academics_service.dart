@@ -23,8 +23,8 @@ class ApiService {
 
   ApiService._internal();
 
-  static const String baseUrl = 'http://localhost/AquareLMS';
-  static const String _logoBaseUrl = "http://localhost/AquareCRM/uploadgcp.php";
+  static const String baseUrl = 'http://10.100.2.119/AquareLMS';
+  static const String _logoBaseUrl = "http://10.100.2.119/AquareCRM/uploadgcp.php";
   static const String _imageBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
   static const String _documentBaseUrl = "https://storage.googleapis.com/upload-images-34/documents/LMS/";
 

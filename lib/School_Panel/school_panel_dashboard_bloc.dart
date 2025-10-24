@@ -500,7 +500,7 @@ class SchoolPanelBloc extends Bloc<SchoolPanelEvent, SchoolPanelState> {
       ) async {
     try {
       final url = Uri.parse(
-        'http://localhost/AquareLMS/school_dashboard.php?Content-Type=application/json',
+        'http://10.100.2.119/AquareLMS/school_dashboard.php?Content-Type=application/json',
       );
 
       final response = await http.post(

@@ -30,6 +30,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -112,10 +113,22 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 600),
     );
-    _fadeAnimation =
-        CurvedAnimation(parent: _animationController, curve: Curves.easeOut);
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    ));
+
     _loadData();
 
     // Add listeners to update completion status
@@ -161,7 +174,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     if (_isEditMode) return true;
     return _controllers['userID']!.text.trim().isNotEmpty &&
         _controllers['userPassword']!.text.trim().isNotEmpty &&
-        _userIdVerified == false; // UserID must be verified as NOT existing
+        _userIdVerified == false;
   }
 
   double _calculateOverallProgress() {
@@ -178,13 +191,16 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
+
     try {
       await _loadLocationData();
+
       if (_isEditMode) {
         final details =
         await _apiService.getPublisherDetails(widget.publisherRecNo!);
         _populateForm(details);
       }
+
       _animationController.forward();
     } catch (e) {
       if (mounted) {
@@ -197,6 +213,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
 
   Future<void> _loadLocationData() async {
     setState(() => _loadingLocations = true);
+
     try {
       final statesData = await _apiService.getStates();
       final statesList = (statesData as List).map((state) {
@@ -210,6 +227,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
         _states = statesList;
         _loadingLocations = false;
       });
+
       print('[AddEditPublisher] Loaded ${_states.length} states');
     } catch (e) {
       setState(() => _loadingLocations = false);
@@ -234,6 +252,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
       setState(() {
         _districts = districtsList;
       });
+
       print(
           '[AddEditPublisher] Loaded ${_districts.length} districts for state $stateID');
     } catch (e) {
@@ -258,6 +277,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
       setState(() {
         _cities = citiesList;
       });
+
       print(
           '[AddEditPublisher] Loaded ${_cities.length} cities for district $districtID');
     } catch (e) {
@@ -289,7 +309,8 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
       setState(() {
         _userIdVerified = exists;
         if (exists) {
-          _userIdVerificationMessage = 'UserID already exists! Please choose another.';
+          _userIdVerificationMessage =
+          'UserID already exists! Please choose another.';
           CustomSnackbar.showError(context, _userIdVerificationMessage!);
         } else {
           _userIdVerificationMessage = 'UserID is available!';
@@ -333,6 +354,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     _controllers['numberOfTitles']!.text =
         details.numberOfTitles?.toString() ?? '';
     _controllers['userID']!.text = details.userID ?? '';
+
     _selectedStateID = details.stateID;
     _selectedDistrictID = details.districtID;
     _selectedCityID = details.cityID;
@@ -343,6 +365,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     if (_selectedStateID != null) {
       _loadDistrictsForState(_selectedStateID!);
     }
+
     if (_selectedDistrictID != null) {
       _loadCitiesForDistrict(_selectedDistrictID!);
     }
@@ -352,6 +375,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     try {
       final XFile? image =
       await _picker.pickImage(source: ImageSource.gallery);
+
       if (image != null) {
         final bytes = await image.readAsBytes();
         setState(() {
@@ -375,8 +399,10 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
         CustomSnackbar.showError(context, 'Please verify the UserID first');
         return;
       }
+
       if (_userIdVerified == true) {
-        CustomSnackbar.showError(context, 'UserID already exists! Choose another UserID');
+        CustomSnackbar.showError(
+            context, 'UserID already exists! Choose another UserID');
         return;
       }
     }
@@ -386,6 +412,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final currentUserCode = userProvider.userCode;
+
       if (currentUserCode == null) throw Exception('User not logged in');
 
       String? uploadedFileName = _existingLogoFileName;
@@ -431,6 +458,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
         };
 
         final success = await _apiService.updatePublisher(data);
+
         if (success && mounted) {
           Navigator.pop(context, true);
           CustomSnackbar.showSuccess(
@@ -438,10 +466,20 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
         }
       } else {
         final userGroups = await _userRightsService.getUserGroups();
-        final publisherGroup = userGroups.firstWhere(
-              (group) => group.userGroupName.toLowerCase().contains('publisher'),
-          orElse: () => throw Exception('Publisher user group not found'),
-        );
+
+        // Find publisher group safely
+        UserGroup? publisherGroup;
+        for (var group in userGroups) {
+          if (group.userGroupName.toLowerCase().contains('publisher')) {
+            publisherGroup = group;
+            break;
+          }
+        }
+
+        if (publisherGroup == null) {
+          throw Exception('Publisher user group not found in the system.');
+        }
+
 
         final userID = _controllers['userID']!.text.trim();
         final userPassword = _controllers['userPassword']!.text.trim();
@@ -490,6 +528,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
         };
 
         final result = await _apiService.addPublisher(data);
+
         if (result['success'] == true && mounted) {
           Navigator.pop(context, true);
           CustomSnackbar.showSuccess(
@@ -512,23 +551,24 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: 950,
-          maxHeight: MediaQuery.of(context).size.height * 0.92,
+          maxWidth: 1000,
+          maxHeight: MediaQuery.of(context).size.height * 0.94,
         ),
         decoration: BoxDecoration(
-          color: AppTheme.background,
-          borderRadius: BorderRadius.circular(28),
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 50,
-              offset: const Offset(0, 20),
+              color: AppTheme.primaryGreen.withOpacity(0.2),
+              blurRadius: 60,
+              spreadRadius: 5,
+              offset: const Offset(0, 25),
             ),
           ],
         ),
         child: Column(
           children: [
-            _buildModernHeader(),
+            _buildGlassmorphicHeader(),
             Expanded(
               child: _isLoading
                   ? Center(
@@ -541,248 +581,322 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
               )
                   : FadeTransition(
                 opacity: _fadeAnimation,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(32),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLogoSection(),
-                        const SizedBox(height: 24),
-                        if (!_isEditMode) ...[
-                          _buildCredentialsSection(),
-                          const SizedBox(height: 24),
-                        ],
-                        _buildSection(
-                          'Basic Information',
-                          Iconsax.info_circle,
-                          Colors.blue,
-                          _isBasicInfoComplete(),
-                          [
-                            _buildModernTextField('Publisher Name',
-                                'publisherName', Iconsax.building,
-                                isRequired: true),
-                            _buildModernDropdown(
-                              label: 'Publisher Type',
-                              icon: Iconsax.category,
-                              value: _selectedPublisherType,
-                              items: _publisherTypes,
-                              itemLabel: (type) => type,
-                              onChanged: (value) => setState(
-                                      () => _selectedPublisherType = value),
-                              isRequired: true,
-                            ),
-                            _buildYearPicker(),
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(32),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLogoSection(),
+                          const SizedBox(height: 28),
+                          if (!_isEditMode) ...[
+                            _buildCredentialsSection(),
+                            const SizedBox(height: 28),
                           ],
-                        ),
-                        const SizedBox(height: 24),
-                        _buildSection(
-                          'Contact Information',
-                          Iconsax.call,
-                          Colors.green,
-                          _isContactInfoComplete(),
-                          [
-                            _buildModernTextField('Contact Person',
-                                'contactPersonName', Iconsax.user),
-                            _buildModernTextField(
-                                'Designation',
-                                'contactPersonDesignation',
-                                Iconsax.briefcase),
-                            _buildModernTextField(
-                                'Email', 'emailID', Iconsax.sms),
-                            _buildModernTextField(
-                                'Phone', 'phoneNumber', Iconsax.call),
-                            _buildModernTextField('Alt. Phone',
-                                'alternatePhoneNumber', Iconsax.call),
-                            _buildModernTextField(
-                                'Fax', 'faxNumber', Iconsax.printer),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        _buildSection(
-                          'Address',
-                          Iconsax.location,
-                          Colors.purple,
-                          _isAddressComplete(),
-                          [
-                            _buildModernTextField('Address Line 1',
-                                'addressLine1', Iconsax.location),
-                            _buildModernTextField('Address Line 2',
-                                'addressLine2', Iconsax.location),
-                            _buildModernDropdown<Map<String, dynamic>>(
-                              label: 'State',
-                              icon: Iconsax.map,
-                              value: _states.isNotEmpty &&
-                                  _selectedStateID != null
-                                  ? _states.firstWhere(
-                                      (s) =>
-                                  s['StateID'] == _selectedStateID,
-                                  orElse: () => {})
-                                  : null,
-                              items: _states
-                                  .where((s) => s.isNotEmpty)
-                                  .toList(),
-                              itemLabel: (state) =>
-                              state['StateName'] ?? 'Unknown',
-                              onChanged: (value) {
-                                if (value != null && value.isNotEmpty) {
+                          _buildSection(
+                            'Basic Information',
+                            Iconsax.info_circle,
+                            Colors.blue,
+                            _isBasicInfoComplete(),
+                            [
+                              _buildModernTextField('Publisher Name',
+                                  'publisherName', Iconsax.building,
+                                  isRequired: true),
+                              _buildModernDropdown(
+                                label: 'Publisher Type',
+                                icon: Iconsax.category,
+                                value: _selectedPublisherType,
+                                items: _publisherTypes,
+                                itemLabel: (type) => type,
+                                onChanged: (value) => setState(
+                                        () => _selectedPublisherType = value),
+                                isRequired: true,
+                              ),
+                              _buildYearPicker(),
+                            ],
+                          ),
+                          const SizedBox(height: 28),
+                          _buildSection(
+                            'Contact Information',
+                            Iconsax.call,
+                            Colors.green,
+                            _isContactInfoComplete(),
+                            [
+                              _buildModernTextField('Contact Person',
+                                  'contactPersonName', Iconsax.user),
+                              _buildModernTextField(
+                                  'Designation',
+                                  'contactPersonDesignation',
+                                  Iconsax.briefcase),
+                              _buildModernTextField(
+                                  'Email', 'emailID', Iconsax.sms),
+                              _buildModernTextField(
+                                  'Phone', 'phoneNumber', Iconsax.call),
+                              _buildModernTextField('Alt. Phone',
+                                  'alternatePhoneNumber', Iconsax.call),
+                              _buildModernTextField(
+                                  'Fax', 'faxNumber', Iconsax.printer),
+                            ],
+                          ),
+                          const SizedBox(height: 28),
+                          _buildSection(
+                            'Address',
+                            Iconsax.location,
+                            Colors.purple,
+                            _isAddressComplete(),
+                            [
+                              _buildModernTextField('Address Line 1',
+                                  'addressLine1', Iconsax.location),
+                              _buildModernTextField('Address Line 2',
+                                  'addressLine2', Iconsax.location),
+                              _buildModernDropdown<Map<String, dynamic>>(
+                                label: 'State',
+                                icon: Iconsax.map,
+                                value: () {
+                                  print(
+                                      '[DEBUG] State Dropdown: _states.length=${_states.length}, _selectedStateID=${_selectedStateID}');
+                                  if (_states.isNotEmpty &&
+                                      _selectedStateID != null) {
+                                    try {
+                                      return _states.firstWhere(
+                                              (s) => s['StateID'] == _selectedStateID,
+                                          orElse: () {
+                                            print('[DEBUG] State orElse executed');
+                                            return <String, Object>{};
+                                          });
+                                    } catch (e) {
+                                      print('[ERROR] State firstWhere failed: $e');
+                                      rethrow; // Re-throw to see the full stack if this is the failure point
+                                    }
+                                  }
+                                  return null;
+                                }(), // Immediately execute the function to get the value
+
+                                items: _states
+                                    .where((s) => s.isNotEmpty)
+                                    .toList(),
+                                itemLabel: (state) =>
+                                state['StateName'] ?? 'Unknown',
+                                onChanged: (value) {
+                                  if (value != null && value.isNotEmpty) {
+                                    setState(() {
+                                      _selectedStateID = value['StateID'];
+                                      _selectedDistrictID = null;
+                                      _selectedCityID = null;
+                                      _districts = [];
+                                      _cities = [];
+                                    });
+                                    print('[DEBUG] State selected: ${value['StateName']} (ID: $_selectedStateID)');
+                                    if (_selectedStateID != null) {
+                                      _loadDistrictsForState(
+                                          _selectedStateID!);
+                                    }
+                                  }
+                                },
+                              ),
+                              _buildModernDropdown<Map<String, dynamic>>(
+                                label: 'District',
+                                icon: Iconsax.location,
+                                value: () {
+                                  print(
+                                      '[DEBUG] District Dropdown: _districts.length=${_districts.length}, _selectedDistrictID=${_selectedDistrictID}');
+                                  if (_districts.isNotEmpty &&
+                                      _selectedDistrictID != null) {
+                                    try {
+                                      return _districts.firstWhere(
+                                              (d) => d['DistrictID'] == _selectedDistrictID,
+                                          orElse: () {
+                                            print('[DEBUG] District orElse executed');
+                                            return <String, Object>{};
+                                          });
+                                    } catch (e) {
+                                      print('[ERROR] District firstWhere failed: $e');
+                                      rethrow;
+                                    }
+                                  }
+                                  return null;
+                                }(),
+
+                                items: _districts,
+                                itemLabel: (district) =>
+                                district['DistrictName'] ?? '',
+                                onChanged: (value) {
                                   setState(() {
-                                    _selectedStateID = value['StateID'];
-                                    _selectedDistrictID = null;
+                                    _selectedDistrictID =
+                                    value?['DistrictID'];
                                     _selectedCityID = null;
-                                    _districts = [];
                                     _cities = [];
                                   });
-                                  if (_selectedStateID != null) {
-                                    _loadDistrictsForState(
-                                        _selectedStateID!);
+                                  print('[DEBUG] District selected: ${value?['DistrictName']} (ID: $_selectedDistrictID)');
+                                  if (_selectedDistrictID != null) {
+                                    _loadCitiesForDistrict(
+                                        _selectedDistrictID!);
                                   }
-                                }
-                              },
-                            ),
-                            _buildModernDropdown<Map<String, dynamic>>(
-                              label: 'District',
-                              icon: Iconsax.location,
-                              value: _districts.isNotEmpty &&
-                                  _selectedDistrictID != null
-                                  ? _districts.firstWhere(
-                                      (d) =>
-                                  d['DistrictID'] ==
-                                      _selectedDistrictID,
-                                  orElse: () => {})
-                                  : null,
-                              items: _districts,
-                              itemLabel: (district) =>
-                              district['DistrictName'] ?? '',
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedDistrictID =
-                                  value?['DistrictID'];
-                                  _selectedCityID = null;
-                                  _cities = [];
-                                });
-                                if (_selectedDistrictID != null) {
-                                  _loadCitiesForDistrict(
-                                      _selectedDistrictID!);
-                                }
-                              },
-                            ),
-                            _buildModernDropdown<Map<String, dynamic>>(
-                              label: 'City',
-                              icon: Iconsax.building_4,
-                              value: _cities.isNotEmpty &&
-                                  _selectedCityID != null
-                                  ? _cities.firstWhere(
-                                      (c) => c['CityID'] == _selectedCityID,
-                                  orElse: () => {})
-                                  : null,
-                              items: _cities,
-                              itemLabel: (city) =>
-                              city['CityName'] ?? '',
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedCityID = value?['CityID'];
-                                });
-                              },
-                            ),
-                            _buildModernTextField(
-                                'Country', 'country', Iconsax.global),
-                            _buildModernTextField('PIN/ZIP Code',
-                                'pinZipCode', Iconsax.code),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        _buildSection(
-                          'Business Details',
-                          Iconsax.document,
-                          Colors.orange,
-                          false,
-                          [
-                            _buildModernTextField(
-                                'Website', 'website', Iconsax.link),
-                            _buildModernTextField(
-                                'GST Number', 'gstNumber', Iconsax.card),
-                            _buildModernTextField(
-                                'PAN Number', 'panNumber', Iconsax.card),
-                            _buildModernTextField('Bank Account Details',
-                                'bankAccountDetails', Iconsax.bank),
-                            _buildModernDropdown(
-                              label: 'Payment Terms',
-                              icon: Iconsax.money,
-                              value: _selectedPaymentTerms,
-                              items: _paymentTerms,
-                              itemLabel: (term) => term,
-                              onChanged: (value) => setState(
-                                      () => _selectedPaymentTerms = value),
-                            ),
-                            _buildModernDropdown(
-                              label: 'Distribution Type',
-                              icon: Iconsax.truck_fast,
-                              value: _selectedDistributionType,
-                              items: _distributionTypes,
-                              itemLabel: (type) => type,
-                              onChanged: (value) => setState(() =>
-                              _selectedDistributionType = value),
-                            ),
-                            _buildModernDropdown(
-                              label: 'Areas Covered',
-                              icon: Iconsax.global,
-                              value: _selectedAreasCovered,
-                              items: _areasCovered,
-                              itemLabel: (area) => area,
-                              onChanged: (value) => setState(
-                                      () => _selectedAreasCovered = value),
-                            ),
-                            _buildModernTextField('Languages Published',
-                                'languagesPublished', Iconsax.translate),
-                            _buildModernTextField('Number of Titles',
-                                'numberOfTitles', Iconsax.book_1),
-                          ],
-                        ),
-                      ],
+                                },
+                              ),
+                              _buildModernDropdown<Map<String, dynamic>>(
+                                label: 'City',
+                                icon: Iconsax.building_4,
+                                value: () {
+                                  print(
+                                      '[DEBUG] City Dropdown: _cities.length=${_cities.length}, _selectedCityID=${_selectedCityID}');
+                                  if (_cities.isNotEmpty &&
+                                      _selectedCityID != null) {
+                                    try {
+                                      return _cities.firstWhere(
+                                              (c) => c['CityID'] == _selectedCityID,
+                                          orElse: () {
+                                            print('[DEBUG] City orElse executed');
+                                            return <String, Object>{};
+                                          });
+                                    } catch (e) {
+                                      print('[ERROR] City firstWhere failed: $e');
+                                      rethrow;
+                                    }
+                                  }
+                                  return null;
+                                }(),
+
+                                items: _cities,
+                                itemLabel: (city) =>
+                                city['CityName'] ?? '',
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedCityID = value?['CityID'];
+                                  });
+                                  print('[DEBUG] City selected: ${value?['CityName']} (ID: $_selectedCityID)');
+                                },
+                              ),
+                              _buildModernTextField(
+                                  'Country', 'country', Iconsax.global),
+                              _buildModernTextField('PIN/ZIP Code',
+                                  'pinZipCode', Iconsax.code),
+                            ],
+                          ),
+                          const SizedBox(height: 28),
+                          _buildSection(
+                            'Business Details',
+                            Iconsax.document,
+                            Colors.orange,
+                            false,
+                            [
+                              _buildModernTextField(
+                                  'Website', 'website', Iconsax.link),
+                              _buildModernTextField(
+                                  'GST Number', 'gstNumber', Iconsax.card),
+                              _buildModernTextField(
+                                  'PAN Number', 'panNumber', Iconsax.card),
+                              _buildModernTextField('Bank Account Details',
+                                  'bankAccountDetails', Iconsax.bank),
+                              _buildModernDropdown(
+                                label: 'Payment Terms',
+                                icon: Iconsax.money,
+                                value: _selectedPaymentTerms,
+                                items: _paymentTerms,
+                                itemLabel: (term) => term,
+                                onChanged: (value) => setState(
+                                        () => _selectedPaymentTerms = value),
+                              ),
+                              _buildModernDropdown(
+                                label: 'Distribution Type',
+                                icon: Iconsax.truck_fast,
+                                value: _selectedDistributionType,
+                                items: _distributionTypes,
+                                itemLabel: (type) => type,
+                                onChanged: (value) => setState(() =>
+                                _selectedDistributionType = value),
+                              ),
+                              _buildModernDropdown(
+                                label: 'Areas Covered',
+                                icon: Iconsax.global,
+                                value: _selectedAreasCovered,
+                                items: _areasCovered,
+                                itemLabel: (area) => area,
+                                onChanged: (value) => setState(
+                                        () => _selectedAreasCovered = value),
+                              ),
+                              _buildModernTextField('Languages Published',
+                                  'languagesPublished', Iconsax.translate),
+                              _buildModernTextField('Number of Titles',
+                                  'numberOfTitles', Iconsax.book_1),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-            _buildActionButtons(),
+            _buildModernActionButtons(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildModernHeader() {
+  Widget _buildGlassmorphicHeader() {
     final progress = _calculateOverallProgress();
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        gradient: AppTheme.primaryGradient,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(28),
-          topRight: Radius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primaryGreen,
+            AppTheme.primaryGreen.withOpacity(0.85),
+            Colors.teal,
+          ],
         ),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(32),
+          topRight: Radius.circular(32),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryGreen.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  _isEditMode ? Iconsax.edit : Iconsax.add_circle,
-                  color: Colors.white,
-                  size: 28,
-                ),
+              // Animated Icon Container
+              TweenAnimationBuilder<double>(
+                duration: const Duration(milliseconds: 600),
+                tween: Tween(begin: 0.0, end: 1.0),
+                builder: (context, value, child) {
+                  return Transform.scale(
+                    scale: value,
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.25),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.4),
+                          width: 2,
+                        ),
+                      ),
+                      child: Icon(
+                        _isEditMode ? Iconsax.edit : Iconsax.add_circle,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                  );
+                },
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 18),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -790,65 +904,100 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                     Text(
                       _isEditMode ? 'Edit Publisher' : 'Add New Publisher',
                       style: GoogleFonts.poppins(
-                        fontSize: 24,
+                        fontSize: 26,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       _isEditMode
                           ? 'Update publisher information'
-                          : 'Fill in the details below',
+                          : 'Fill in the details below to create new publisher',
                       style: GoogleFonts.inter(
                         fontSize: 14,
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withOpacity(0.95),
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close, color: Colors.white),
-                iconSize: 28,
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  iconSize: 28,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          // Progress Bar
+          const SizedBox(height: 24),
+          // Enhanced Progress Bar
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Completion Progress',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: Colors.white.withOpacity(0.9),
-                      fontWeight: FontWeight.w500,
-                    ),
+                  Row(
+                    children: [
+                      Icon(
+                        Iconsax.chart_1,
+                        size: 16,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Completion Progress',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: Colors.white.withOpacity(0.95),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '${(progress * 100).toInt()}%',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${(progress * 100).toInt()}%',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 8,
-                  backgroundColor: Colors.white.withOpacity(0.3),
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                borderRadius: BorderRadius.circular(12),
+                child: TweenAnimationBuilder<double>(
+                  duration: const Duration(milliseconds: 800),
+                  curve: Curves.easeOutCubic,
+                  tween: Tween(begin: 0.0, end: progress),
+                  builder: (context, value, child) {
+                    return LinearProgressIndicator(
+                      value: value,
+                      minHeight: 10,
+                      backgroundColor: Colors.white.withOpacity(0.25),
+                      valueColor: AlwaysStoppedAnimation(
+                        value >= 1.0 ? Colors.amber : Colors.white,
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -860,52 +1009,117 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
 
   Widget _buildLogoSection() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.2)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            Colors.grey[50]!,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.3), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryGreen.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          Text(
-            'Publisher Logo',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.darkText,
-            ),
+          Row(
+            children: [
+              Icon(Iconsax.gallery, color: AppTheme.primaryGreen, size: 22),
+              const SizedBox(width: 12),
+              Text(
+                'Publisher Logo',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.darkText,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           GestureDetector(
             onTap: _pickLogo,
-            child: Container(
-              width: 150,
-              height: 150,
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.primaryGreen, width: 2),
-              ),
-              child: _selectedLogoBytes != null
-                  ? ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.memory(_selectedLogoBytes!, fit: BoxFit.cover),
-              )
-                  : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Iconsax.gallery_add,
-                      size: 48, color: AppTheme.primaryGreen),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Tap to upload',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: 170,
+                height: 170,
+                decoration: BoxDecoration(
+                  gradient: _selectedLogoBytes != null
+                      ? null
+                      : LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.grey[100]!,
+                      Colors.grey[200]!,
+                    ],
                   ),
-                ],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AppTheme.primaryGreen.withOpacity(0.5),
+                    width: 3,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryGreen.withOpacity(0.15),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: _selectedLogoBytes != null
+                    ? ClipRRect(
+                  borderRadius: BorderRadius.circular(17),
+                  child: Image.memory(
+                    _selectedLogoBytes!,
+                    fit: BoxFit.cover,
+                  ),
+                )
+                    : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryGreen.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Iconsax.gallery_add,
+                        size: 40,
+                        color: AppTheme.primaryGreen,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Tap to upload logo',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'PNG, JPG (Max 5MB)',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -922,6 +1136,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
       _isCredentialsComplete(),
       [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: _buildModernTextField(
@@ -931,18 +1146,19 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                 isRequired: true,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
             Container(
+              margin: const EdgeInsets.only(top: 0),
               height: 56,
               child: ElevatedButton.icon(
                 onPressed: _isVerifyingUserID ? null : _verifyUserID,
                 icon: _isVerifyingUserID
                     ? SizedBox(
-                  width: 16,
-                  height: 16,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation(Colors.white),
                   ),
                 )
                     : Icon(
@@ -951,9 +1167,15 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                       : _userIdVerified!
                       ? Iconsax.close_circle
                       : Iconsax.tick_circle,
-                  size: 20,
+                  size: 22,
                 ),
-                label: Text(_isVerifyingUserID ? 'Checking...' : 'Verify'),
+                label: Text(
+                  _isVerifyingUserID ? 'Checking...' : 'Verify',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _userIdVerified == null
                       ? AppTheme.primaryGreen
@@ -962,34 +1184,48 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
                       : Colors.green,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  elevation: 3,
                 ),
               ),
             ),
           ],
         ),
         if (_userIdVerificationMessage != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8, left: 4),
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: (_userIdVerified == true
+                  ? Colors.red
+                  : Colors.green)
+                  .withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: (_userIdVerified == true ? Colors.red : Colors.green)
+                    .withOpacity(0.3),
+              ),
+            ),
             child: Row(
               children: [
                 Icon(
                   _userIdVerified == true
                       ? Icons.error_outline
                       : Icons.check_circle_outline,
-                  size: 16,
+                  size: 20,
                   color: _userIdVerified == true ? Colors.red : Colors.green,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     _userIdVerificationMessage!,
                     style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: _userIdVerified == true ? Colors.red : Colors.green,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                      color:
+                      _userIdVerified == true ? Colors.red : Colors.green,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -1014,111 +1250,181 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
       bool isComplete,
       List<Widget> children,
       ) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isComplete ? Colors.green.withOpacity(0.5) : color.withOpacity(0.2),
-          width: isComplete ? 2 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: isComplete
-                      ? Colors.green.withOpacity(0.15)
-                      : color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  size: 20,
-                  color: isComplete ? Colors.green : color,
-                ),
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 400),
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 0.95 + (value * 0.05),
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white,
+                  Colors.grey[50]!,
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.darkText,
-                  ),
-                ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: isComplete
+                    ? Colors.green.withOpacity(0.5)
+                    : color.withOpacity(0.3),
+                width: isComplete ? 2.5 : 2,
               ),
-              if (isComplete)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle, size: 16, color: Colors.green),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Complete',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green,
+              boxShadow: [
+                BoxShadow(
+                  color: (isComplete ? Colors.green : color).withOpacity(0.12),
+                  blurRadius: 25,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isComplete
+                              ? [Colors.green, Colors.green.shade400]
+                              : [color, color.withOpacity(0.7)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isComplete ? Colors.green : color)
+                                .withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        icon,
+                        size: 22,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.darkText,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    if (isComplete)
+                      TweenAnimationBuilder<double>(
+                        duration: const Duration(milliseconds: 500),
+                        tween: Tween(begin: 0.0, end: 1.0),
+                        builder: (context, value, child) {
+                          return Transform.scale(
+                            scale: value,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Colors.green, Colors.green.shade400],
+                                ),
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.green.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check_circle,
+                                      size: 18, color: Colors.white),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Complete',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
                 ),
-            ],
+                const SizedBox(height: 20),
+                ...children,
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          ...children,
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildModernTextField(String label, String key, IconData icon,
       {bool isPassword = false, bool isRequired = false}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 18),
       child: TextFormField(
         controller: _controllers[key],
         obscureText: isPassword,
+        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           labelText: label + (isRequired ? ' *' : ''),
-          prefixIcon: Icon(icon, size: 20, color: AppTheme.primaryGreen),
+          labelStyle: GoogleFonts.inter(
+            fontSize: 14,
+            color: Colors.grey[700],
+            fontWeight: FontWeight.w500,
+          ),
+          prefixIcon: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryGreen.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 20, color: AppTheme.primaryGreen),
+          ),
           filled: true,
           fillColor: Colors.grey[50],
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey[300]!),
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey[300]!),
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppTheme.primaryGreen, width: 2),
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: AppTheme.primaryGreen, width: 2.5),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.red, width: 1.5),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.red, width: 2.5),
           ),
           contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         ),
         validator: isRequired
             ? (value) {
@@ -1142,35 +1448,48 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     bool isRequired = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 18),
       child: DropdownButtonFormField<T>(
         value: (value != null && items.contains(value)) ? value : null,
         decoration: InputDecoration(
           labelText: label + (isRequired ? ' *' : ''),
-          prefixIcon: Icon(icon, size: 20, color: AppTheme.primaryGreen),
+          labelStyle: GoogleFonts.inter(
+            fontSize: 14,
+            color: Colors.grey[700],
+            fontWeight: FontWeight.w500,
+          ),
+          prefixIcon: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryGreen.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 20, color: AppTheme.primaryGreen),
+          ),
           filled: true,
           fillColor: Colors.grey[50],
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey[300]!),
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey[300]!),
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppTheme.primaryGreen, width: 2),
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: AppTheme.primaryGreen, width: 2.5),
           ),
           contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         ),
         items: items.map((item) {
           return DropdownMenuItem<T>(
             value: item,
             child: Text(
               itemLabel(item),
-              style: GoogleFonts.inter(fontSize: 14),
+              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500),
             ),
           );
         }).toList(),
@@ -1182,7 +1501,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
         }
             : null,
         dropdownColor: Colors.white,
-        icon: Icon(Iconsax.arrow_down_1, size: 20, color: AppTheme.primaryGreen),
+        icon: Icon(Iconsax.arrow_down_1, size: 22, color: AppTheme.primaryGreen),
         isExpanded: true,
       ),
     );
@@ -1190,7 +1509,7 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
 
   Widget _buildYearPicker() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 18),
       child: InkWell(
         onTap: () async {
           final picked = await showDatePicker(
@@ -1212,36 +1531,51 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
               );
             },
           );
+
           if (picked != null) {
             setState(() => _selectedYear = picked.year);
           }
         },
         child: InputDecorator(
           decoration: InputDecoration(
-            labelText: 'Year of Establishment',
-            prefixIcon:
-            Icon(Iconsax.calendar, size: 20, color: AppTheme.primaryGreen),
+            labelText: 'Year of Establishment *',
+            labelStyle: GoogleFonts.inter(
+              fontSize: 14,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
+            ),
+            prefixIcon: Container(
+              margin: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child:
+              Icon(Iconsax.calendar, size: 20, color: AppTheme.primaryGreen),
+            ),
             filled: true,
             fillColor: Colors.grey[50],
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey[300]!, width: 1.5),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppTheme.primaryGreen, width: 2),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: AppTheme.primaryGreen, width: 2.5),
             ),
             contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           ),
           child: Text(
             _selectedYear?.toString() ?? 'Select Year',
             style: GoogleFonts.inter(
-              fontSize: 14,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
               color: _selectedYear != null ? Colors.black87 : Colors.grey[600],
             ),
           ),
@@ -1250,77 +1584,79 @@ class _AddEditPublisherDialogState extends State<AddEditPublisherDialog>
     );
   }
 
-  Widget _buildActionButtons() {
+  Widget _buildModernActionButtons() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, -8),
           ),
         ],
       ),
       child: Row(
         children: [
           Expanded(
-            child: OutlinedButton(
+            child: OutlinedButton.icon(
               onPressed: () => Navigator.pop(context),
+              icon: Icon(Iconsax.close_circle, size: 20),
+              label: Text('Cancel'),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 18),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                side: BorderSide(color: AppTheme.primaryGreen),
-              ),
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.primaryGreen,
-                ),
+                side: BorderSide(color: AppTheme.primaryGreen, width: 2),
+                foregroundColor: AppTheme.primaryGreen,
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 20),
           Expanded(
             flex: 2,
-            child: ElevatedButton(
+            child: ElevatedButton.icon(
               onPressed: _isSaving ? null : _saveForm,
+              icon: _isSaving
+                  ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                ),
+              )
+                  : Icon(
+                _isEditMode ? Iconsax.tick_circle : Iconsax.add_circle,
+                size: 22,
+              ),
+              label: Text(
+                _isSaving
+                    ? 'Saving...'
+                    : _isEditMode
+                    ? 'Update Publisher'
+                    : 'Create Publisher',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 18),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 backgroundColor: AppTheme.primaryGreen,
+                foregroundColor: Colors.white,
                 disabledBackgroundColor: Colors.grey[300],
-              ),
-              child: _isSaving
-                  ? const ButtonLoader()
-                  : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _isEditMode ? Iconsax.tick_circle : Iconsax.add_circle,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _isEditMode ? 'Update Publisher' : 'Create Publisher',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
+                elevation: 5,
+                shadowColor: AppTheme.primaryGreen.withOpacity(0.5),
               ),
             ),
           ),
