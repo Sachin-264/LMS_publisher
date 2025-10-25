@@ -170,7 +170,7 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
       emit(StudentLoadingState());
       try {
         final students = await apiService.fetchStudents(
-          schoolRecNo: event.schoolRecNo ?? StudentApiService.defaultSchoolRecNo,
+          schoolRecNo: event.schoolRecNo!,
           classRecNo: event.classRecNo,
           isActive: event.isActive,
           academicYear: event.academicYear,  // ADD THIS

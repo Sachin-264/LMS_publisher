@@ -1,3 +1,4 @@
+// main_layout.dart
 import 'package:flutter/material.dart'; // Import flutter/material.dart for SystemMouseCursors
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,6 +18,8 @@ import 'package:lms_publisher/screens/SubscriptionScreen/subscription_dart.dart'
 import 'package:lms_publisher/screens/LoginScreen/login_bloc.dart';
 import 'package:provider/provider.dart';
 
+import '../School_Panel/class_module/class_manage_screen.dart';
+
 // Enum to identify the active screen for the sidebar
 enum AppScreen {
   dashboard,
@@ -29,6 +32,8 @@ enum AppScreen {
   schoolPanel,
   subjectModule,
   mySubjects,
+  // ✅ NEW ENTRY: M012 Class Module
+  classModule,
   settings
 }
 
@@ -450,6 +455,9 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
     // 🆕 ADDED: Consumer wrapper for UserProvider access
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
+        // Get schoolRecNo from UserProvider for passing to screens
+        final int schoolRecNo = int.tryParse(userProvider.userCode ?? '0') ?? 0;
+
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -687,6 +695,28 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                         ),
                       ],
 
+                      // ✅ NEW MODULE: Class Module - M012
+                      if (userProvider.hasMenuAccess('M012')) ...[
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.building, // Icon for Class/Structure
+                          text: 'Class',
+                          isActive: activeScreen == AppScreen.classModule,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.classModule) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ClassManageScreen( // <<< NEW SCREEN
+                                    schoolRecNo: schoolRecNo, // Pass the schoolRecNo from UserProvider
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+
                       // Subject Module - M010
                       // ✅ UPDATED: Wrapped with M010 access check
                       if (userProvider.hasMenuAccess('M010')) ...[
@@ -700,9 +730,9 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => const SubjectModuleScreen(
-                                    schoolRecNo: 1,
-                                    academicYear: '2025-26',
+                                  builder: (_) => SubjectModuleScreen(
+                                    schoolRecNo: schoolRecNo,
+                                    academicYear: '2025-26', // Placeholder
                                   ),
                                 ),
                               );
@@ -1017,6 +1047,9 @@ class _MobileDrawer extends StatelessWidget {
       backgroundColor: Colors.white,
       child: Consumer<UserProvider>(
         builder: (context, userProvider, child) {
+          // Get schoolRecNo from UserProvider for passing to screens
+          final int schoolRecNo = int.tryParse(userProvider.userCode ?? '0') ?? 0;
+
           return Column(
             children: [
               // ✅ IMPROVED HEADER with better close button
@@ -1284,6 +1317,20 @@ class _MobileDrawer extends StatelessWidget {
                         onTap: () => _navigateTo(context, const SchoolPanelDashboard()),
                       ),
 
+                    // ✅ NEW MODULE: Class Module - M012
+                    if (userProvider.hasMenuAccess('M012'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.building,
+                        title: 'Class',
+                        isActive: activeScreen == AppScreen.classModule,
+                        onTap: () => _navigateTo(
+                          context,
+                          ClassManageScreen(
+                            schoolRecNo: schoolRecNo,
+                          ),
+                        ),
+                      ),
+
                     // Subject Module - M010
                     // ✅ UPDATED: Wrapped with M010 access check
                     if (userProvider.hasMenuAccess('M010'))
@@ -1293,8 +1340,8 @@ class _MobileDrawer extends StatelessWidget {
                         isActive: activeScreen == AppScreen.subjectModule,
                         onTap: () => _navigateTo(
                           context,
-                          const SubjectModuleScreen(
-                            schoolRecNo: 1,
+                          SubjectModuleScreen(
+                            schoolRecNo: schoolRecNo,
                             academicYear: '2025-26',
                           ),
                         ),
@@ -1504,17 +1551,16 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 4),
-      child: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: AppTheme.bodyText.withOpacity(0.5),
-          letterSpacing: 1.2,
-        ),
-      ),
-    );
+        padding: const EdgeInsets.only(left: 4, bottom: 4),
+        child: Text(
+          title,
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.bodyText.withOpacity(0.5),
+            letterSpacing: 1.2,
+          ),
+        ));
   }
 }
 

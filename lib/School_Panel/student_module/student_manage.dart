@@ -1056,8 +1056,10 @@ class _FilterDialogState extends State<FilterDialog> {
   Future<void> fetchClasses() async {
     try {
       final apiService = StudentApiService();
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final schoolRecNo = int.tryParse(userProvider.userCode ?? '0') ?? 0;
       final classes = await apiService.fetchClassesBySchool(
-        schoolRecNo: StudentApiService.defaultSchoolRecNo,
+        schoolRecNo: schoolRecNo,
       );
       setState(() {
         classList = classes;

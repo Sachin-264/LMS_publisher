@@ -27,18 +27,17 @@ class CityModel {
 
 class StudentApiService {
   // Update this with your actual API URL
-  static const String baseUrl =  'http://10.100.2.119/AquareLMS';
+  static const String baseUrl =  'http://localhost/AquareLMS';
   static const String _imageBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
   // static const String _imageUploadUrl = "$baseUrl/upload-image-gcp/uploadgcp.php";
 
   static const String _imageUploadUrl = "https://www.aquare.co.in/mobileAPI/sachin/photogcp1.php";
-  // Default school RecNo - UPDATE THIS based on your logged-in school
-  static const int defaultSchoolRecNo = 1; // Replace with actual school ID
+  // School RecNo must be provided by callers via parameters or payload
 
   // List Students
 // List Students
   Future<List<StudentModel>> fetchStudents({
-    int? schoolRecNo,
+    required int schoolRecNo,
     int? classRecNo,
     bool? isActive,
     String? academicYear,  // ADD THIS
@@ -46,7 +45,7 @@ class StudentApiService {
     try {
       final Map<String, dynamic> requestBody = {
         'action': 'LIST',
-        'School_RecNo': schoolRecNo ?? defaultSchoolRecNo,
+'School_RecNo': schoolRecNo,
         if (classRecNo != null) 'ClassRecNo': classRecNo,
         if (isActive != null) 'IsActive': isActive ? 1 : 0,
         if (academicYear != null) 'Academic_Year': academicYear,  // ADD THIS
@@ -242,7 +241,7 @@ class StudentApiService {
 
       final requestBody = {
         'action': 'INSERT',
-        'School_RecNo': studentData['School_RecNo'] ?? defaultSchoolRecNo,
+'School_RecNo': studentData['School_RecNo'],
         ...studentData,
       };
 
@@ -426,7 +425,7 @@ class StudentApiService {
       final requestBody = {
         'action': 'UPDATE',
         'RecNo': recNo,
-        'School_RecNo': studentData['School_RecNo'] ?? defaultSchoolRecNo,
+'School_RecNo': studentData['School_RecNo'],
         ...studentData,
       };
 

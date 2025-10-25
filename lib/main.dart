@@ -37,6 +37,11 @@ import 'package:lms_publisher/screens/AcademicsScreen/academics_screen.dart';
 import 'package:lms_publisher/AdminScreen/AdminPublish/publisher_screen.dart';
 import 'package:lms_publisher/School_Panel/School_panel_dashboard.dart';
 import 'package:lms_publisher/School_Panel/subject_module/subject_module_screen.dart';
+// Class Module Imports
+import 'package:lms_publisher/School_Panel/class_module/class_manage_screen.dart'; // Import ClassManageScreen
+import 'package:lms_publisher/School_Panel/class_module/class_service.dart'; // Import ClassApiService
+import 'package:lms_publisher/School_Panel/class_module/class_bloc.dart'; // Import ClassBloc
+
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -89,6 +94,10 @@ class MyApp extends StatelessWidget {
           RepositoryProvider(
             create: (context) => TeacherApiService(),
           ),
+          // ✅ ADDED: Class Service
+          RepositoryProvider(
+            create: (context) => ClassApiService(),
+          ),
         ],
         child: MultiBlocProvider(
           providers: [
@@ -139,6 +148,12 @@ class MyApp extends StatelessWidget {
             BlocProvider(
               create: (context) => TeacherBloc(
                 apiService: RepositoryProvider.of(context),
+              ),
+            ),
+            // ✅ ADDED: Class BLoC (to resolve ProviderNotFoundException in ClassAllotmentDialog)
+            BlocProvider(
+              create: (context) => ClassBloc(
+                apiService: RepositoryProvider.of<ClassApiService>(context),
               ),
             ),
           ],
@@ -234,6 +249,10 @@ class MyApp extends StatelessWidget {
 
   // ✅ NEW: Helper function to map menuCode to Widget
   Widget _getScreenByMenuCode(String menuCode) {
+    // Use dummy IDs for ClassManageScreen as it's the default behavior when navigating
+    const int dummySchoolRecNo = 1;
+    const String defaultAcademicYear = '2025-26';
+
     switch (menuCode) {
       case 'M001':
         return const HomeScreen();
@@ -253,8 +272,12 @@ class MyApp extends StatelessWidget {
         return const SchoolPanelDashboard();
       case 'M010':
         return const SubjectModuleScreen(
-          schoolRecNo: 1,
-          academicYear: '2025-26',
+          schoolRecNo: dummySchoolRecNo,
+          academicYear: defaultAcademicYear,
+        );
+      case 'M012': // Assuming this is the code for Class Management
+        return const ClassManageScreen(
+          schoolRecNo: dummySchoolRecNo,
         );
       default:
       // Fallback to Dashboard if menuCode doesn't match

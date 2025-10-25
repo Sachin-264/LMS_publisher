@@ -68,6 +68,9 @@ class _BeautifulLoaderState extends State<BeautifulLoader>
       case LoaderType.pulse:
         loader = _buildPulseLoader(loaderColor);
         break;
+      case LoaderType.cube:
+        // TODO: Handle this case.
+        throw UnimplementedError();
     }
 
     if (widget.message != null) {
@@ -242,7 +245,7 @@ enum LoaderType {
   dots,
   bars,
   spinner,
-  pulse,
+  pulse, cube,
 }
 
 /// Overlay loader that covers the entire screen

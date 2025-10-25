@@ -144,7 +144,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
       emit(TeacherLoadingState());
       try {
         final teachers = await apiService.fetchTeachers(
-          schoolRecNo: event.schoolRecNo ?? TeacherApiService.defaultSchoolRecNo,
+          schoolRecNo: event.schoolRecNo!,
           isActive: event.isActive,
         );
         _cachedTeachers = teachers;
