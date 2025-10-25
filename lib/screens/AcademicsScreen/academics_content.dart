@@ -6,6 +6,7 @@ import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:lms_publisher/Service/academics_service.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:lms_publisher/screens/AcademicsScreen/materialdetailscreen.dart';
 import 'dart:ui';
 import 'academics_bloc.dart';
 import 'package:file_picker/file_picker.dart';
@@ -14,6 +15,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:provider/provider.dart';
+
+
 
 
 const String _imageBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
@@ -75,6 +78,84 @@ void _showPermissionDeniedDialog(BuildContext context, String action) {
       ],
     ),
   );
+}
+
+// XML Generation Helper for Multiple Files
+String generateXmlFromFiles(List<String> files) {
+  if (files.isEmpty) return '';
+
+  StringBuffer xml = StringBuffer('<Files>');
+  for (int i = 0; i < files.length; i++) {
+    // Escape XML special characters
+    String escapedPath = files[i]
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+
+    xml.write('<File Sno="${i + 1}" Path="$escapedPath" />');
+  }
+  xml.write('</Files>');
+
+  return xml.toString();
+}
+
+// XML Parsing Helper to Extract Files - DETAILED DEBUG VERSION
+List<Map<String, dynamic>> parseXmlFiles(String xmlString) {
+  if (xmlString.isEmpty) return [];
+
+  print('🔍 [parseXmlFiles] Input XML: $xmlString');
+
+  try {
+    final List<Map<String, dynamic>> files = [];
+
+    // ✅ UPDATED REGEX - Now includes Name attribute
+    final filePattern = RegExp(
+      r'<File\s+Sno="(\d+)"\s+Path="([^"]+)"\s+Type="([^"]+)"(?:\s+Name="([^"]*)")?\s*/?>',
+      caseSensitive: false,
+    );
+
+    final matches = filePattern.allMatches(xmlString);
+    print('🔍 [parseXmlFiles] Found ${matches.length} file matches');
+
+    for (final match in matches) {
+      final sno = int.tryParse(match.group(1) ?? '0') ?? 0;
+      final path = match.group(2) ?? '';
+      final type = match.group(3) ?? '';
+      final name = match.group(4) ?? 'Unnamed File'; // ✅ EXTRACT NAME
+
+      // Decode HTML entities
+      final decodedPath = path
+          .replaceAll('&amp;', '&')
+          .replaceAll('&lt;', '<')
+          .replaceAll('&gt;', '>')
+          .replaceAll('&quot;', '"')
+          .replaceAll('&apos;', "'");
+
+      final decodedName = name
+          .replaceAll('&amp;', '&')
+          .replaceAll('&lt;', '<')
+          .replaceAll('&gt;', '>')
+          .replaceAll('&quot;', '"')
+          .replaceAll('&apos;', "'");
+
+      print('📄 [parseXmlFiles] File #$sno: name=$decodedName, type=$type, path=$decodedPath');
+
+      files.add({
+        'sno': sno,
+        'path': decodedPath,
+        'type': type,
+        'name': decodedName, // ✅ ADD NAME
+      });
+    }
+
+    print('✅ [parseXmlFiles] Successfully parsed ${files.length} files');
+    return files;
+  } catch (e) {
+    print('❌ [parseXmlFiles] Error: $e');
+    return [];
+  }
 }
 
 
@@ -341,7 +422,7 @@ child: StyledDropdownField<int>(
 label: label,
 icon: Iconsax.building, // Default icon for SingleFilter
 selectedValue: selectedValue,
-items: items.map((item) => DropdownMenuItem(value: int.parse(item.id), child: Text(item.name))).toList(),
+items: items.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
 onChanged: onChanged,
 onClear: () => onChanged(null),
 ),
@@ -619,7 +700,21 @@ class _MaterialsPageState extends State<MaterialsPage> {
         return MasterViewTemplate(
           title: 'Study Materials',
           buttonLabel: 'Add Material',
-          onAddPressed: () => showAddMaterialDialog(context, allClasses, allSubjects),
+          onAddPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MaterialDetailScreen(
+                  isAddMode: true,
+                  allClasses: allClasses,
+                  allSubjects: allSubjects,
+                  allChapters: allChapters,
+                ),
+              ),
+            );
+            // Reload materials after adding
+            context.read<AcademicsBloc>().add(LoadMaterialsEvent());
+          },
           header: const SizedBox.shrink(),
           headerActions: [
             // Material Type Filter
@@ -761,92 +856,283 @@ class CascadingFiltersWithChapter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filteredSubjects = selectedClassId != null
-        ? allSubjects.where((s) => s.classId == selectedClassId.toString()).toList()
-        : allSubjects;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 700;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppTheme.defaultPadding * 1.5),
-      child: LayoutBuilder(builder: (context, constraints) {
-        if (constraints.maxWidth < 700) {
-          return Column(mainAxisSize: MainAxisSize.min, children: [
-            _buildClassDropdown(),
-            const SizedBox(height: 14),
-            _buildSubjectDropdown(filteredSubjects),
-            const SizedBox(height: 14),
-            _buildChapterDropdown(),
-          ]);
-        }
-        return Row(children: [
-          Expanded(child: _buildClassDropdown()),
-          const SizedBox(width: 14),
-          Expanded(child: _buildSubjectDropdown(filteredSubjects)),
-          const SizedBox(width: 14),
-          Expanded(child: _buildChapterDropdown()),
-        ]);
-      }),
+    // Filter subjects based on selected class
+    final availableSubjects = selectedClassId != null
+        ? allSubjects.where((s) => s.classId == selectedClassId).toList()
+        : <SubjectModel>[];
+
+    // Filter chapters based on selected subject
+    final availableChapters = selectedSubjectId != null
+        ? allChapters.where((ch) => ch.subjectId == selectedSubjectId).toList()
+        : <ChapterModel>[];
+
+    if (isMobile) {
+      // Mobile: Vertical layout
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildClassFilter(),
+          const SizedBox(height: 12),
+          _buildSubjectFilter(availableSubjects),
+          const SizedBox(height: 12),
+          _buildChapterFilter(availableChapters),
+        ],
+      );
+    }
+
+    // Desktop: Horizontal layout
+    return Row(
+      children: [
+        Expanded(child: _buildClassFilter()),
+        const SizedBox(width: 12),
+        Expanded(child: _buildSubjectFilter(availableSubjects)),
+        const SizedBox(width: 12),
+        Expanded(child: _buildChapterFilter(availableChapters)),
+      ],
     );
   }
 
-  Widget _buildClassDropdown() {
-    return StyledDropdownField<int>(
-      label: "Select Class",
-      icon: Iconsax.building,
-      selectedValue: selectedClassId,
-      items: allClasses.map((item) => DropdownMenuItem(value: int.parse(item.id), child: Text(item.name))).toList(),
-      onChanged: (value) {
-        print('🔎 CascadingFiltersWithChapter: Class Changed to $value');
-        onClassChanged(value);
-        onSubjectChanged(null);
-        onChapterChanged(null);
-      },
-      onClear: () {
-        print('🔎 CascadingFiltersWithChapter: Class Cleared');
-        onClassChanged(null);
-        onSubjectChanged(null);
-        onChapterChanged(null);
-      },
+  Widget _buildClassFilter() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppTheme.borderGrey),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int?>(
+          value: selectedClassId,
+          hint: Row(
+            children: [
+              const Icon(Iconsax.building, size: 18, color: AppTheme.bodyText),
+              const SizedBox(width: 8),
+              Text(
+                'All Classes',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: AppTheme.bodyText,
+                ),
+              ),
+            ],
+          ),
+          isExpanded: true,
+          icon: const Icon(Iconsax.arrow_down_1, size: 18),
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppTheme.darkText,
+          ),
+          items: [
+            DropdownMenuItem<int?>(
+              value: null,
+              child: Row(
+                children: [
+                  const Icon(Iconsax.building, size: 18, color: AppTheme.primaryGreen),
+                  const SizedBox(width: 8),
+                  Text(
+                    'All Classes',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+            ...allClasses.map((c) {
+              return DropdownMenuItem<int?>(
+                value: c.id,
+                child: Row(
+                  children: [
+                    const Icon(Iconsax.building, size: 18, color: AppTheme.bodyText),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        c.name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+          onChanged: (value) {
+            onClassChanged(value);
+          },
+        ),
+      ),
     );
   }
 
-  Widget _buildSubjectDropdown(List<SubjectModel> subjects) {
-    return StyledDropdownField<int>(
-      label: "Select Subject",
-      icon: Iconsax.book_1,
-      selectedValue: selectedSubjectId,
-      items: subjects.map((item) => DropdownMenuItem(value: int.parse(item.id), child: Text(item.name))).toList(),
-      onChanged: selectedClassId != null ? (value) {
-        print('🔎 CascadingFiltersWithChapter: Subject Changed to $value');
-        onSubjectChanged(value);
-        onChapterChanged(null);
-      } : null,
-      onClear: () {
-        print('🔎 CascadingFiltersWithChapter: Subject Cleared');
-        onSubjectChanged(null);
-        onChapterChanged(null);
-      },
-      enabled: selectedClassId != null && subjects.isNotEmpty,
+  Widget _buildSubjectFilter(List<SubjectModel> availableSubjects) {
+    final isEnabled = selectedClassId != null && availableSubjects.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: isEnabled ? Colors.white : Colors.grey[100],
+        border: Border.all(
+          color: isEnabled ? AppTheme.borderGrey : Colors.grey[300]!,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int?>(
+          value: selectedSubjectId,
+          hint: Row(
+            children: [
+              Icon(
+                Iconsax.book,
+                size: 18,
+                color: isEnabled ? AppTheme.bodyText : Colors.grey[400],
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isEnabled ? 'All Subjects' : 'Select class first',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: isEnabled ? AppTheme.bodyText : Colors.grey[400],
+                ),
+              ),
+            ],
+          ),
+          isExpanded: true,
+          icon: Icon(
+            Iconsax.arrow_down_1,
+            size: 18,
+            color: isEnabled ? AppTheme.darkText : Colors.grey[400],
+          ),
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppTheme.darkText,
+          ),
+          items: isEnabled
+              ? [
+            DropdownMenuItem<int?>(
+              value: null,
+              child: Row(
+                children: [
+                  const Icon(Iconsax.book, size: 18, color: AppTheme.primaryGreen),
+                  const SizedBox(width: 8),
+                  Text(
+                    'All Subjects',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+            ...availableSubjects.map((s) {
+              return DropdownMenuItem<int?>(
+                value: s.id,
+                child: Row(
+                  children: [
+                    const Icon(Iconsax.book, size: 18, color: AppTheme.bodyText),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        s.name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ]
+              : null,
+          onChanged: isEnabled ? (value) => onSubjectChanged(value) : null,
+        ),
+      ),
     );
   }
 
-  Widget _buildChapterDropdown() {
-    return StyledDropdownField<int>(
-      label: "Select Chapter",
-      icon: Iconsax.document_text_1,
-      selectedValue: selectedChapterId,
-      items: allChapters.map((item) => DropdownMenuItem(value: int.parse(item.id), child: Text(item.name))).toList(),
-      onChanged: allChapters.isNotEmpty ? (value) {
-        print('🔎 CascadingFiltersWithChapter: Chapter Changed to $value');
-        onChapterChanged(value);
-      } : null,
-      onClear: () {
-        print('🔎 CascadingFiltersWithChapter: Chapter Cleared');
-        onChapterChanged(null);
-      },
-      enabled: allChapters.isNotEmpty,
+  Widget _buildChapterFilter(List<ChapterModel> availableChapters) {
+    final isEnabled = selectedSubjectId != null && availableChapters.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: isEnabled ? Colors.white : Colors.grey[100],
+        border: Border.all(
+          color: isEnabled ? AppTheme.borderGrey : Colors.grey[300]!,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int?>(
+          value: selectedChapterId,
+          hint: Row(
+            children: [
+              Icon(
+                Iconsax.document_text,
+                size: 18,
+                color: isEnabled ? AppTheme.bodyText : Colors.grey[400],
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isEnabled ? 'All Chapters' : 'Select subject first',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: isEnabled ? AppTheme.bodyText : Colors.grey[400],
+                ),
+              ),
+            ],
+          ),
+          isExpanded: true,
+          icon: Icon(
+            Iconsax.arrow_down_1,
+            size: 18,
+            color: isEnabled ? AppTheme.darkText : Colors.grey[400],
+          ),
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppTheme.darkText,
+          ),
+          items: isEnabled
+              ? [
+            DropdownMenuItem<int?>(
+              value: null,
+              child: Row(
+                children: [
+                  const Icon(Iconsax.document_text, size: 18, color: AppTheme.primaryGreen),
+                  const SizedBox(width: 8),
+                  Text(
+                    'All Chapters',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+            ...availableChapters.map((ch) {
+              return DropdownMenuItem<int?>(
+                value: ch.id,
+                child: Row(
+                  children: [
+                    const Icon(Iconsax.document_text, size: 18, color: AppTheme.bodyText),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        ch.name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ]
+              : null,
+          onChanged: isEnabled ? (value) => onChapterChanged(value) : null,
+        ),
+      ),
     );
   }
 }
+
 
 
 
@@ -900,7 +1186,7 @@ return StyledDropdownField<int>(
 label: "Select Class",
 icon: Iconsax.building,
 selectedValue: selectedClassId,
-items: allClasses.map((item) => DropdownMenuItem(value: int.parse(item.id), child: Text(item.name))).toList(),
+items: allClasses.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
 onChanged: (value) {
 print('🔎 CascadingFilters: Class Changed to $value'); // ADDED PRINT
 onClassChanged(value);
@@ -919,7 +1205,7 @@ return StyledDropdownField<int>(
 label: "Select Subject",
 icon: Iconsax.book_1,
 selectedValue: selectedSubjectId,
-items: subjects.map((item) => DropdownMenuItem(value: int.parse(item.id), child: Text(item.name))).toList(),
+items: subjects.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
 onChanged: selectedClassId != null ? (value) {
 print('🔎 CascadingFilters: Subject Changed to $value'); // ADDED PRINT
 onSubjectChanged(value);
@@ -1263,7 +1549,7 @@ class ClassListItem extends StatelessWidget {
             Colors.blue,
                 () {
               context.read<AcademicsBloc>().add(DeleteClassEvent(
-                classId: int.parse(item.id),
+                classId:item.id,
                 hardDelete: true,
               ));
             },
@@ -1327,7 +1613,7 @@ class ClassListItem extends StatelessWidget {
                 Colors.blue,
                     () {
                   context.read<AcademicsBloc>().add(DeleteClassEvent(
-                    classId: int.parse(item.id),
+                    classId: item.id,
                     hardDelete: true,
                   ));
                 },
@@ -1389,7 +1675,7 @@ class SubjectListItem extends StatelessWidget {
       icon: Iconsax.book_1,
       iconColor: Colors.green,
       title: item.name,
-      subtitle: item.className,
+      subtitle: null,
       statusBadge: StatusBadge(isActive: item.isActive),
       onEdit: canEdit ? () {
         print('🔐 SubjectListItem: Checking EDIT permission for M004');
@@ -1415,7 +1701,7 @@ class SubjectListItem extends StatelessWidget {
               print('🗑️ SubjectListItem: Delete confirmed for ${item.name} (ID: ${item.id})');
               context.read<AcademicsBloc>().add(
                 DeleteSubjectEvent(
-                  subjectId: int.parse(item.id),
+                  subjectId: item.id,
                   hardDelete: true,
                 ),
               );
@@ -1442,7 +1728,7 @@ class SubjectListItem extends StatelessWidget {
               ),
               DetailField(
                 label: 'Class',
-                value: item.className,
+                value: item.className??'',
                 icon: Iconsax.building,
               ),
               DetailField(
@@ -1482,7 +1768,7 @@ class SubjectListItem extends StatelessWidget {
         WebCell(
           flex: 3,
           child: Text(
-            item.className,
+            item.className ?? '',
             style: GoogleFonts.inter(fontSize: 14),
           ),
         ),
@@ -1515,7 +1801,7 @@ class SubjectListItem extends StatelessWidget {
                   print('🗑️ SubjectListItem: Web Delete confirmed for ${item.name} (ID: ${item.id})');
                   context.read<AcademicsBloc>().add(
                     DeleteSubjectEvent(
-                      subjectId: int.parse(item.id),
+                      subjectId:item.id,
                       hardDelete: true,
                     ),
                   );
@@ -1538,7 +1824,7 @@ class SubjectListItem extends StatelessWidget {
                     ),
                     DetailField(
                       label: 'Class',
-                      value: item.className,
+                      value: item.className??'',
                       icon: Iconsax.building,
                     ),
                     DetailField(
@@ -1624,7 +1910,7 @@ class ChapterListItem extends StatelessWidget {
             Colors.orange,
                 () {
               context.read<AcademicsBloc>().add(DeleteChapterEvent(
-                chapterId: int.parse(item.id),
+                chapterId: item.id,
                 hardDelete: true,
               ));
             },
@@ -1643,7 +1929,7 @@ class ChapterListItem extends StatelessWidget {
             color: Colors.orange,
             fields: [
               DetailField(label: 'Chapter Name', value: item.name, icon: Iconsax.edit),
-              DetailField(label: 'Subject', value: item.subjectName, icon: Iconsax.book_1),
+              DetailField(label: 'Subject', value: item.subjectName??'', icon: Iconsax.book_1),
               DetailField(label: 'Materials', value: item.materialCount.toString(), icon: Iconsax.folder_open),
             ],
             onEdit: canEdit ? () {
@@ -1660,7 +1946,7 @@ class ChapterListItem extends StatelessWidget {
         ),
         WebCell(
           flex: 3,
-          child: Text(item.subjectName, style: GoogleFonts.inter(fontSize: 14)),
+          child: Text(item.subjectName??'', style: GoogleFonts.inter(fontSize: 14)),
         ),
         WebCell(
           flex: 2,
@@ -1678,7 +1964,7 @@ class ChapterListItem extends StatelessWidget {
                 Colors.orange,
                     () {
                   context.read<AcademicsBloc>().add(DeleteChapterEvent(
-                    chapterId: int.parse(item.id),
+                    chapterId: item.id,
                     hardDelete: true,
                   ));
                 },
@@ -1693,7 +1979,7 @@ class ChapterListItem extends StatelessWidget {
                   color: Colors.orange,
                   fields: [
                     DetailField(label: 'Chapter Name', value: item.name, icon: Iconsax.edit),
-                    DetailField(label: 'Subject', value: item.subjectName, icon: Iconsax.book_1),
+                    DetailField(label: 'Subject', value: item.subjectName??'', icon: Iconsax.book_1),
                     DetailField(label: 'Materials', value: item.materialCount.toString(), icon: Iconsax.folder_open),
                   ],
                   onEdit: canEdit ? () {
@@ -1769,7 +2055,11 @@ class MaterialGridItem extends StatefulWidget {
   final MaterialModel item;
   final List<SubjectModel> allSubjects;
 
-  const MaterialGridItem({super.key, required this.item, required this.allSubjects});
+  const MaterialGridItem({
+    super.key,
+    required this.item,
+    required this.allSubjects,
+  });
 
   @override
   MaterialGridItemState createState() => MaterialGridItemState();
@@ -1778,81 +2068,40 @@ class MaterialGridItem extends StatefulWidget {
 class MaterialGridItemState extends State<MaterialGridItem> {
   bool isHovered = false;
 
-  Map<String, String> getPathsForMaterial(MaterialModel item) {
-    Map<String, String> paths = {};
-
-    // Check for YouTube video link first
-    if (item.videoLink.isNotEmpty && isYoutubeVideo(item.videoLink)) {
-      paths['VideoLink'] = item.videoLink;
-    }
-
-    if (item.isVideoFile && item.link.isNotEmpty) {
-      paths['VideoFile'] = item.link;
-    }
-    if (item.worksheetPath.isNotEmpty) {
-      paths['WorksheetPath'] = item.worksheetPath;
-    }
-    if (item.extraQuestionsPath.isNotEmpty) {
-      paths['ExtraQuestionsPath'] = item.extraQuestionsPath;
-    }
-    if (item.solvedQuestionsPath.isNotEmpty) {
-      paths['SolvedQuestionsPath'] = item.solvedQuestionsPath;
-    }
-    if (item.revisionNotesPath.isNotEmpty) {
-      paths['RevisionNotesPath'] = item.revisionNotesPath;
-    }
-    if (item.lessonPlansPath.isNotEmpty) {
-      paths['LessonPlansPath'] = item.lessonPlansPath;
-    }
-    if (item.teachingAidsPath.isNotEmpty) {
-      paths['TeachingAidsPath'] = item.teachingAidsPath;
-    }
-    if (item.assessmentToolsPath.isNotEmpty) {
-      paths['AssessmentToolsPath'] = item.assessmentToolsPath;
-    }
-    if (item.homeworkToolsPath.isNotEmpty) {
-      paths['HomeworkToolsPath'] = item.homeworkToolsPath;
-    }
-    if (item.practiceZonePath.isNotEmpty) {
-      paths['PracticeZonePath'] = item.practiceZonePath;
-    }
-    if (item.learningPathPath.isNotEmpty) {
-      paths['LearningPathPath'] = item.learningPathPath;
-    }
-    return paths;
+  // Get all available materials count
+  int getTotalMaterialsCount() {
+    int count = 0;
+    if (widget.item.videoLinks.isNotEmpty) count += widget.item.videoLinks.length;
+    if (widget.item.worksheets.isNotEmpty) count += widget.item.worksheets.length;
+    if (widget.item.extraQuestions.isNotEmpty) count += widget.item.extraQuestions.length;
+    if (widget.item.solvedQuestions.isNotEmpty) count += widget.item.solvedQuestions.length;
+    if (widget.item.revisionNotes.isNotEmpty) count += widget.item.revisionNotes.length;
+    if (widget.item.lessonPlans.isNotEmpty) count += widget.item.lessonPlans.length;
+    if (widget.item.teachingAids.isNotEmpty) count += widget.item.teachingAids.length;
+    if (widget.item.assessmentTools.isNotEmpty) count += widget.item.assessmentTools.length;
+    if (widget.item.homeworkTools.isNotEmpty) count += widget.item.homeworkTools.length;
+    if (widget.item.practiceZone.isNotEmpty) count += widget.item.practiceZone.length;
+    if (widget.item.learningPath.isNotEmpty) count += widget.item.learningPath.length;
+    return count;
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = getMaterialColor(widget.item.type);
-    final icon = getMaterialIcon(widget.item.type);
-    final materialPaths = getPathsForMaterial(widget.item);
+    final userProvider = Provider.of<UserProvider>(context);
+    final canEdit = userProvider.hasPermission('M004', 'edit');
+    final canDelete = userProvider.hasPermission('M004', 'delete');
 
-    String? firstPath;
-    String? firstType;
-    for (var entry in materialPaths.entries) {
-      if (entry.value.isNotEmpty) {
-        firstPath = entry.value;
-        firstType = entry.key;
-        break;
-      }
+    // Get subject color
+    Color subjectColor = AppTheme.primaryGreen;
+    try {
+      final subject = widget.allSubjects.firstWhere((s) => s.id == widget.item.subjectId);
+      final colorHex = subject.color.startsWith('#') ? subject.color : '#${subject.color}';
+      subjectColor = Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+    } catch (e) {
+      // Use default color if subject not found
     }
 
-    // Determine if it's a YouTube video
-    final isYouTubeVideo = firstType == 'VideoLink' && firstPath != null && isYoutubeVideo(firstPath);
-    final isVideoFile = firstType == 'VideoFile' && firstPath != null && firstPath.isNotEmpty;
-    final isDocument = !isYouTubeVideo && !isVideoFile && firstPath != null && firstPath.isNotEmpty;
-
-    String fullDocumentUrl = '';
-    if (firstPath != null && firstPath.isNotEmpty) {
-      if (isVideoFile) {
-        fullDocumentUrl = firstPath;
-      } else if (!isYouTubeVideo) {
-        fullDocumentUrl = getFullDocumentUrl(firstPath);
-      }
-    }
-
-    final isImageFile = isDocument && ['jpg', 'jpeg', 'png', 'gif', 'bmp'].contains(firstPath?.split('.').last.toLowerCase());
+    final totalFiles = getTotalMaterialsCount();
 
     return MouseRegion(
       onEnter: (_) => setState(() => isHovered = true),
@@ -1860,321 +2109,474 @@ class MaterialGridItemState extends State<MaterialGridItem> {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () {
-          if (materialPaths.length == 1 && firstPath != null && firstPath.isNotEmpty) {
-            if (isYouTubeVideo) {
-              // Launch YouTube video
-              launchUrl(Uri.parse(firstPath), mode: LaunchMode.externalApplication);
-            } else if (isVideoFile) {
-              launchUrl(Uri.parse(firstPath), mode: LaunchMode.platformDefault);
-            } else {
-              launchUrl(Uri.parse(fullDocumentUrl), mode: LaunchMode.platformDefault);
-            }
-          } else {
-            showDetailDialog(
-              context,
-              DetailDialogData(
-                title: widget.item.name,
-                icon: icon,
-                color: color,
-                documentPath: isYouTubeVideo ? firstPath : fullDocumentUrl,
-                materialPaths: materialPaths,
-                fields: [
-                  DetailField(label: 'Material Name', value: widget.item.name, icon: Iconsax.edit),
-                  DetailField(label: 'Type', value: widget.item.type, icon: icon),
-                  DetailField(
-                    label: 'Uploaded On',
-                    value: '${widget.item.uploadedOn.day}/${widget.item.uploadedOn.month}/${widget.item.uploadedOn.year}',
-                    icon: Iconsax.calendar,
-                  ),
-                  if (isYouTubeVideo)
-                    DetailField(label: 'Video Link', value: firstPath ?? '', icon: Iconsax.video),
-                  if (isVideoFile)
-                    DetailField(label: 'Video File', value: firstPath ?? '', icon: Iconsax.video),
-                  if (isDocument)
-                    DetailField(label: 'File Name', value: firstPath ?? '', icon: Iconsax.document_text),
-                ],
-                onEdit: () {
-                  Navigator.pop(context);
-                  showEditMaterialDialog(context, widget.item, widget.allSubjects);
-                },
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MaterialDetailScreen(
+                material: widget.item,
+                allClasses: const [], // Empty list for detail view
+                allSubjects: widget.allSubjects,
+                allChapters: const [], // Empty list for detail view
+                isAddMode: false,
               ),
-            );
-          }
+            ),
+          );
         },
+
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
-          margin: const EdgeInsets.all(8), // Added margin for proper spacing
-          padding: const EdgeInsets.all(16), // Reduced padding
           decoration: BoxDecoration(
-            color: isHovered ? color.withOpacity(0.04) : Colors.white,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isHovered ? color.withOpacity(0.3) : AppTheme.borderGrey.withOpacity(0.4),
+              color: isHovered
+                  ? subjectColor.withOpacity(0.4)
+                  : AppTheme.borderGrey.withOpacity(0.3),
             ),
-            boxShadow: isHovered
-                ? [BoxShadow(color: color.withOpacity(0.15), blurRadius: 15, offset: const Offset(0, 6))]
-                : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 2))],
+            boxShadow: [
+              BoxShadow(
+                color: isHovered
+                    ? subjectColor.withOpacity(0.15)
+                    : Colors.black.withOpacity(0.05),
+                blurRadius: isHovered ? 15 : 10,
+                offset: Offset(0, isHovered ? 6 : 2),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min, // Important: prevent infinite height
             children: [
-              // Thumbnail/Icon Section
-              AspectRatio(
-                aspectRatio: 1.6,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: color.withOpacity(0.3)),
+              // Header Section
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: subjectColor.withOpacity(0.1),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
                   ),
-                  child: isYouTubeVideo && widget.item.thumbnail != null
-                      ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Stack(
-                      fit: StackFit.expand,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        CachedNetworkImage(
-                          imageUrl: widget.item.thumbnail!,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Center(
-                            child: Icon(Iconsax.video, color: color, size: 30),
-                          ),
-                          errorWidget: (context, url, error) => Center(
-                            child: Icon(Iconsax.video, color: Colors.red, size: 30),
-                          ),
-                        ),
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.9),
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(12),
-                                topRight: Radius.circular(12),
-                              ),
+                        Expanded(
+                          child: Text(
+                            widget.item.chapterName,
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.darkText,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        Center(
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.9),
-                              shape: BoxShape.circle,
+                        if (canEdit || canDelete)
+                          PopupMenuButton<String>(
+                            icon: const Icon(Iconsax.more, size: 18),
+                            onSelected: (value) {
+                              if (value == 'edit' && canEdit) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => MaterialDetailScreen(
+                                      material: widget.item,
+                                      allClasses: const [],
+                                      allSubjects: widget.allSubjects,
+                                      allChapters: const [],
+                                      isAddMode: false,
+                                    ),
+                                  ),
+                                );
+                              }
+                              else if (value == 'delete' && canDelete) {
+                                _showDeleteConfirmation(context);
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              if (canEdit)
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Iconsax.edit, size: 16),
+                                      SizedBox(width: 8),
+                                      Text('Edit'),
+                                    ],
+                                  ),
+                                ),
+                              if (canDelete)
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Iconsax.trash, size: 16, color: Colors.red),
+                                      SizedBox(width: 8),
+                                      Text('Delete', style: TextStyle(color: Colors.red)),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: subjectColor.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            widget.item.subjectName,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: subjectColor,
                             ),
-                            child: const Icon(
-                              Icons.play_arrow,
-                              color: Colors.white,
-                              size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            widget.item.className,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: AppTheme.bodyText,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                  )
-                      : isVideoFile
-                      ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Center(
-                          child: Icon(Iconsax.video, color: color, size: 36),
+                  ],
+                ),
+              ),
+
+              // Materials Count Section
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (totalFiles > 0) ...[
+                        Icon(
+                          Iconsax.folder_open,
+                          size: 36,
+                          color: subjectColor.withOpacity(0.7),
                         ),
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.9),
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(12),
-                                topRight: Radius.circular(12),
+                        const SizedBox(height: 6),
+                        Text(
+                          '$totalFiles',
+                          style: GoogleFonts.poppins(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w700,
+                            color: subjectColor,
+                          ),
+                        ),
+                        Text(
+                          totalFiles == 1 ? 'File' : 'Files',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: AppTheme.bodyText,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Material type badges
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            if (widget.item.videoLinks.isNotEmpty)
+                              _buildMaterialTypeBadge(
+                                'Video',
+                                Iconsax.video,
+                                Colors.red,
+                                widget.item.videoLinks.length,
                               ),
-                            ),
+                            if (widget.item.worksheets.isNotEmpty)
+                              _buildMaterialTypeBadge(
+                                'Worksheet',
+                                Iconsax.document,
+                                Colors.blue,
+                                widget.item.worksheets.length,
+                              ),
+                            if (widget.item.revisionNotes.isNotEmpty)
+                              _buildMaterialTypeBadge(
+                                'Notes',
+                                Iconsax.note,
+                                Colors.purple,
+                                widget.item.revisionNotes.length,
+                              ),
+                            if (widget.item.extraQuestions.isNotEmpty)
+                              _buildMaterialTypeBadge(
+                                'Extra Q',
+                                Iconsax.document_text,
+                                Colors.orange,
+                                widget.item.extraQuestions.length,
+                              ),
+                            if (widget.item.solvedQuestions.isNotEmpty)
+                              _buildMaterialTypeBadge(
+                                'Solved',
+                                Iconsax.tick_circle,
+                                Colors.green,
+                                widget.item.solvedQuestions.length,
+                              ),
+                          ],
+                        ),
+                      ] else ...[
+                        Icon(
+                          Iconsax.folder_2,
+                          size: 48,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No Materials',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: AppTheme.bodyText,
+                            fontStyle: FontStyle.italic,
                           ),
                         ),
                       ],
-                    ),
-                  )
-                      : isImageFile
-                      ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CachedNetworkImage(
-                          imageUrl: fullDocumentUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Center(
-                            child: Icon(icon, color: color, size: 30),
-                          ),
-                          errorWidget: (context, url, error) => Center(
-                            child: Icon(Iconsax.image, color: Colors.red, size: 30),
-                          ),
-                        ),
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.9),
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(12),
-                                topRight: Radius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                      : Center(
-                    child: Stack(
-                      children: [
-                        Center(child: Icon(icon, color: color, size: 36)),
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.9),
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(12),
-                                topRight: Radius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
 
-              // Title and Actions Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.item.name,
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+              // Footer
+              if (widget.item.uploadedOn != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
                     ),
                   ),
-                  ActionButtons(
-                    onEdit: Provider.of<UserProvider>(context, listen: false).hasPermission('M004', 'edit')
-                        ? () {
-                      print('🔐 MaterialGridItem: Checking EDIT permission');
-                      showEditMaterialDialog(context, widget.item, widget.allSubjects);
-                    }
-                        : null,
-                    onDelete: Provider.of<UserProvider>(context, listen: false).hasPermission('M004', 'delete')
-                        ? () {
-                      print('🔐 MaterialGridItem: Checking DELETE permission');
-                      final userProvider = Provider.of<UserProvider>(context, listen: false);
-                      if (userProvider.hasPermission('M004', 'delete')) {
-                        showConfirmDeleteDialog(
-                          context,
-                          widget.item.name,
-                          color,
-                              () {
-                            context.read<AcademicsBloc>().add(
-                              DeleteMaterialEvent(
-                                recNo: int.parse(widget.item.id),
-                                hardDelete: true,
-                              ),
-                            );
-                          },
-                        );
-                      } else {
-                        _showPermissionDeniedDialog(context, 'delete materials');
-                      }
-                    }
-                        : null,
-                    onView: () => showDetailDialog(
-                      context,
-                      DetailDialogData(
-                        title: widget.item.name,
-                        icon: icon,
-                        color: color,
-                        documentPath: isYouTubeVideo ? firstPath : fullDocumentUrl,
-                        materialPaths: materialPaths,
-                        fields: [
-                          DetailField(label: 'Material Name', value: widget.item.name, icon: Iconsax.edit),
-                          DetailField(label: 'Type', value: widget.item.type, icon: icon),
-                          DetailField(
-                            label: 'Uploaded On',
-                            value:
-                            '${widget.item.uploadedOn.day}/${widget.item.uploadedOn.month}/${widget.item.uploadedOn.year}',
-                            icon: Iconsax.calendar,
+                  child: Row(
+                    children: [
+                      const Icon(Iconsax.clock, size: 12, color: AppTheme.bodyText),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          _formatDate(widget.item.uploadedOn!),
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AppTheme.bodyText,
                           ),
-                          if (isYouTubeVideo) DetailField(label: 'Video Link', value: firstPath ?? '', icon: Iconsax.video),
-                          if (isVideoFile) DetailField(label: 'Video File', value: firstPath ?? '', icon: Iconsax.video),
-                          if (isDocument) DetailField(label: 'File Name', value: firstPath ?? '', icon: Iconsax.document_text),
-                        ],
-                        onEdit: () {
-                          Navigator.pop(context);
-                          showEditMaterialDialog(context, widget.item, widget.allSubjects);
-                        },
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    usePopup: true,
+                    ],
                   ),
-                ],
-              ),
-               Row(
-                children: [
-                  Icon(Iconsax.calendar, size: 12, color: AppTheme.bodyText),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${widget.item.uploadedOn.day}/${widget.item.uploadedOn.month}/${widget.item.uploadedOn.year}',
-                    style: GoogleFonts.inter(color: AppTheme.bodyText, fontSize: 11),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-              // Type Chips Section
-              Wrap(
-                spacing: 6.0,
-                runSpacing: 6.0,
+  Widget _buildMaterialTypeBadge(String label, IconData icon, Color color, int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$count',
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inDays == 0) return 'Today';
+    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inDays < 7) return '${diff.inDays} days ago';
+    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()} weeks ago';
+    if (diff.inDays < 365) return '${(diff.inDays / 30).floor()} months ago';
+    return '${(diff.inDays / 365).floor()} years ago';
+  }
+
+  void _showMaterialDetailDialog(BuildContext context, Color subjectColor) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 700, maxHeight: 600),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
                 children: [
-                  if (isYouTubeVideo || isVideoFile) _buildTypeChip('Video', Iconsax.video, Colors.red),
-                  if (widget.item.worksheetPath.isNotEmpty)
-                    _buildTypeChip('Worksheet', Iconsax.document_text_1, Colors.green),
-                  if (widget.item.extraQuestionsPath.isNotEmpty)
-                    _buildTypeChip('Extra', Iconsax.document_text, Colors.teal),
-                  if (widget.item.solvedQuestionsPath.isNotEmpty)
-                    _buildTypeChip('Solved', Iconsax.document_text, Colors.indigo),
-                  if (widget.item.revisionNotesPath.isNotEmpty) _buildTypeChip('Notes', Iconsax.note_1, Colors.orange),
-                  if (widget.item.lessonPlansPath.isNotEmpty) _buildTypeChip('Lesson', Iconsax.ruler, Colors.purple),
-                  if (widget.item.teachingAidsPath.isNotEmpty)
-                    _buildTypeChip('Aids', Iconsax.clipboard_text, Colors.brown),
-                  if (widget.item.assessmentToolsPath.isNotEmpty)
-                    _buildTypeChip('Assess', Iconsax.award, Colors.cyan),
-                  if (widget.item.homeworkToolsPath.isNotEmpty)
-                    _buildTypeChip('Homework', Iconsax.home, Colors.blueGrey),
-                  if (widget.item.practiceZonePath.isNotEmpty)
-                    _buildTypeChip('Practice', Iconsax.cpu, Colors.deepPurple),
-                  if (widget.item.learningPathPath.isNotEmpty)
-                    _buildTypeChip('Learning', Iconsax.chart_2, Colors.green.shade700),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: subjectColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Iconsax.folder_open, color: subjectColor, size: 28),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.item.chapterName,
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${widget.item.subjectName} - ${widget.item.className}',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: AppTheme.bodyText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Iconsax.close_circle),
+                  ),
                 ],
+              ),
+              const Divider(height: 32),
+
+              // Materials List
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (widget.item.videoLinks.isNotEmpty)
+                        _buildMaterialSection(
+                          'Videos',
+                          Iconsax.video,
+                          Colors.red,
+                          widget.item.videoLinks,
+                          isVideo: true,
+                        ),
+                      if (widget.item.worksheets.isNotEmpty)
+                        _buildMaterialSection(
+                          'Worksheets',
+                          Iconsax.document,
+                          Colors.blue,
+                          widget.item.worksheets,
+                        ),
+                      if (widget.item.extraQuestions.isNotEmpty)
+                        _buildMaterialSection(
+                          'Extra Questions',
+                          Iconsax.document_text,
+                          Colors.orange,
+                          widget.item.extraQuestions,
+                        ),
+                      if (widget.item.solvedQuestions.isNotEmpty)
+                        _buildMaterialSection(
+                          'Solved Questions',
+                          Iconsax.tick_circle,
+                          Colors.green,
+                          widget.item.solvedQuestions,
+                        ),
+                      if (widget.item.revisionNotes.isNotEmpty)
+                        _buildMaterialSection(
+                          'Revision Notes',
+                          Iconsax.note,
+                          Colors.purple,
+                          widget.item.revisionNotes,
+                        ),
+                      if (widget.item.lessonPlans.isNotEmpty)
+                        _buildMaterialSection(
+                          'Lesson Plans',
+                          Iconsax.note_1,
+                          Colors.teal,
+                          widget.item.lessonPlans,
+                        ),
+                      if (widget.item.teachingAids.isNotEmpty)
+                        _buildMaterialSection(
+                          'Teaching Aids',
+                          Iconsax.teacher,
+                          Colors.indigo,
+                          widget.item.teachingAids,
+                        ),
+                      if (widget.item.assessmentTools.isNotEmpty)
+                        _buildMaterialSection(
+                          'Assessment Tools',
+                          Iconsax.task_square,
+                          Colors.pink,
+                          widget.item.assessmentTools,
+                        ),
+                      if (widget.item.homeworkTools.isNotEmpty)
+                        _buildMaterialSection(
+                          'Homework Tools',
+                          Iconsax.clipboard_text,
+                          Colors.brown,
+                          widget.item.homeworkTools,
+                        ),
+                      if (widget.item.practiceZone.isNotEmpty)
+                        _buildMaterialSection(
+                          'Practice Zone',
+                          Iconsax.activity,
+                          Colors.cyan,
+                          widget.item.practiceZone,
+                        ),
+                      if (widget.item.learningPath.isNotEmpty)
+                        _buildMaterialSection(
+                          'Learning Path',
+                          Iconsax.map,
+                          Colors.lime,
+                          widget.item.learningPath,
+                        ),
+                      if (getTotalMaterialsCount() == 0)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(40.0),
+                            child: Text(
+                              'No materials available',
+                              style: GoogleFonts.inter(
+                                color: AppTheme.bodyText,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -2183,35 +2585,137 @@ class MaterialGridItemState extends State<MaterialGridItem> {
     );
   }
 
-  // --- MODIFIED WIDGET ---
-  // The fix is applied here by wrapping the Text widget with Flexible.
-  Widget _buildTypeChip(String text, IconData icon, Color color) {
+  Widget _buildMaterialSection(
+      String title,
+      IconData icon,
+      Color color,
+      List<Map<String, dynamic>> files, {
+        bool isVideo = false,
+      }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        border: Border.all(color: color.withOpacity(0.3)),
-        borderRadius: BorderRadius.circular(999),
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 10, color: color),
-          const SizedBox(width: 3),
-          // Flexible widget prevents the Text from causing an overflow
-          Flexible(
-            child: Text(
-              text,
-              style: GoogleFonts.inter(fontSize: 10, color: color, fontWeight: FontWeight.w600),
-              overflow: TextOverflow.ellipsis, // Handles text that is still too long
-              softWrap: false, // Prevents wrapping to a new line, prefers ellipsis
-            ),
+          Row(
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${files.length}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 12),
+          ...files.map((file) {
+            final sno = file['sno'] ?? 0;
+            final path = file['path'] ?? '';
+
+            return InkWell(
+              onTap: () async {
+                final url = isVideo ? path : getFullDocumentUrl(path);
+                final uri = Uri.parse(url);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: color.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$sno',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        path.length > 40 ? '${path.substring(0, 40)}...' : path,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      isVideo ? Iconsax.play_circle : Iconsax.document_download,
+                      size: 18,
+                      color: color,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
         ],
       ),
     );
   }
+
+  void _showDeleteConfirmation(BuildContext context) {
+    showConfirmDeleteDialog(
+      context,
+      widget.item.chapterName,
+      AppTheme.primaryGreen,
+          () {
+        context.read<AcademicsBloc>().add(
+          DeleteMaterialEvent(
+            recNo: widget.item.recNo,
+            hardDelete: true,
+          ),
+        );
+      },
+    );
+  }
 }
+
 
 
 
@@ -3085,7 +3589,7 @@ onSave: () async {
 await ApiService.manageAcademicModule({
 'table': 'Class_Master',
 'operation': 'UPDATE',
-'ClassID': int.parse(item.id),
+'ClassID': item.id,
 'ClassDescription': descController.text,
 'DisplayOrder': int.tryParse(orderController.text) ?? 0,
 'ModifiedBy': 'Admin',
@@ -3209,7 +3713,7 @@ void showAddSubjectDialog(BuildContext context, List<ClassModel> allClasses) {
                 selectedValue: selectedClassId,
                 items: allClasses
                     .map((c) => DropdownMenuItem(
-                  value: int.parse(c.id),
+                  value: c.id,
                   child: Text(c.name),
                 ))
                     .toList(),
@@ -3283,7 +3787,7 @@ void showEditSubjectDialog(
           final response = await ApiService.manageAcademicModule({
             'table': 'Subject_Name_Master',
             'operation': 'UPDATE',
-            'SubjectID': int.parse(item.id),
+            'SubjectID': item.id,
             'SubjectDescription': descController.text,
             'ModifiedBy': 'Admin',
           });
@@ -3402,7 +3906,7 @@ customWidget: StyledDropdownField<int>(
 label: "Select Class",
 icon: Iconsax.building,
 selectedValue: selectedClassId,
-items: allClasses.map((c) => DropdownMenuItem(value: int.parse(c.id), child: Text(c.name))).toList(),
+items: allClasses.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
 onChanged: (value) => setState(() {
 selectedClassId = value;
 selectedSubjectId = null;
@@ -3443,7 +3947,7 @@ DialogField(controller: orderController, label: "Chapter Order", hint: "1", icon
 void showEditChapterDialog(BuildContext context, ChapterModel item, List<SubjectModel> allSubjects) {
 final nameController = TextEditingController(text: item.name);
 final descController = TextEditingController(text: item.description);
-final orderController = TextEditingController(text: item.chapterOrder.toString());
+final orderController = TextEditingController(text: item.order.toString());
 
 showDialog(
 context: context,
@@ -3456,7 +3960,7 @@ onSave: () async {
 await ApiService.manageAcademicModule({
 'table': 'Chapter_Master',
 'operation': 'UPDATE',
-'ChapterID': int.parse(item.id),
+'ChapterID': item.id,
 'ChapterDescription': descController.text,
 'ChapterOrder': int.tryParse(orderController.text) ?? 0,
 'ModifiedBy': 'Admin',
@@ -3476,1183 +3980,13 @@ DialogField(controller: orderController, label: "Chapter Order", hint: "1", icon
 }
 
 
-void showAddMaterialDialog(BuildContext context, List<ClassModel> allClasses, List<SubjectModel> allSubjects) {
-  // Capture the bloc reference BEFORE showing the dialog
-  final academicsBloc = context.read<AcademicsBloc>();
 
-  // Create copies of the lists to avoid affecting the original lists
-  final List<ClassModel> dialogClasses = List.from(allClasses);
-  final List<SubjectModel> dialogSubjects = List.from(allSubjects);
 
-  int? selectedClassId;
-  int? selectedSubjectId;
-  int? selectedChapterId;
-  List<ChapterModel> chapters = [];
-  Map<String, List<String>> uploadedFiles = {};
-  Map<String, bool> uploadingStates = {}; // Track uploading state for each material type
 
-  final List<String> materialTypes = [
-    'Video_Link',
-    'Worksheet_Path',
-    'Extra_Questions_Path',
-    'Solved_Questions_Path',
-    'Revision_Notes_Path',
-    'Lesson_Plans_Path',
-    'Teaching_Aids_Path',
-    'Assessment_Tools_Path',
-    'Homework_Tools_Path',
-    'Practice_Zone_Path',
-    'Learning_Path_Path',
-  ];
 
-  for (String type in materialTypes) {
-    uploadedFiles[type] = [];
-    uploadingStates[type] = false; // Initialize uploading state for each type
-  }
 
-  Future<void> loadChapters(int subjectId, void Function(void Function()) setState) async {
-    print('📖 _loadChapters: Loading chapters for subject: $subjectId');
-    final response = await ApiService.getChapters(subjectId: subjectId);
-    if (context.mounted && (response['status'] == 'success' || response['success'] == true) && response['data'] != null) {
-      setState(() {
-        chapters = (response['data'] as List).map((json) => ChapterModel.fromJson(json)).toList();
-      });
-      print('✅ _loadChapters: Loaded ${chapters.length} chapters');
-    } else {
-      setState(() {
-        chapters = [];
-      });
-      print('⚠️ _loadChapters: No chapters data found');
-    }
-  }
 
-  Future<void> pickAndUploadFiles(String materialType, void Function(void Function()) setState) async {
-    if (!context.mounted) return;
 
-    try {
-      setState(() {
-        uploadingStates[materialType] = true; // Set uploading state for this specific type
-      });
-      print('📁 FilePicker: Starting file picking for $materialType...');
-
-      if (materialType == 'Video_Link') {
-        final TextEditingController linkController = TextEditingController();
-        final result = await showDialog<String>(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Iconsax.video, color: Colors.red, size: 24),
-                ),
-                SizedBox(width: 12),
-                Text('Add YouTube Video Link', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Enter the YouTube video URL you want to add as a learning material.',
-                  style: GoogleFonts.inter(color: AppTheme.bodyText),
-                ),
-                SizedBox(height: 16),
-                TextField(
-                  controller: linkController,
-                  decoration: InputDecoration(
-                    hintText: 'https://www.youtube.com/watch?v=...',
-                    hintStyle: GoogleFonts.inter(color: AppTheme.bodyText.withOpacity(0.6)),
-                    prefixIcon: Icon(Iconsax.link, color: AppTheme.primaryGreen),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppTheme.borderGrey),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppTheme.primaryGreen, width: 2),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey.withOpacity(0.05),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, linkController.text),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryGreen,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: Text('Add', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-              ),
-            ],
-          ),
-        );
-
-        if (result != null && result.isNotEmpty) {
-          setState(() {
-            uploadedFiles[materialType] = [result];
-          });
-          print('✅ Added video link: $result');
-        }
-      } else {
-        FilePickerResult? result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
-          allowMultiple: true,
-        );
-
-        if (!context.mounted) return;
-
-        if (result != null && result.files.isNotEmpty) {
-          List<String> newFileNames = [];
-          for (var file in result.files) {
-            File? fileToUpload;
-            if (file.path != null) {
-              fileToUpload = File(file.path!);
-            } else if (file.bytes != null) {
-              final tempDir = Directory.systemTemp;
-              final tempFile = File('${tempDir.path}/${file.name ?? 'tempfile'}');
-              await tempFile.writeAsBytes(file.bytes!);
-              fileToUpload = tempFile;
-            }
-
-            if (fileToUpload != null) {
-              final fileForUpload = XFile(fileToUpload.path);
-              print('📁 FilePicker: File picked: ${fileForUpload.name}');
-              print('📤 uploadDocument: File path for upload: ${fileToUpload.path}');
-
-              final filename = await ApiService.uploadDocument(fileForUpload, context: context);
-              print('📥 Upload Result: $filename');
-
-              if (filename != null && filename.isNotEmpty) {
-                newFileNames.add(filename);
-                if (file.path == null && file.bytes != null) {
-                  try {
-                    await fileToUpload.delete();
-                  } catch (e) {
-                    print('⚠️ Warning: Could not delete temp file: $e');
-                  }
-                }
-              }
-            }
-          }
-
-          if (newFileNames.isNotEmpty) {
-            setState(() {
-              uploadedFiles[materialType] = [...uploadedFiles[materialType]!, ...newFileNames];
-            });
-            print('✅ Upload State: $materialType files = ${uploadedFiles[materialType]}');
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${newFileNames.length} files uploaded successfully!'),
-                  backgroundColor: Colors.green,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              );
-            }
-          } else {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('File upload failed'),
-                  backgroundColor: Colors.red,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              );
-            }
-          }
-        }
-      }
-    } catch (e) {
-      print('❌ Upload Error: $e');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        );
-      }
-    } finally {
-      if (context.mounted) {
-        setState(() {
-          uploadingStates[materialType] = false; // Reset uploading state for this specific type
-        });
-      }
-    }
-  }
-
-  showDialog(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (builderContext, setState) {
-        print('🏗️ showAddMaterialDialog: Rebuilding State. ClassID: $selectedClassId, SubjectID: $selectedSubjectId');
-
-        final filteredSubjects = selectedClassId != null
-            ? dialogSubjects.where((s) => s.classId == selectedClassId.toString()).toList()
-            : <SubjectModel>[];
-
-        final subjectDropdownEnabled = filteredSubjects.isNotEmpty;
-        final subjectDropdownItemCount = filteredSubjects.length;
-        print('💡 Subject Dropdown Debug: filteredSubjects.length=$subjectDropdownItemCount, enabled=$subjectDropdownEnabled');
-
-        return AddEditDialog(
-          title: 'Add New Material',
-          icon: Iconsax.folder_add,
-          color: Colors.purple,
-          onSave: () async {
-            print('💾 onSave: Validating input...');
-            if (selectedChapterId != null) {
-              bool hasContent = false;
-              for (String type in materialTypes) {
-                if (uploadedFiles[type]!.isNotEmpty) {
-                  hasContent = true;
-                  break;
-                }
-              }
-
-              if (hasContent) {
-                print('💾 Saving Material: ChapterID=$selectedChapterId');
-
-                // Prepare the data - CHECK THE FIELD NAME
-                String? videoLinkOrPath;
-                bool isVideoFile = false;
-
-                if (uploadedFiles['Video_Link']!.isNotEmpty) {
-                  final linkOrPath = uploadedFiles['Video_Link']!.first;
-                  if (isYoutubeVideo(linkOrPath)) {
-                    // It's a YouTube link - use Video_Link field
-                    videoLinkOrPath = linkOrPath;
-                    print('🎬 Video Link (YouTube): $videoLinkOrPath');
-                  } else {
-                    // It's a file - use Video_File_Path field
-                    videoLinkOrPath = linkOrPath;
-                    isVideoFile = true;
-                    print('🎬 Video File Path: $videoLinkOrPath');
-                  }
-                }
-
-                final response = await ApiService.addMaterial(
-                  chapterId: selectedChapterId!,
-                  // Use correct field name based on type
-                  videoLink: (!isVideoFile && videoLinkOrPath != null) ? videoLinkOrPath : null,
-                  videoFilePath: (isVideoFile && videoLinkOrPath != null) ? videoLinkOrPath : null,
-                  worksheetPath: uploadedFiles['Worksheet_Path']!.isNotEmpty ? uploadedFiles['Worksheet_Path']!.first : null,
-                  extraQuestionsPath: uploadedFiles['Extra_Questions_Path']!.isNotEmpty ? uploadedFiles['Extra_Questions_Path']!.first : null,
-                  solvedQuestionsPath: uploadedFiles['Solved_Questions_Path']!.isNotEmpty ? uploadedFiles['Solved_Questions_Path']!.first : null,
-                  revisionNotesPath: uploadedFiles['Revision_Notes_Path']!.isNotEmpty ? uploadedFiles['Revision_Notes_Path']!.first : null,
-                  lessonPlansPath: uploadedFiles['Lesson_Plans_Path']!.isNotEmpty ? uploadedFiles['Lesson_Plans_Path']!.first : null,
-                  teachingAidsPath: uploadedFiles['Teaching_Aids_Path']!.isNotEmpty ? uploadedFiles['Teaching_Aids_Path']!.first : null,
-                  assessmentToolsPath: uploadedFiles['Assessment_Tools_Path']!.isNotEmpty ? uploadedFiles['Assessment_Tools_Path']!.first : null,
-                  homeworkToolsPath: uploadedFiles['Homework_Tools_Path']!.isNotEmpty ? uploadedFiles['Homework_Tools_Path']!.first : null,
-                  practiceZonePath: uploadedFiles['Practice_Zone_Path']!.isNotEmpty ? uploadedFiles['Practice_Zone_Path']!.first : null,
-                  learningPathPath: uploadedFiles['Learning_Path_Path']!.isNotEmpty ? uploadedFiles['Learning_Path_Path']!.first : null,
-                );
-
-                print('📥 Save Response: $response');
-
-                if (context.mounted) {
-                  Navigator.pop(dialogContext);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Material added successfully!'),
-                      backgroundColor: Colors.green,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  );
-
-                  await Future.delayed(const Duration(milliseconds: 500));
-                  // Use the captured bloc reference instead of context.read
-                  print('🔄 Reloading materials after save...');
-                  academicsBloc.add(LoadMaterialsEvent());
-                  academicsBloc.add(LoadKPIEvent());
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Material added successfully!'),
-                      backgroundColor: Colors.green,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  );
-                }
-              } else {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Please select a Chapter and provide a Link or upload at least one File.'),
-                      backgroundColor: Colors.orange,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  );
-                }
-              }
-            } else {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Please select a Chapter.'),
-                    backgroundColor: Colors.orange,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                );
-              }
-            }
-          },
-          fields: [
-            // Class Dropdown
-            DialogField(
-              controller: null,
-              label: 'Select Class',
-              hint: 'Choose a class',
-              icon: Iconsax.building,
-              customWidget: Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: StyledDropdownField<int>(
-                  key: ValueKey('class_dropdown_$selectedClassId'),
-                  label: "Select Class",
-                  icon: Iconsax.building,
-                  selectedValue: selectedClassId,
-                  items: dialogClasses.map((c) => DropdownMenuItem(value: int.parse(c.id), child: Text(c.name))).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedClassId = value;
-                      selectedSubjectId = null;
-                      selectedChapterId = null;
-                      chapters = [];
-                    });
-                    final subjectsForSelectedClass = dialogSubjects.where((s) => s.classId == value.toString()).toList();
-                    print('🔎 Class Changed to $value. Subjects filtered. Chapters cleared. Subjects available in new state: ${subjectsForSelectedClass.length}');
-                  },
-                  onClear: () {
-                    setState(() {
-                      selectedClassId = null;
-                      selectedSubjectId = null;
-                      selectedChapterId = null;
-                      chapters = [];
-                    });
-                    print('🔎 Class Cleared');
-                  },
-                ),
-              ),
-            ),
-
-            // Subject Dropdown
-            DialogField(
-              controller: null,
-              label: 'Select Subject',
-              hint: 'Choose a subject',
-              icon: Iconsax.book_1,
-              customWidget: Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: StyledDropdownField<int>(
-                  key: ValueKey('subject_dropdown_$selectedClassId'),
-                  label: "Select Subject",
-                  icon: Iconsax.book_1,
-                  selectedValue: selectedSubjectId,
-                  items: filteredSubjects.map((s) => DropdownMenuItem(value: int.parse(s.id), child: Text(s.name))).toList(),
-                  onChanged: filteredSubjects.isNotEmpty
-                      ? (value) async {
-                    setState(() {
-                      selectedSubjectId = value;
-                      selectedChapterId = null;
-                      chapters = [];
-                    });
-                    print('🔎 Subject Changed to $value. Chapters loading...');
-                    if (value != null) {
-                      await loadChapters(value, setState);
-                    }
-                  }
-                      : null,
-                  onClear: () {
-                    setState(() {
-                      selectedSubjectId = null;
-                      selectedChapterId = null;
-                      chapters = [];
-                    });
-                    print('🔎 Subject Cleared');
-                  },
-                  enabled: filteredSubjects.isNotEmpty,
-                ),
-              ),
-            ),
-
-            // Chapter Dropdown
-            DialogField(
-              controller: null,
-              label: 'Select Chapter',
-              hint: 'Choose a chapter',
-              icon: Iconsax.document_text_1,
-              customWidget: Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: StyledDropdownField<int>(
-                  key: ValueKey('chapter_dropdown_$selectedSubjectId'),
-                  label: "Select Chapter",
-                  icon: Iconsax.document_text_1,
-                  selectedValue: selectedChapterId,
-                  items: chapters.map((ch) => DropdownMenuItem(value: int.parse(ch.id), child: Text(ch.name))).toList(),
-                  onChanged: chapters.isNotEmpty
-                      ? (value) {
-                    setState(() {
-                      selectedChapterId = value;
-                    });
-                    print('🔎 Chapter Changed to $value');
-                  }
-                      : null,
-                  onClear: () {
-                    setState(() {
-                      selectedChapterId = null;
-                    });
-                    print('🔎 Chapter Cleared');
-                  },
-                  enabled: chapters.isNotEmpty,
-                ),
-              ),
-            ),
-
-            // Material Types Section
-            DialogField(
-              controller: null,
-              label: 'Material Files',
-              hint: 'Upload files for different material types',
-              icon: Iconsax.folder_open,
-              customWidget: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Select material types to upload files',
-                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.bodyText),
-                  ),
-                  const SizedBox(height: 12),
-                  ...materialTypes.map((type) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.borderGrey.withOpacity(0.3)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
-                            )
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: getMaterialColor(type).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(getMaterialIcon(type), size: 18, color: getMaterialColor(type)),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        type == 'Video_Link' ? 'YouTube Video Link' : type.replaceAll('_', ' '),
-                                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.darkText),
-                                      ),
-                                      if (uploadedFiles[type]!.isNotEmpty)
-                                        Text(
-                                          '${uploadedFiles[type]!.length} file(s) added',
-                                          style: GoogleFonts.inter(fontSize: 12, color: AppTheme.primaryGreen),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                ElevatedButton.icon(
-                                  onPressed: uploadingStates[type]! ? null : () => pickAndUploadFiles(type, setState),
-                                  icon: uploadingStates[type]!
-                                      ? SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                  )
-                                      : Icon(Iconsax.document_upload, size: 16),
-                                  label: Text(
-                                    type == 'Video_Link' ? 'Add Link' : (uploadingStates[type]! ? 'Uploading...' : 'Upload File'),
-                                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: getMaterialColor(type),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    minimumSize: Size(0, 32),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (uploadedFiles[type]!.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 12.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Added files:', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.bodyText)),
-                                    const SizedBox(height: 8),
-                                    ...uploadedFiles[type]!.map((filename) {
-                                      return Padding(
-                                        padding: const EdgeInsets.only(bottom: 8.0),
-                                        child: Container(
-                                          padding: EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey.withOpacity(0.05),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(type == 'Video_Link' ? Iconsax.link : Iconsax.document, size: 14, color: Colors.green),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                                child: Text(
-                                                  type == 'Video_Link' ? 'YouTube Link' : filename,
-                                                  style: GoogleFonts.inter(fontSize: 12, color: Colors.green),
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              IconButton(
-                                                icon: Icon(Icons.clear, size: 16, color: Colors.red),
-                                                onPressed: () {
-                                                  setState(() {
-                                                    uploadedFiles[type]!.remove(filename);
-                                                  });
-                                                },
-                                                padding: EdgeInsets.zero,
-                                                constraints: BoxConstraints(minWidth: 24, minHeight: 24),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    ),
-  );
-}
-
-void showEditMaterialDialog(BuildContext context, MaterialModel item, List<SubjectModel> allSubjects) {
-  // Determine which type of material this is for the title
-  String materialType = item.type.replaceAll('_', ' ');
-
-  // Controllers for the material fields. Only non-empty paths are initialized.
-  // Removed videoController since we're no longer using YouTube links
-  final videoFileController = TextEditingController(text: item.isVideoFile ? item.link : '');
-  final worksheetController = TextEditingController(text: item.worksheetPath.isNotEmpty ? item.worksheetPath : '');
-  final notesController = TextEditingController(text: item.revisionNotesPath.isNotEmpty ? item.revisionNotesPath : '');
-  final extraQuestionsController = TextEditingController(text: item.extraQuestionsPath.isNotEmpty ? item.extraQuestionsPath : '');
-  final solvedQuestionsController = TextEditingController(text: item.solvedQuestionsPath.isNotEmpty ? item.solvedQuestionsPath : '');
-  final lessonPlansController = TextEditingController(text: item.lessonPlansPath.isNotEmpty ? item.lessonPlansPath : '');
-  final teachingAidsController = TextEditingController(text: item.teachingAidsPath.isNotEmpty ? item.teachingAidsPath : '');
-  final assessmentToolsController = TextEditingController(text: item.assessmentToolsPath.isNotEmpty ? item.assessmentToolsPath : '');
-  final homeworkToolsController = TextEditingController(text: item.homeworkToolsPath.isNotEmpty ? item.homeworkToolsPath : '');
-  final practiceZoneController = TextEditingController(text: item.practiceZonePath.isNotEmpty ? item.practiceZonePath : '');
-  final learningPathController = TextEditingController(text: item.learningPathPath.isNotEmpty ? item.learningPathPath : '');
-
-  // State for tracking if we're adding a new video file
-  bool isAddingNewVideo = false;
-  String? newVideoFilePath;
-  // Track uploading state for other material types
-  final Map<String, bool> isUploading = {
-    'Worksheet_Path': false,
-    'Extra_Questions_Path': false,
-    'Solved_Questions_Path': false,
-    'Revision_Notes_Path': false,
-    'Lesson_Plans_Path': false,
-    'Teaching_Aids_Path': false,
-    'Assessment_Tools_Path': false,
-    'Homework_Tools_Path': false,
-    'Practice_Zone_Path': false,
-    'Learning_Path_Path': false,
-  };
-
-  showDialog(
-    context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) {
-        Future<void> pickAndUploadGeneric(String key, TextEditingController controller) async {
-          try {
-            setState(() { isUploading[key] = true; });
-            FilePickerResult? result = await FilePicker.platform.pickFiles(
-              type: FileType.custom,
-              allowedExtensions: ['pdf','doc','docx','ppt','pptx','xls','xlsx','jpg','jpeg','png','gif','bmp','mp4','avi','mov','wmv','flv','webm','zip'],
-              allowMultiple: false,
-            );
-            if (result != null && result.files.isNotEmpty) {
-              final file = result.files.first;
-              File? fileToUpload;
-              if (file.path != null) {
-                fileToUpload = File(file.path!);
-              } else if (file.bytes != null) {
-                final tempDir = Directory.systemTemp;
-                final tempFile = File('${tempDir.path}/${file.name ?? 'temp_upload'}');
-                await tempFile.writeAsBytes(file.bytes!);
-                fileToUpload = tempFile;
-              }
-              if (fileToUpload != null) {
-                final fileForUpload = XFile(fileToUpload.path);
-                final filename = await ApiService.uploadDocument(fileForUpload);
-                if (filename != null && filename.isNotEmpty) {
-                  setState(() { controller.text = filename; });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('File uploaded successfully'), backgroundColor: Colors.green),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('File upload failed'), backgroundColor: Colors.red),
-                  );
-                }
-                if (file.path == null && file.bytes != null) {
-                  try { await fileToUpload.delete(); } catch (_) {}
-                }
-              }
-            }
-          } catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red),
-              );
-            }
-          } finally {
-            if (context.mounted) {
-              setState(() { isUploading[key] = false; });
-            }
-          }
-        }
-        Future<void> pickAndUploadVideoFile() async {
-          try {
-            setState(() => isAddingNewVideo = true);
-            print('📁 FilePicker: Starting video file picking...');
-
-            FilePickerResult? result = await FilePicker.platform.pickFiles(
-              type: FileType.custom,
-              allowedExtensions: ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'],
-              allowMultiple: false, // Only allow one video file
-            );
-
-            if (!context.mounted) return;
-
-            if (result != null && result.files.isNotEmpty) {
-              final file = result.files.first;
-              File? fileToUpload;
-
-              if (file.path != null) {
-                fileToUpload = File(file.path!);
-              } else if (file.bytes != null) {
-                final tempDir = Directory.systemTemp;
-                final tempFile = File('${tempDir.path}/${file.name ?? 'temp_video'}');
-                await tempFile.writeAsBytes(file.bytes!);
-                fileToUpload = tempFile;
-              }
-
-              if (fileToUpload != null) {
-                final fileForUpload = XFile(fileToUpload.path);
-                print('📁 FilePicker: Video file picked: ${fileForUpload.name}');
-                print('🚀 [uploadDocument] Video file path for upload: ${fileToUpload.path}');
-
-                final filename = await ApiService.uploadDocument(fileForUpload);
-                print('📁 Upload Result: $filename');
-
-                if (filename != null && filename.isNotEmpty) {
-                  setState(() {
-                    newVideoFilePath = filename;
-                    videoFileController.text = filename;
-                  });
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text('✅ Video file uploaded successfully!'),
-                        backgroundColor: Colors.green
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text('❌ Video file upload failed'),
-                        backgroundColor: Colors.red
-                    ),
-                  );
-                }
-
-                // Clean up temp file if we created one
-                if (file.path == null && file.bytes != null) {
-                  try {
-                    await fileToUpload.delete();
-                  } catch (e) {
-                    print('Warning: Could not delete temp file: $e');
-                  }
-                }
-              }
-            } else {
-              print('⚠️ FilePicker: No video file selected.');
-            }
-          } catch (e) {
-            print('❌ Upload Error: $e');
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('❌ Upload failed: $e'), backgroundColor: Colors.red),
-              );
-            }
-          } finally {
-            if (context.mounted) {
-              setState(() => isAddingNewVideo = false);
-            }
-          }
-        }
-
-        return AddEditDialog(
-          title: "Edit $materialType",
-          subtitle: item.name,
-          icon: getMaterialIcon(item.type),
-          color: getMaterialColor(item.type),
-          onSave: () async {
-            print('💾 Updating Material: RecNo=${item.id}');
-
-            Map<String, dynamic> updateData = {
-              'table': 'Study_Material',
-              'operation': 'UPDATE',
-              'RecNo': int.parse(item.id),
-            };
-
-            // Update video file if changed
-            if (newVideoFilePath != null && newVideoFilePath!.isNotEmpty) {
-              updateData['Video_File_Path'] = newVideoFilePath;
-              updateData['Is_Video_File'] = true;
-              print('   Updating Video_File_Path: $newVideoFilePath');
-            } else if (item.isVideoFile && videoFileController.text.isNotEmpty) {
-              updateData['Video_File_Path'] = videoFileController.text;
-              updateData['Is_Video_File'] = true;
-              print('   Keeping existing Video_File_Path: ${videoFileController.text}');
-            }
-
-            // Update other material paths if they have values
-            if (worksheetController.text.isNotEmpty) {
-              updateData['Worksheet_Path'] = worksheetController.text;
-              print('   Updating Worksheet_Path: ${worksheetController.text}');
-            }
-
-            if (extraQuestionsController.text.isNotEmpty) {
-              updateData['Extra_Questions_Path'] = extraQuestionsController.text;
-              print('   Updating Extra_Questions_Path: ${extraQuestionsController.text}');
-            }
-
-            if (solvedQuestionsController.text.isNotEmpty) {
-              updateData['Solved_Questions_Path'] = solvedQuestionsController.text;
-              print('   Updating Solved_Questions_Path: ${solvedQuestionsController.text}');
-            }
-
-            if (notesController.text.isNotEmpty) {
-              updateData['Revision_Notes_Path'] = notesController.text;
-              print('   Updating Revision_Notes_Path: ${notesController.text}');
-            }
-
-            if (lessonPlansController.text.isNotEmpty) {
-              updateData['Lesson_Plans_Path'] = lessonPlansController.text;
-              print('   Updating Lesson_Plans_Path: ${lessonPlansController.text}');
-            }
-
-            if (teachingAidsController.text.isNotEmpty) {
-              updateData['Teaching_Aids_Path'] = teachingAidsController.text;
-              print('   Updating Teaching_Aids_Path: ${teachingAidsController.text}');
-            }
-
-            if (assessmentToolsController.text.isNotEmpty) {
-              updateData['Assessment_Tools_Path'] = assessmentToolsController.text;
-              print('   Updating Assessment_Tools_Path: ${assessmentToolsController.text}');
-            }
-
-            if (homeworkToolsController.text.isNotEmpty) {
-              updateData['Homework_Tools_Path'] = homeworkToolsController.text;
-              print('   Updating Homework_Tools_Path: ${homeworkToolsController.text}');
-            }
-
-            if (practiceZoneController.text.isNotEmpty) {
-              updateData['Practice_Zone_Path'] = practiceZoneController.text;
-              print('   Updating Practice_Zone_Path: ${practiceZoneController.text}');
-            }
-
-            if (learningPathController.text.isNotEmpty) {
-              updateData['Learning_Path_Path'] = learningPathController.text;
-              print('   Updating Learning_Path_Path: ${learningPathController.text}');
-            }
-
-            print('📤 [updateMaterial] Sending request with data: $updateData');
-            final response = await ApiService.manageAcademicModule(updateData);
-            print('📥 [updateMaterial] Received response: $response');
-
-            if (context.mounted) {
-              Navigator.pop(context);
-              context.read<AcademicsBloc>().add(LoadMaterialsEvent());
-            }
-          },
-          fields: [
-            // Video File Section
-            if (item.isVideoFile || item.type == 'Video_File')
-              DialogField(
-                controller: videoFileController,
-                label: "Video File",
-                hint: "Video file path",
-                icon: Iconsax.video,
-                customWidget: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: videoFileController,
-                      readOnly: true,
-                      style: GoogleFonts.inter(color: AppTheme.darkText),
-                      decoration: _buildDialogInputDecoration(
-                        "Video File",
-                        Iconsax.video,
-                        hint: "Video file path",
-                        enabled: false,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: isAddingNewVideo ? null : pickAndUploadVideoFile,
-                      icon: isAddingNewVideo
-                          ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                          : Icon(Iconsax.document_upload, size: 16),
-                      label: Text(
-                        isAddingNewVideo ? 'Uploading...' : 'Upload New Video',
-                        style: GoogleFonts.inter(fontSize: 12),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        minimumSize: Size(0, 32),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            // Displaying all other potential fields with their current values
-
-              DialogField(
-                controller: worksheetController,
-                label: "Worksheet Path",
-                hint: "/uploads/...",
-                icon: Iconsax.document_text_1,
-                customWidget: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: worksheetController,
-                      readOnly: true,
-                      style: GoogleFonts.inter(color: AppTheme.darkText),
-                      decoration: _buildDialogInputDecoration("Worksheet Path", Iconsax.document_text_1, hint: "/uploads/...", enabled: false),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: isUploading['Worksheet_Path'] == true ? null : () => pickAndUploadGeneric('Worksheet_Path', worksheetController),
-                      icon: isUploading['Worksheet_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
-                      label: Text(isUploading['Worksheet_Path'] == true ? 'Uploading...' : 'Upload New Worksheet', style: GoogleFonts.inter(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
-                    ),
-                  ],
-                ),
-              ),
-
-
-              DialogField(
-                controller: extraQuestionsController,
-                label: "Extra Questions Path",
-                hint: "/uploads/...",
-                icon: Iconsax.document_text,
-                customWidget: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: extraQuestionsController,
-                      readOnly: true,
-                      style: GoogleFonts.inter(color: AppTheme.darkText),
-                      decoration: _buildDialogInputDecoration("Extra Questions Path", Iconsax.document_text, hint: "/uploads/...", enabled: false),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: isUploading['Extra_Questions_Path'] == true ? null : () => pickAndUploadGeneric('Extra_Questions_Path', extraQuestionsController),
-                      icon: isUploading['Extra_Questions_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
-                      label: Text(isUploading['Extra_Questions_Path'] == true ? 'Uploading...' : 'Upload New Extra Questions', style: GoogleFonts.inter(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
-                    ),
-                  ],
-                ),
-              ),
-
-
-              DialogField(
-                controller: solvedQuestionsController,
-                label: "Solved Questions Path",
-                hint: "/uploads/...",
-                icon: Iconsax.document_text,
-                customWidget: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: solvedQuestionsController,
-                      readOnly: true,
-                      style: GoogleFonts.inter(color: AppTheme.darkText),
-                      decoration: _buildDialogInputDecoration("Solved Questions Path", Iconsax.document_text, hint: "/uploads/...", enabled: false),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: isUploading['Solved_Questions_Path'] == true ? null : () => pickAndUploadGeneric('Solved_Questions_Path', solvedQuestionsController),
-                      icon: isUploading['Solved_Questions_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
-                      label: Text(isUploading['Solved_Questions_Path'] == true ? 'Uploading...' : 'Upload New Solved Questions', style: GoogleFonts.inter(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
-                    ),
-                  ],
-                ),
-              ),
-
-
-              DialogField(
-                controller: notesController,
-                label: "Revision Notes Path",
-                hint: "/uploads/...",
-                icon: Iconsax.note_1,
-                customWidget: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: notesController,
-                      readOnly: true,
-                      style: GoogleFonts.inter(color: AppTheme.darkText),
-                      decoration: _buildDialogInputDecoration("Revision Notes Path", Iconsax.note_1, hint: "/uploads/...", enabled: false),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: isUploading['Revision_Notes_Path'] == true ? null : () => pickAndUploadGeneric('Revision_Notes_Path', notesController),
-                      icon: isUploading['Revision_Notes_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
-                      label: Text(isUploading['Revision_Notes_Path'] == true ? 'Uploading...' : 'Upload New Revision Notes', style: GoogleFonts.inter(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
-                    ),
-                  ],
-                ),
-              ),
-
-
-              DialogField(
-                controller: lessonPlansController,
-                label: "Lesson Plans Path",
-                hint: "/uploads/...",
-                icon: Iconsax.ruler,
-                customWidget: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: lessonPlansController,
-                      readOnly: true,
-                      style: GoogleFonts.inter(color: AppTheme.darkText),
-                      decoration: _buildDialogInputDecoration("Lesson Plans Path", Iconsax.ruler, hint: "/uploads/...", enabled: false),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: isUploading['Lesson_Plans_Path'] == true ? null : () => pickAndUploadGeneric('Lesson_Plans_Path', lessonPlansController),
-                      icon: isUploading['Lesson_Plans_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
-                      label: Text(isUploading['Lesson_Plans_Path'] == true ? 'Uploading...' : 'Upload New Lesson Plans', style: GoogleFonts.inter(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
-                    ),
-                  ],
-                ),
-              ),
-
-
-              DialogField(
-                controller: teachingAidsController,
-                label: "Teaching Aids Path",
-                hint: "/uploads/...",
-                icon: Iconsax.clipboard_text,
-                customWidget: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: teachingAidsController,
-                      readOnly: true,
-                      style: GoogleFonts.inter(color: AppTheme.darkText),
-                      decoration: _buildDialogInputDecoration("Teaching Aids Path", Iconsax.clipboard_text, hint: "/uploads/...", enabled: false),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: isUploading['Teaching_Aids_Path'] == true ? null : () => pickAndUploadGeneric('Teaching_Aids_Path', teachingAidsController),
-                      icon: isUploading['Teaching_Aids_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
-                      label: Text(isUploading['Teaching_Aids_Path'] == true ? 'Uploading...' : 'Upload New Teaching Aids', style: GoogleFonts.inter(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
-                    ),
-                  ],
-                ),
-              ),
-
-
-              DialogField(
-                controller: assessmentToolsController,
-                label: "Assessment Tools Path",
-                hint: "/uploads/...",
-                icon: Iconsax.award,
-                customWidget: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: assessmentToolsController,
-                      readOnly: true,
-                      style: GoogleFonts.inter(color: AppTheme.darkText),
-                      decoration: _buildDialogInputDecoration("Assessment Tools Path", Iconsax.award, hint: "/uploads/...", enabled: false),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: isUploading['Assessment_Tools_Path'] == true ? null : () => pickAndUploadGeneric('Assessment_Tools_Path', assessmentToolsController),
-                      icon: isUploading['Assessment_Tools_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
-                      label: Text(isUploading['Assessment_Tools_Path'] == true ? 'Uploading...' : 'Upload New Assessment Tools', style: GoogleFonts.inter(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
-                    ),
-                  ],
-                ),
-              ),
-
-
-              DialogField(
-                controller: homeworkToolsController,
-                label: "Homework Tools Path",
-                hint: "/uploads/...",
-                icon: Iconsax.home,
-                customWidget: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: homeworkToolsController,
-                      readOnly: true,
-                      style: GoogleFonts.inter(color: AppTheme.darkText),
-                      decoration: _buildDialogInputDecoration("Homework Tools Path", Iconsax.home, hint: "/uploads/...", enabled: false),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: isUploading['Homework_Tools_Path'] == true ? null : () => pickAndUploadGeneric('Homework_Tools_Path', homeworkToolsController),
-                      icon: isUploading['Homework_Tools_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
-                      label: Text(isUploading['Homework_Tools_Path'] == true ? 'Uploading...' : 'Upload New Homework Tools', style: GoogleFonts.inter(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
-                    ),
-                  ],
-                ),
-              ),
-
-
-              DialogField(
-                controller: practiceZoneController,
-                label: "Practice Zone Path",
-                hint: "/uploads/...",
-                icon: Iconsax.cpu,
-                customWidget: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: practiceZoneController,
-                      readOnly: true,
-                      style: GoogleFonts.inter(color: AppTheme.darkText),
-                      decoration: _buildDialogInputDecoration("Practice Zone Path", Iconsax.cpu, hint: "/uploads/...", enabled: false),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: isUploading['Practice_Zone_Path'] == true ? null : () => pickAndUploadGeneric('Practice_Zone_Path', practiceZoneController),
-                      icon: isUploading['Practice_Zone_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
-                      label: Text(isUploading['Practice_Zone_Path'] == true ? 'Uploading...' : 'Upload New Practice Zone', style: GoogleFonts.inter(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
-                    ),
-                  ],
-                ),
-              ),
-
-
-              DialogField(
-                controller: learningPathController,
-                label: "Learning Path Path",
-                hint: "/uploads/...",
-                icon: Iconsax.chart_2,
-                customWidget: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: learningPathController,
-                      readOnly: true,
-                      style: GoogleFonts.inter(color: AppTheme.darkText),
-                      decoration: _buildDialogInputDecoration("Learning Path Path", Iconsax.chart_2, hint: "/uploads/...", enabled: false),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: isUploading['Learning_Path_Path'] == true ? null : () => pickAndUploadGeneric('Learning_Path_Path', learningPathController),
-                      icon: isUploading['Learning_Path_Path'] == true ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Iconsax.document_upload, size: 16),
-                      label: Text(isUploading['Learning_Path_Path'] == true ? 'Uploading...' : 'Upload New Learning Path', style: GoogleFonts.inter(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), minimumSize: Size(0, 32)),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        );
-      },
-    ),
-  );
-}
 
 class DialogField {
 final TextEditingController? controller;

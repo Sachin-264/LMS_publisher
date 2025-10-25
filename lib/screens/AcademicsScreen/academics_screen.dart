@@ -5,6 +5,7 @@ import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:lms_publisher/Service/academics_service.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/screens/AcademicsScreen/academics_content.dart';
+import 'package:lms_publisher/screens/AcademicsScreen/materialdetailscreen.dart';
 import 'package:lms_publisher/screens/main_layout.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:provider/provider.dart';
@@ -280,14 +281,14 @@ class _AcademicsViewState extends State<AcademicsView> {
             });
 
             if (subjectId != null) {
-              print('📖 Loading chapters for subject $subjectId');
+              print('📖 Loading chapters for subject: $subjectId');
               try {
                 final chaptersResponse = await ApiService.getChapters(
                   schoolRecNo: 1,
                   subjectId: subjectId,
                 );
 
-                if (chaptersResponse['success'] == true && chaptersResponse['data'] != null) {
+                if (chaptersResponse['status'] == 'success' && chaptersResponse['data'] != null) {
                   setState(() {
                     _allChapters = (chaptersResponse['data'] as List)
                         .map((json) => ChapterModel.fromJson(json))
@@ -299,8 +300,11 @@ class _AcademicsViewState extends State<AcademicsView> {
                 print('❌ Error loading chapters: $e');
               }
             }
-            _loadViewDataDebounced();
+
+            // ✅ IMPORTANT: Load chapters in BLoC after setState
+            _loadViewData();
           },
+
           onChapterFilterChanged: (chapterId) {
             setState(() => _selectedChapterId = chapterId);
             _loadViewDataDebounced();
@@ -371,7 +375,6 @@ class ClassView extends StatelessWidget {
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
     final canAdd = userProvider.hasPermission('M004', 'add');
-
     print('🏗️ ClassView: Building...');
     return BlocBuilder<AcademicsBloc, AcademicsState>(
       buildWhen: (previous, current) {
@@ -381,7 +384,6 @@ class ClassView extends StatelessWidget {
       },
       builder: (context, state) {
         print('🏗️ ClassView builder: state=${state.runtimeType}');
-
         if (state is AcademicsLoading) {
           return Center(
             child: Padding(
@@ -396,15 +398,77 @@ class ClassView extends StatelessWidget {
           );
         }
 
-
         if (state is ClassesLoaded) {
           print('✅ ClassView: ClassesLoaded with ${state.classes.length} classes');
 
+          // FIXED: Show "Add Class" button when empty
           if (state.classes.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(40.0),
-                child: Text('No classes available'),
+                padding: const EdgeInsets.all(40.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryGreen.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Iconsax.building,
+                        size: 64,
+                        color: AppTheme.primaryGreen,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'No Classes Yet',
+                      style: GoogleFonts.poppins(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.darkText,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Start by creating your first class to organize your academic content.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.bodyText,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    if (canAdd)
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          print('🔐 ClassView Empty State: Checking ADD permission for M004');
+                          if (userProvider.hasPermission('M004', 'add')) {
+                            print('✅ ClassView Empty State: ADD permission granted');
+                            showAddClassDialog(context);
+                          } else {
+                            print('❌ ClassView Empty State: ADD permission denied');
+                            _showPermissionDeniedDialog(context, 'add classes');
+                          }
+                        },
+                        icon: const Icon(Iconsax.add),
+                        label: Text(
+                          'Add Your First Class',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryGreen,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             );
           }
@@ -414,7 +478,8 @@ class ClassView extends StatelessWidget {
             title: "All Classes",
             buttonLabel: canAdd ? "Add Class" : null,
             buttonIcon: Iconsax.add,
-            onAddPressed: canAdd ? () {
+            onAddPressed: canAdd
+                ? () {
               print('🔐 ClassView: Checking ADD permission for M004');
               if (userProvider.hasPermission('M004', 'add')) {
                 print('✅ ClassView: ADD permission granted');
@@ -423,7 +488,8 @@ class ClassView extends StatelessWidget {
                 print('❌ ClassView: ADD permission denied');
                 _showPermissionDeniedDialog(context, 'add classes');
               }
-            } : null,
+            }
+                : null,
             header: const ResponsiveTableHeader(headers: [
               HeaderItem(text: "CLASS NAME", flex: 4),
               HeaderItem(text: "Description", flex: 4),
@@ -444,6 +510,7 @@ class ClassView extends StatelessWidget {
     );
   }
 }
+
 
 class ChapterView extends StatelessWidget {
   final int? selectedClassId;
@@ -469,6 +536,8 @@ class ChapterView extends StatelessWidget {
     final canAdd = userProvider.hasPermission('M004', 'add');
 
     print('🏗️ ChapterView: Building...');
+    print('🔍 ChapterView: selectedClassId=$selectedClassId, selectedSubjectId=$selectedSubjectId');
+
     return BlocBuilder<AcademicsBloc, AcademicsState>(
       buildWhen: (previous, current) {
         final shouldRebuild = current is ChaptersLoaded || current is AcademicsLoading;
@@ -492,25 +561,47 @@ class ChapterView extends StatelessWidget {
           );
         }
 
-
         if (state is ChaptersLoaded) {
-          print('✅ ChapterView: ChaptersLoaded with ${state.chapters.length} chapters');
+          print('📖 ChapterView: ChaptersLoaded with ${state.chapters.length} chapters');
+
+          // ✅ Filter chapters based on selections
+          List<ChapterModel> filteredChapters = state.chapters;
+
+          if (selectedSubjectId != null) {
+            filteredChapters = state.chapters
+                .where((ch) => ch.subjectId == selectedSubjectId)
+                .toList();
+            print('📖 ChapterView: Filtered to ${filteredChapters.length} chapters for subject $selectedSubjectId');
+          } else if (selectedClassId != null) {
+            // Get all subjects for the selected class
+            final classSubjectIds = allSubjects
+                .where((s) => s.classId == selectedClassId)
+                .map((s) => s.id)
+                .toSet();
+
+            filteredChapters = state.chapters
+                .where((ch) => classSubjectIds.contains(ch.subjectId))
+                .toList();
+            print('📖 ChapterView: Filtered to ${filteredChapters.length} chapters for class $selectedClassId');
+          }
 
           return MasterViewTemplate(
-            key: ValueKey('chapters_${state.chapters.length}_${DateTime.now().millisecondsSinceEpoch}'),
-            title: "All Chapters",
-            buttonLabel: canAdd ? "Add Chapter" : null,
+            key: ValueKey('chapters_${filteredChapters.length}_${DateTime.now().millisecondsSinceEpoch}'),
+            title: 'All Chapters',
+            buttonLabel: canAdd ? 'Add Chapter' : null,
             buttonIcon: Iconsax.add,
-            onAddPressed: canAdd ? () {
-              print('🔐 ChapterView: Checking ADD permission for M004');
+            onAddPressed: canAdd
+                ? () {
+              print('🏗️ ChapterView: Checking ADD permission for M004');
               if (userProvider.hasPermission('M004', 'add')) {
                 print('✅ ChapterView: ADD permission granted');
                 showAddChapterDialog(context, allClasses, allSubjects);
               } else {
                 print('❌ ChapterView: ADD permission denied');
-                _showPermissionDeniedDialog(context, 'add chapters');
+                showPermissionDeniedDialog(context, 'add chapters');
               }
-            } : null,
+            }
+                : null,
             filters: CascadingFilters(
               selectedClassId: selectedClassId,
               selectedSubjectId: selectedSubjectId,
@@ -519,24 +610,25 @@ class ChapterView extends StatelessWidget {
               onClassChanged: onClassFilterChanged,
               onSubjectChanged: onSubjectFilterChanged,
             ),
-            header: const ResponsiveTableHeader(headers: [
-              HeaderItem(text: "CHAPTER", flex: 4),
-              HeaderItem(text: "SUBJECT", flex: 3),
-              HeaderItem(text: "MATERIALS", flex: 2),
-              HeaderItem(text: "ACTIONS", flex: 1, alignment: Alignment.centerRight),
-            ]),
-            itemCount: state.chapters.isEmpty ? 1 : state.chapters.length,
+            header: const ResponsiveTableHeader(
+              headers: [
+                HeaderItem(text: 'CHAPTER', flex: 4),
+                HeaderItem(text: 'SUBJECT', flex: 3),
+                HeaderItem(text: 'MATERIALS', flex: 2),
+                HeaderItem(text: 'ACTIONS', flex: 1, alignment: Alignment.centerRight),
+              ],
+            ),
+            itemCount: filteredChapters.isEmpty ? 1 : filteredChapters.length,
             itemBuilder: (context, index) {
-              if (state.chapters.isEmpty) {
+              if (filteredChapters.isEmpty) {
                 return const Padding(
                   padding: EdgeInsets.all(40.0),
                   child: Center(child: Text('No chapters available')),
                 );
               }
-
               return ChapterListItem(
-                key: ValueKey('chapter_${state.chapters[index].id}'),
-                item: state.chapters[index],
+                key: ValueKey('chapter_${filteredChapters[index].id}'),
+                item: filteredChapters[index],
                 allSubjects: allSubjects,
               );
             },
@@ -548,6 +640,59 @@ class ChapterView extends StatelessWidget {
     );
   }
 }
+
+// Add this function at the end of the file, before the last closing brace
+
+void showPermissionDeniedDialog(BuildContext context, String action) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Iconsax.info_circle, color: Colors.red),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Permission Denied',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+      content: Text(
+        'You do not have permission to $action.',
+        style: GoogleFonts.inter(fontSize: 14),
+      ),
+      actions: [
+        ElevatedButton(
+          onPressed: () => Navigator.pop(ctx),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryGreen,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Text(
+            'OK',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+
 
 class SubjectView extends StatelessWidget {
   final int? selectedClassId;
@@ -680,7 +825,6 @@ class MaterialView extends StatelessWidget {
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
     final canAdd = userProvider.hasPermission('M004', 'add');
-
     print('🏗️ MaterialView: Building...');
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 700;
@@ -694,7 +838,6 @@ class MaterialView extends StatelessWidget {
       },
       builder: (context, state) {
         print('🏗️ MaterialView builder: state=${state.runtimeType}');
-
         List<MaterialModel> materials = [];
         if (state is MaterialsLoaded) {
           materials = state.materials;
@@ -704,7 +847,9 @@ class MaterialView extends StatelessWidget {
         if (state is AcademicsLoading) {
           print('⏳ MaterialView: Loading state...');
           final screenWidth = MediaQuery.of(context).size.width;
-          double maxCrossAxisExtent = screenWidth < 600 ? (screenWidth < 400 ? screenWidth - 32 : 200) : (screenWidth < 900 ? 250 : (screenWidth < 1200 ? 280 : 300));
+          double maxCrossAxisExtent = screenWidth < 600
+              ? (screenWidth < 400 ? screenWidth - 32 : 200)
+              : (screenWidth < 900 ? 250 : (screenWidth < 1200 ? 280 : 300));
           double childAspectRatio = screenWidth < 600 ? 0.75 : (screenWidth < 900 ? 0.80 : 0.85);
           double spacing = screenWidth < 900 ? 12 : AppTheme.defaultPadding;
 
@@ -731,17 +876,35 @@ class MaterialView extends StatelessWidget {
           title: "All Materials",
           buttonLabel: canAdd ? "Add Material" : null,
           buttonIcon: Iconsax.add,
-          onAddPressed: canAdd ? () {
+          onAddPressed: canAdd
+              ? () async {
             print('➕ MaterialView: Add Material button pressed');
             print('🔐 MaterialView: Checking ADD permission for M004');
             if (userProvider.hasPermission('M004', 'add')) {
               print('✅ MaterialView: ADD permission granted');
-              showAddMaterialDialog(context, allClasses, allSubjects);
+
+              // ✅ Navigate to MaterialDetailScreen in Add mode
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MaterialDetailScreen(
+                    isAddMode: true,
+                    allClasses: allClasses,
+                    allSubjects: allSubjects,
+                    allChapters: allChapters,
+                  ),
+                ),
+              );
+
+              // Reload materials after adding
+              print('🔄 MaterialView: Reloading materials after add');
+              context.read<AcademicsBloc>().add(LoadMaterialsEvent());
             } else {
               print('❌ MaterialView: ADD permission denied');
               _showPermissionDeniedDialog(context, 'add materials');
             }
-          } : null,
+          }
+              : null,
           filters: allClasses.isNotEmpty
               ? CascadingFiltersWithChapter(
             selectedClassId: selectedClassId,
@@ -764,7 +927,6 @@ class MaterialView extends StatelessWidget {
             },
           )
               : null,
-          // Material Type Filter - Placed on new row for mobile
           headerActions: [
             LayoutBuilder(
               builder: (context, constraints) {
@@ -812,7 +974,7 @@ class MaterialView extends StatelessWidget {
               },
             ),
           ],
-          placeHeaderActionsOnNewRow: isMobile, // NEW: Place on new row for mobile
+          placeHeaderActionsOnNewRow: isMobile,
           header: const SizedBox.shrink(),
           itemCount: 1,
           itemBuilder: (context, index) {
@@ -828,9 +990,45 @@ class MaterialView extends StatelessWidget {
             return buildGridView(context, materials, allSubjects);
           },
         );
+
       },
     );
   }
+
+  // Add this method inside the MaterialView class in academics_screen.dart
+
+  Widget buildGridView(BuildContext context, List<MaterialModel> materials, List<SubjectModel> allSubjects) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    double maxCrossAxisExtent = screenWidth < 600
+        ? (screenWidth < 400 ? screenWidth - 32 : 200)
+        : (screenWidth < 900 ? 250 : (screenWidth < 1200 ? 280 : 300));
+
+    double childAspectRatio = screenWidth < 600 ? 0.75 : (screenWidth < 900 ? 0.80 : 0.85);
+    double spacing = screenWidth < 900 ? 12 : AppTheme.defaultPadding;
+
+    return GridView.builder(
+      key: const ValueKey('grid_materials'),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.all(screenWidth < 600 ? 8 : AppTheme.defaultPadding),
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: maxCrossAxisExtent,
+        childAspectRatio: childAspectRatio,
+        crossAxisSpacing: spacing,
+        mainAxisSpacing: spacing,
+      ),
+      itemCount: materials.length,
+      itemBuilder: (context, index) {
+        return MaterialGridItem(
+          key: ValueKey('material_${materials[index].recNo}'),
+          item: materials[index],
+          allSubjects: allSubjects,
+        );
+      },
+    );
+  }
+
 
   Widget _buildMaterialSkeletonCard(BuildContext context) {
     final color = AppTheme.borderGrey;
@@ -865,64 +1063,6 @@ class MaterialView extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget buildGridView(BuildContext context, List<MaterialModel> materials, List<SubjectModel> allSubjects) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    print('🎨 buildGridView: Building grid for ${materials.length} materials, screenWidth=$screenWidth');
-
-    double maxCrossAxisExtent;
-    double childAspectRatio;
-    double crossAxisSpacing;
-    double mainAxisSpacing;
-
-    if (screenWidth < 600) {
-      maxCrossAxisExtent = screenWidth < 400 ? screenWidth - 32 : 200;
-      childAspectRatio = 0.75;
-      crossAxisSpacing = 12;
-      mainAxisSpacing = 12;
-      print('📱 buildGridView: MOBILE grid config');
-    } else if (screenWidth < 900) {
-      maxCrossAxisExtent = 250;
-      childAspectRatio = 0.80;
-      crossAxisSpacing = 16;
-      mainAxisSpacing = 16;
-      print('📱 buildGridView: TABLET grid config');
-    } else if (screenWidth < 1200) {
-      maxCrossAxisExtent = 280;
-      childAspectRatio = 0.85;
-      crossAxisSpacing = AppTheme.defaultPadding;
-      mainAxisSpacing = AppTheme.defaultPadding;
-      print('🖥️ buildGridView: SMALL DESKTOP grid config');
-    } else {
-      maxCrossAxisExtent = 300;
-      childAspectRatio = 0.85;
-      crossAxisSpacing = AppTheme.defaultPadding;
-      mainAxisSpacing = AppTheme.defaultPadding;
-      print('🖥️ buildGridView: LARGE DESKTOP grid config');
-    }
-
-    return GridView.builder(
-      key: const ValueKey('grid'),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.all(screenWidth < 600 ? 8 : AppTheme.defaultPadding),
-      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: maxCrossAxisExtent,
-        childAspectRatio: childAspectRatio,
-        crossAxisSpacing: crossAxisSpacing,
-        mainAxisSpacing: mainAxisSpacing,
-      ),
-      itemCount: materials.length,
-      itemBuilder: (context, index) {
-        print('🎨 buildGridView: Building item $index - ${materials[index].name}');
-        return MaterialGridItem(
-          key: ValueKey('material_${materials[index].id}'),
-          item: materials[index],
-          allSubjects: allSubjects,
-        );
-      },
     );
   }
 }

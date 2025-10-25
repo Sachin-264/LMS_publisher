@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lms_publisher/Service/academics_service.dart';
+import 'package:lms_publisher/screens/AcademicsScreen/academics_content.dart';
 
 // ==================== HELPER FUNCTIONS ====================
 // Helper to check if it's a YouTube video link
@@ -148,212 +149,244 @@ class AcademicsError extends AcademicsState {
 }
 
 // ==================== MODELS ====================
+
 class ClassModel {
-  final String id, name, description;
-  final int subjectCount;
+  final int id;
+  final String name;
+  final String description;
+  final int displayOrder;
   final bool isActive;
+  final String pubCode;
+  final int? subjectCount;  // ADD THIS LINE
 
   ClassModel({
     required this.id,
     required this.name,
     required this.description,
-    required this.subjectCount,
+    required this.displayOrder,
     required this.isActive,
+    required this.pubCode,
+    this.subjectCount,  // ADD THIS LINE
   });
 
   factory ClassModel.fromJson(Map<String, dynamic> json) {
-    print('📦 ClassModel.fromJson: $json');
     return ClassModel(
-      id: json['ClassID']?.toString() ?? '',
-      name: json['ClassName'] ?? '',
-      description: json['ClassDescription'] ?? '',
-      subjectCount: int.tryParse(json['TotalSubjects']?.toString() ?? '0') ?? 0,
-      isActive: json['IsActive'] == 1 || json['IsActive'] == '1',
+      id: json['ClassID'] ?? 0,
+      name: json['ClassName']?.toString() ?? '',
+      description: json['ClassDescription']?.toString() ?? '',
+      displayOrder: json['DisplayOrder'] ?? 0,
+      isActive: json['IsActive'] == 1 || json['IsActive'] == true,
+      pubCode: json['PubCode']?.toString() ?? '0',  // ✅ FIXED: Convert int to String
+      subjectCount: json['TotalSubjects'],
     );
   }
 }
 
+
 class SubjectModel {
-  final String id, name, className, description, classId;
-  final int chapterCount;
+  final int id;  // Changed from String to int
+  final int classId;
+  final String name;
+  final String code;
+  final String description;
+  final String color;
   final bool isActive;
+  final String pubCode;
+
+  // Optional fields that may come from API with joins
+  final String? className;
+  final int? chapterCount;
 
   SubjectModel({
     required this.id,
-    required this.name,
-    required this.className,
-    required this.description,
     required this.classId,
-    required this.chapterCount,
+    required this.name,
+    required this.code,
+    required this.description,
+    required this.color,
     required this.isActive,
+    required this.pubCode,
+    this.className,
+    this.chapterCount,
   });
 
   factory SubjectModel.fromJson(Map<String, dynamic> json) {
-    print('📦 SubjectModel.fromJson: $json');
     return SubjectModel(
-      id: json['SubjectID']?.toString() ?? '',
-      name: json['SubjectName'] ?? '',
-      className: json['ClassName'] ?? '',
-      description: json['SubjectDescription'] ?? '',
-      classId: json['ClassID']?.toString() ?? '',
-      chapterCount: int.tryParse(json['TotalChapters']?.toString() ?? '0') ?? 0,
-      isActive: json['IsActive'] == 1 || json['IsActive'] == '1',
+      id: json['SubjectID'] ?? 0,
+      classId: json['ClassID'] ?? 0,
+      name: json['SubjectName']?.toString() ?? '',
+      code: json['SubjectCode']?.toString() ?? '',
+      description: json['SubjectDescription']?.toString() ?? '',
+      color: json['SubjectColor']?.toString() ?? '#4CAF50',
+      isActive: json['IsActive'] == 1 || json['IsActive'] == true,
+      pubCode: json['PubCode']?.toString() ?? '0',  // ✅ FIXED: Convert int to String
+      className: json['ClassName']?.toString(),
+      chapterCount: json['TotalChapters'],
     );
   }
 }
 
 class ChapterModel {
-  final String id, name, subjectName, description;
-  final int materialCount, chapterOrder;
+  final int id; // Changed from String to int
+  final int subjectId;
+  final String name;
+  final String code;
+  final String description;
+  final int order;
+  final bool isActive;
+  final String pubCode;
+
+  // Optional fields that may come from API with joins
+  final String? subjectName;
+  final int? materialCount;
 
   ChapterModel({
     required this.id,
+    required this.subjectId,
     required this.name,
-    required this.subjectName,
+    required this.code,
     required this.description,
-    required this.materialCount,
-    required this.chapterOrder,
+    required this.order,
+    required this.isActive,
+    required this.pubCode,
+    this.subjectName,
+    this.materialCount,
   });
 
+// REPLACE WITH:
   factory ChapterModel.fromJson(Map<String, dynamic> json) {
-    print('📦 ChapterModel.fromJson: $json');
     return ChapterModel(
-      id: json['ChapterID']?.toString() ?? '',
-      name: json['ChapterName'] ?? '',
-      subjectName: json['SubjectName'] ?? '',
-      description: json['ChapterDescription'] ?? '',
-      chapterOrder: int.tryParse(json['ChapterOrder']?.toString() ?? '0') ?? 0,
-      materialCount: int.tryParse(json['TotalStudyMaterials']?.toString() ?? '0') ?? 0,
+      id: json['ChapterID'] ?? 0,
+      subjectId: json['SubjectID'] ?? 0,
+      name: json['ChapterName']?.toString() ?? '',
+      code: json['ChapterCode']?.toString() ?? '',
+      description: json['ChapterDescription']?.toString() ?? '',
+      order: json['ChapterOrder'] ?? 0,
+      isActive: json['IsActive'] == 1 || json['IsActive'] == true,
+      pubCode: json['PubCode']?.toString() ?? '0',
+      // ✅ FIXED: Convert int to String
+      subjectName: json['SubjectName']?.toString(),
+      materialCount: json['MaterialCount'],
     );
   }
 }
 
 class MaterialModel {
-  final String id, name, type, link, chapterName;
-  final DateTime uploadedOn;
-  final String? thumbnail;
-  final bool isVideoFile;
-  final String videoLink;
-
-  final String worksheetPath;
-  final String extraQuestionsPath;
-  final String solvedQuestionsPath;
-  final String revisionNotesPath;
-  final String lessonPlansPath;
-  final String teachingAidsPath;
-  final String assessmentToolsPath;
-  final String homeworkToolsPath;
-  final String practiceZonePath;
-  final String learningPathPath;
+  final int recNo;
+  final int materialId;
+  final int chapterId;
+  final String chapterName;
+  final int subjectId;
+  final String subjectName;
+  final int classId;
+  final String className;
+  final DateTime? uploadedOn;
+  final List<Map<String, dynamic>> videoLinks;
+  final List<Map<String, dynamic>> worksheets;
+  final List<Map<String, dynamic>> extraQuestions;
+  final List<Map<String, dynamic>> solvedQuestions;
+  final List<Map<String, dynamic>> revisionNotes;
+  final List<Map<String, dynamic>> lessonPlans;
+  final List<Map<String, dynamic>> teachingAids;
+  final List<Map<String, dynamic>> assessmentTools;
+  final List<Map<String, dynamic>> homeworkTools;
+  final List<Map<String, dynamic>> practiceZone;
+  final List<Map<String, dynamic>> learningPath;
 
   MaterialModel({
-    required this.id,
-    required this.name,
-    required this.type,
-    required this.link,
+    required this.recNo,
+    required this.materialId,
+    required this.chapterId,
     required this.chapterName,
-    required this.uploadedOn,
-    this.thumbnail,
-    this.isVideoFile = false,
-    required this.videoLink,
-    required this.worksheetPath,
-    required this.extraQuestionsPath,
-    required this.solvedQuestionsPath,
-    required this.revisionNotesPath,
-    required this.lessonPlansPath,
-    required this.teachingAidsPath,
-    required this.assessmentToolsPath,
-    required this.homeworkToolsPath,
-    required this.practiceZonePath,
-    required this.learningPathPath,
+    required this.subjectId,
+    required this.subjectName,
+    required this.classId,
+    required this.className,
+    this.uploadedOn,
+    required this.videoLinks,
+    required this.worksheets,
+    required this.extraQuestions,
+    required this.solvedQuestions,
+    required this.revisionNotes,
+    required this.lessonPlans,
+    required this.teachingAids,
+    required this.assessmentTools,
+    required this.homeworkTools,
+    required this.practiceZone,
+    required this.learningPath,
   });
 
   factory MaterialModel.fromJson(Map<String, dynamic> json) {
-    print('📦 MaterialModel.fromJson: $json');
-    String type = 'Document';
-    String link = '';
-    String? thumbnail;
-    String name = '';
-    bool isVideoFile = false;
-    String videoLink = '';
+    print('🏭 [MaterialModel.fromJson] Starting parse for RecNo: ${json['RecNo']}');
 
-    final String video = json['Video_Link'] ?? '';
-    final String worksheet = json['Worksheet_Path'] ?? '';
-    final String extraQuestions = json['Extra_Questions_Path'] ?? '';
-    final String solvedQuestions = json['Solved_Questions_Path'] ?? '';
-    final String notes = json['Revision_Notes_Path'] ?? '';
-    final String lessonPlans = json['Lesson_Plans_Path'] ?? '';
-    final String teachingAids = json['Teaching_Aids_Path'] ?? '';
-    final String assessmentTools = json['Assessment_Tools_Path'] ?? '';
-    final String homeworkTools = json['Homework_Tools_Path'] ?? '';
-    final String practiceZone = json['Practice_Zone_Path'] ?? '';
-    final String learningPath = json['Learning_Path_Path'] ?? '';
+    // ✅ CALL parseXmlFiles for each field
+    final videoLinks = parseXmlFiles(json['Video_Link'] ?? '');
+    final worksheets = parseXmlFiles(json['Worksheet_Path'] ?? '');
+    final extraQuestions = parseXmlFiles(json['Extra_Questions_Path'] ?? '');
+    final solvedQuestions = parseXmlFiles(json['Solved_Questions_Path'] ?? '');
+    final revisionNotes = parseXmlFiles(json['Revision_Notes_Path'] ?? '');
+    final lessonPlans = parseXmlFiles(json['Lesson_Plans_Path'] ?? '');
+    final teachingAids = parseXmlFiles(json['Teaching_Aids_Path'] ?? '');
+    final assessmentTools = parseXmlFiles(json['Assessment_Tools_Path'] ?? '');
+    final homeworkTools = parseXmlFiles(json['Homework_Tools_Path'] ?? '');
+    final practiceZone = parseXmlFiles(json['Practice_Zone_Path'] ?? '');
+    final learningPath = parseXmlFiles(json['Learning_Path_Path'] ?? '');
 
-    // Check if there's a video file
-    if (json['Is_Video_File'] == true || json['Is_Video_File'] == 1) {
-      type = 'Video_File';
-      link = json['Video_File_Path'] ?? '';
-      isVideoFile = true;
-      name = 'Video - ${json['ChapterName'] ?? 'Material'}';
-    } else if (video.isNotEmpty) {
-      type = 'Video_Link';
-      link = video;
-      videoLink = video;
-      name = 'Video - ${json['ChapterName'] ?? 'Material'}';
-
-      // Extract YouTube thumbnail
-      if (isYoutubeVideo(video)) {
-        final videoId = extractYoutubeVideoId(video);
-        if (videoId != null) {
-          thumbnail = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
-          print('🎬 YouTube thumbnail generated: $thumbnail');
-        }
-      }
-    } else if (worksheet.isNotEmpty) {
-      type = 'Worksheet_Path';
-      link = worksheet;
-      name = 'Worksheet - ${json['ChapterName'] ?? 'Material'}';
-    } else if (notes.isNotEmpty) {
-      type = 'Revision_Notes_Path';
-      link = notes;
-      name = 'Notes - ${json['ChapterName'] ?? 'Material'}';
-    } else if (extraQuestions.isNotEmpty) {
-      type = 'Extra_Questions_Path';
-      link = extraQuestions;
-      name = 'Extra Questions - ${json['ChapterName'] ?? 'Material'}';
-    } else if (solvedQuestions.isNotEmpty) {
-      type = 'Solved_Questions_Path';
-      link = solvedQuestions;
-      name = 'Solved Questions - ${json['ChapterName'] ?? 'Material'}';
-    } else {
-      name = json['ChapterName'] ?? 'Study Material';
-    }
+    print('🎬 Material Debug: RecNo=${json['RecNo']}, Chapter="${json['ChapterName']}", Videos=${videoLinks.length}, Worksheets=${worksheets.length}, TotalFiles=${videoLinks.length + worksheets.length + extraQuestions.length + solvedQuestions.length + revisionNotes.length + lessonPlans.length + teachingAids.length + assessmentTools.length + homeworkTools.length + practiceZone.length + learningPath.length}');
 
     return MaterialModel(
-      id: json['RecNo']?.toString() ?? json['Material_ID']?.toString() ?? '',
-      name: name,
-      type: type,
-      link: link,
+      recNo: json['RecNo'] ?? 0,
+      materialId: json['Material_ID'] ?? 0,
+      chapterId: json['Chapter_ID'] ?? 0,
       chapterName: json['ChapterName'] ?? '',
-      uploadedOn: json['Uploaded_On'] != null
-          ? DateTime.tryParse(json['Uploaded_On']) ?? DateTime.now()
-          : DateTime.now(),
-      thumbnail: thumbnail,
-      isVideoFile: isVideoFile,
-      videoLink: videoLink,
-      worksheetPath: worksheet,
-      extraQuestionsPath: extraQuestions,
-      solvedQuestionsPath: solvedQuestions,
-      revisionNotesPath: notes,
-      lessonPlansPath: lessonPlans,
-      teachingAidsPath: teachingAids,
-      assessmentToolsPath: assessmentTools,
-      homeworkToolsPath: homeworkTools,
-      practiceZonePath: practiceZone,
-      learningPathPath: learningPath,
+      subjectId: json['SubjectID'] ?? 0,
+      subjectName: json['SubjectName'] ?? '',
+      classId: json['ClassID'] ?? 0,
+      className: json['ClassName'] ?? '',
+      uploadedOn: json['Uploaded_On'] != null ? DateTime.tryParse(json['Uploaded_On']) : null,
+      videoLinks: videoLinks,
+      worksheets: worksheets,
+      extraQuestions: extraQuestions,
+      solvedQuestions: solvedQuestions,
+      revisionNotes: revisionNotes,
+      lessonPlans: lessonPlans,
+      teachingAids: teachingAids,
+      assessmentTools: assessmentTools,
+      homeworkTools: homeworkTools,
+      practiceZone: practiceZone,
+      learningPath: learningPath,
     );
   }
+
+
+  // Helper methods to check if material types exist
+  bool get hasVideos => videoLinks.isNotEmpty;
+  bool get hasWorksheets => worksheets.isNotEmpty;
+  bool get hasExtraQuestions => extraQuestions.isNotEmpty;
+  bool get hasSolvedQuestions => solvedQuestions.isNotEmpty;
+  bool get hasRevisionNotes => revisionNotes.isNotEmpty;
+  bool get hasLessonPlans => lessonPlans.isNotEmpty;
+  bool get hasTeachingAids => teachingAids.isNotEmpty;
+  bool get hasAssessmentTools => assessmentTools.isNotEmpty;
+  bool get hasHomeworkTools => homeworkTools.isNotEmpty;
+  bool get hasPracticeZone => practiceZone.isNotEmpty;
+  bool get hasLearningPath => learningPath.isNotEmpty;
+
+  bool get hasAnyMaterial =>
+      hasVideos ||
+          hasWorksheets ||
+          hasExtraQuestions ||
+          hasSolvedQuestions ||
+          hasRevisionNotes ||
+          hasLessonPlans ||
+          hasTeachingAids ||
+          hasAssessmentTools ||
+          hasHomeworkTools ||
+          hasPracticeZone ||
+          hasLearningPath;
 }
+
+
 
 // ==================== BLOC CLASS ====================
 class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
@@ -497,29 +530,30 @@ class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
       filteredMaterials = _allMaterials.where((material) {
         switch (event.materialType) {
           case 'Video':
-            return material.videoLink.isNotEmpty || material.isVideoFile;
+            return material.hasVideos;
           case 'Worksheet':
-            return material.worksheetPath.isNotEmpty;
+            return material.hasWorksheets;
           case 'Extra Questions':
-            return material.extraQuestionsPath.isNotEmpty;
+            return material.hasExtraQuestions;
           case 'Solved Questions':
-            return material.solvedQuestionsPath.isNotEmpty;
+            return material.hasSolvedQuestions;
           case 'Revision Notes':
-            return material.revisionNotesPath.isNotEmpty;
+            return material.hasRevisionNotes;
           case 'Lesson Plans':
-            return material.lessonPlansPath.isNotEmpty;
+            return material.hasLessonPlans;
           case 'Teaching Aids':
-            return material.teachingAidsPath.isNotEmpty;
+            return material.hasTeachingAids;
           case 'Assessment Tools':
-            return material.assessmentToolsPath.isNotEmpty;
+            return material.hasAssessmentTools;
           case 'Homework Tools':
-            return material.homeworkToolsPath.isNotEmpty;
+            return material.hasHomeworkTools;
           case 'Practice Zone':
-            return material.practiceZonePath.isNotEmpty;
+            return material.hasPracticeZone;
           case 'Learning Path':
-            return material.learningPathPath.isNotEmpty;
+            return material.hasLearningPath;
           default:
-            return false;
+            return true;
+
         }
       }).toList();
     }
@@ -547,7 +581,10 @@ class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
         final List<dynamic> data = response['data'];
         _allMaterials = data.map((json) {
           final material = MaterialModel.fromJson(json);
-          print('🎬 Material Debug: ID=${material.id}, videoLink="${material.videoLink}", isVideoFile=${material.isVideoFile}, link="${material.link}", thumbnail="${material.thumbnail}"');
+          // Updated debug info using new MaterialModel structure
+          print('🎬 Material Debug: RecNo=${material.recNo}, Chapter="${material.chapterName}", '
+              'Videos=${material.videoLinks.length}, Worksheets=${material.worksheets.length}, '
+              'TotalFiles=${material.videoLinks.length + material.worksheets.length + material.extraQuestions.length}');
           return material;
         }).toList();
         print('✅ Parsed ${_allMaterials.length} materials');
@@ -573,6 +610,7 @@ class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
       emit(AcademicsError('Error loading materials: $e'));
     }
   }
+
 
   void _onToggleMaterialView(ToggleMaterialViewEvent event, Emitter<AcademicsState> emit) {
     print('🔄 Toggling material view to: ${event.isGrid ? "Grid" : "List"}');

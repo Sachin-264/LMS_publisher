@@ -11,7 +11,6 @@ class StudentSubjectService {
     try {
       final uri = Uri.parse(videoUrl);
       String? videoId;
-
       if (uri.host.contains('youtube.com')) {
         videoId = uri.queryParameters['v'];
       } else if (uri.host.contains('youtu.be')) {
@@ -24,7 +23,6 @@ class StudentSubjectService {
     } catch (e) {
       print('Error parsing YouTube URL: $e');
     }
-
     return 'https://via.placeholder.com/1280x720/4CAF50/FFFFFF?text=Video';
   }
 
@@ -165,26 +163,24 @@ class MaterialsResponse {
   final String status;
   final ChapterInfo chapterInfo;
   final Map<String, dynamic> materials;
+  final int materialCount;
 
   MaterialsResponse({
     required this.status,
     required this.chapterInfo,
     required this.materials,
+    required this.materialCount,
   });
 
   factory MaterialsResponse.fromJson(Map<String, dynamic> json) {
-    // ✅ FIX: Handle both List and Map responses
     dynamic materialsData = json['materials'];
     Map<String, dynamic> materialsMap = {};
 
-    if (materialsData is Map<String, dynamic>) {
-      // Already a map - use as is
-      materialsMap = materialsData;
+    if (materialsData is Map) {
+      materialsMap = materialsData as Map<String, dynamic>;
     } else if (materialsData is List) {
-      // Convert list to map (if API returns array format)
-      // This shouldn't happen with our SP, but adding safety
       for (var item in materialsData) {
-        if (item is Map<String, dynamic> && item.containsKey('type')) {
+        if (item is Map && item.containsKey('type')) {
           materialsMap[item['type']] = item;
         }
       }
@@ -194,12 +190,42 @@ class MaterialsResponse {
       status: json['status'] ?? '',
       chapterInfo: ChapterInfo.fromJson(json['chapter_info'] ?? {}),
       materials: materialsMap,
+      materialCount: json['material_count'] ?? 0,
     );
   }
 }
 
-
 // ========== DATA MODELS ==========
+
+class MaterialFile {
+  final int sno;
+  final String path;
+  final String type;
+  final String name;
+
+  MaterialFile({
+    required this.sno,
+    required this.path,
+    required this.type,
+    required this.name,
+  });
+
+  factory MaterialFile.fromJson(Map<String, dynamic> json) {
+    return MaterialFile(
+      sno: json['sno'] ?? 0,
+      path: json['path'] ?? '',
+      type: json['type'] ?? '',
+      name: json['name'] ?? '',
+    );
+  }
+
+  String get fullUrl {
+    if (type == 'video' || path.startsWith('http')) {
+      return path;
+    }
+    return StudentSubjectService.getDocumentUrl(path);
+  }
+}
 
 class SubjectModel {
   final int subjectId;
