@@ -26,8 +26,7 @@ class CityModel {
 
 
 class TeacherApiService {
-  static const String baseUrl =  'http://10.100.2.119/AquareLMS';
-  static const int defaultSchoolRecNo = 1;
+  static const String baseUrl =  'http://localhost/AquareLMS';
 
   static const String _imageUploadUrl = "https://www.aquare.co.in/mobileAPI/sachin/photogcp1.php";
   static const String _imageBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
@@ -250,13 +249,13 @@ class TeacherApiService {
 
   // Fetch all teachers
   Future<List<TeacherModel>> fetchTeachers({
-    int? schoolRecNo,
+    required int schoolRecNo,
     bool? isActive,
   }) async {
     try {
       final Map<String, dynamic> requestBody = {
         'action': 'GET_LIST',
-        'SchoolRecNo': schoolRecNo ?? defaultSchoolRecNo,
+'SchoolRecNo': schoolRecNo,
         if (isActive != null) 'IsActive': isActive ? 1 : 0,
       };
 

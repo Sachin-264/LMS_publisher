@@ -4,7 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 
 class UserRightsService {
-  static const String baseUrl = 'http://10.100.2.119/AquareLMS';
+  static const String baseUrl = 'http://localhost/AquareLMS';
 
   // Fetch all user groups/roles
   Future<List<UserGroup>> getUserGroups() async {

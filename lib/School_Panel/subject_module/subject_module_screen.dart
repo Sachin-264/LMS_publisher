@@ -7,7 +7,6 @@ import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'subject_module_bloc.dart';
 import 'subject_module_model.dart';
-import 'subject_module_api_service.dart';
 import '../../Theme/apptheme.dart';
 import '../../screens/main_layout.dart';
 import '../../Util/custom_snackbar.dart';
@@ -40,6 +39,148 @@ class ClassTeacherPair {
   int get hashCode => classRecNo.hashCode ^ teacherRecNo.hashCode;
 }
 
+// ============================================================================
+// DYNAMIC HEIGHT TAB BAR VIEW WIDGET (CRITICAL FIX)
+// ============================================================================
+// ============================================================================
+// DYNAMIC HEIGHT TAB BAR VIEW WIDGET (CRITICAL FIX)
+// ============================================================================
+
+class _DynamicTabBarView extends StatefulWidget {
+  final TabController controller;
+  final List<Widget> children;
+
+  const _DynamicTabBarView({
+    required this.controller,
+    required this.children,
+  });
+
+  @override
+  _DynamicTabBarViewState createState() => _DynamicTabBarViewState();
+}
+
+class _DynamicTabBarViewState extends State<_DynamicTabBarView> {
+  // 1. Use GlobalKey for persistent access to the rendered Box
+  late List<GlobalKey> _keys;
+  List<double> _heights = [];
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeLists(widget.children.length);
+    _currentIndex = widget.controller.index;
+    widget.controller.addListener(_updateIndex);
+    // Measure heights after the first frame has rendered the content
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureHeights());
+  }
+
+  void _initializeLists(int length) {
+    // Generates a persistent GlobalKey for each child
+    _keys = List.generate(length, (index) => GlobalKey(debugLabel: 'tab_key_$index'));
+    // Initialize heights to a default list of 0.0
+    _heights = List.generate(length, (index) => 0.0);
+  }
+
+  @override
+  void didUpdateWidget(_DynamicTabBarView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.controller != oldWidget.controller) {
+      oldWidget.controller.removeListener(_updateIndex);
+      widget.controller.addListener(_updateIndex);
+      _currentIndex = widget.controller.index;
+    }
+    // Re-initialize keys if the number of children changes
+    if (widget.children.length != oldWidget.children.length) {
+      _initializeLists(widget.children.length);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _measureHeights());
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_updateIndex);
+    super.dispose();
+  }
+
+  void _updateIndex() {
+    setState(() {
+      _currentIndex = widget.controller.index;
+      // Schedule height measurement for the newly active tab's layout
+      WidgetsBinding.instance.addPostFrameCallback((_) => _measureHeights());
+    });
+  }
+
+  // 2. CORRECTED MEASUREMENT FUNCTION
+  void _measureHeights() {
+    if (!mounted) return;
+    bool needsSetState = false;
+
+    // Loop through the persistent keys to check the height of the corresponding rendered widget
+    for (int i = 0; i < _keys.length; i++) {
+      final key = _keys[i];
+      // Use GlobalKey.currentContext to safely find the RenderBox
+      final renderBox = key.currentContext?.findRenderObject() as RenderBox?;
+
+      if (renderBox != null && renderBox.hasSize) {
+        final height = renderBox.size.height;
+        if (_heights[i] != height) {
+          _heights[i] = height;
+          needsSetState = true;
+        }
+      }
+    }
+
+    if (needsSetState) {
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double currentHeight = _heights.isNotEmpty && _currentIndex < _heights.length
+        ? _heights[_currentIndex]
+        : 300.0; // Fallback min height
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      // The height is now bounded and dynamic
+      height: currentHeight,
+      child: TabBarView(
+        controller: widget.controller,
+        physics: const NeverScrollableScrollPhysics(),
+        children: widget.children.asMap().entries.map((entry) {
+          final index = entry.key;
+          final child = entry.value;
+
+          return OverflowBox(
+            // Allows the children to size themselves fully despite the height constraint
+            minHeight: 0.0,
+            maxHeight: double.infinity,
+            alignment: Alignment.topLeft,
+            // Assign the persistent GlobalKey here
+            child: KeyedSubtree(
+              key: _keys[index],
+              child: NotificationListener<SizeChangedLayoutNotification>(
+                // This notifier listens for layout changes within the tab content
+                onNotification: (notification) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _measureHeights();
+                  });
+                  return true;
+                },
+                child: SizeChangedLayoutNotifier(
+                  child: child,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
 // ============================================================================
 // MAIN SUBJECT MODULE SCREEN
 // ============================================================================
@@ -94,15 +235,16 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
     _tabController = TabController(length: 2, vsync: this, initialIndex: 1);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
-        setState(() {
-          if (_tabController.index == 0) {
-            _fetchAvailableData();
-          } else {
-            _fetchMySubjectsData();
-          }
-        });
+        // No setState here, let the BlocConsumer handle state updates if necessary,
+        // but the DynamicTabBarView will handle the index change for height calculation.
+        if (_tabController.index == 0) {
+          _fetchAvailableData();
+        } else {
+          _fetchMySubjectsData();
+        }
       }
     });
+    // Set initial data fetch outside of build
     Future.delayed(Duration.zero, () {
       _fetchAvailableData();
       _fetchSchoolClassesAndTeachers();
@@ -183,7 +325,6 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
   }
 
   void _refreshData() {
-    //print('🔄 Refreshing data...');
     if (_tabController.index == 0) {
       _fetchAvailableData();
     } else {
@@ -192,17 +333,13 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
     _fetchSchoolClassesAndTeachers();
   }
 
-// In _SubjectModuleScreenState class
-
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<SubjectModuleBloc, SubjectModuleState>(
-      // In SubjectModuleScreenState, inside BlocConsumer
       listener: (context, state) async {
         if (state is SubjectModuleError) {
           CustomSnackbar.showError(context, state.message);
         }
-        // NEW: Handle all operation success states
         else if (state is SubjectModuleOperationSuccess) {
           await Future.delayed(const Duration(milliseconds: 100));
           if (!context.mounted) return;
@@ -211,7 +348,6 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
           if (!context.mounted) return;
           _refreshData();
         }
-        // Keep existing loaded states
         else if (state is AvailableClassesLoaded) {
           setState(() {
             availableClasses = state.classes;
@@ -250,286 +386,211 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
       builder: (context, state) {
         return MainLayout(
           activeScreen: AppScreen.subjectModule,
-          child: _buildContent(state),
-        );
-      },
-    );
-  }
-
-  Widget _buildContent(SubjectModuleState state) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 600;
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 🎨 SEXY GRADIENT HEADER
-              Container(
-                padding: EdgeInsets.all(isMobile ? 12 : 16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppTheme.primaryGreen,
-                      AppTheme.accentGreen,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primaryGreen.withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    TweenAnimationBuilder(
-                      tween: Tween<double>(begin: 0.0, end: 1.0),
-                      duration: const Duration(milliseconds: 600),
-                      curve: Curves.elasticOut,
-                      builder: (context, value, child) {
-                        return Transform.scale(
-                          scale: value,
-                          child: Container(
-                            padding: EdgeInsets.all(isMobile ? 10 : 12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFFFFF).withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: const Color(0xFFFFFFFF).withOpacity(0.3),
-                                width: 2,
-                              ),
-                            ),
-                            child: Icon(
-                              Iconsax.book_1,
-                              color: const Color(0xFFFFFFFF),
-                              size: isMobile ? 20 : 28,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    SizedBox(width: isMobile ? 10 : 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Subject Module Manager',
-                            style: GoogleFonts.poppins(
-                              fontSize: isMobile ? 16 : 22,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFFFFFFFF),
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            'Manage subjects, chapters and learning materials',
-                            style: GoogleFonts.poppins(
-                              fontSize: isMobile ? 11 : 13,
-                              color: const Color(0xFFFFFFFF).withOpacity(0.9),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (!isMobile) ...[
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFFFFF),
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Iconsax.calendar_1,
-                              size: 16,
-                              color: AppTheme.primaryGreen,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              widget.academicYear,
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryGreen,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              SizedBox(height: isMobile ? 12 : 16),
-
-              // 🎨 SEXY TABS
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFFFF),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: TabBar(
-                    controller: _tabController,
-                    labelColor: const Color(0xFFFFFFFF),
-                    unselectedLabelColor: AppTheme.bodyText,
-                    indicator: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicatorPadding: const EdgeInsets.all(5),
-                    labelStyle: GoogleFonts.poppins(
-                      fontSize: isMobile ? 13 : 14,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
-                    ),
-                    unselectedLabelStyle: GoogleFonts.poppins(
-                      fontSize: isMobile ? 13 : 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    tabs: [
-                      Tab(
-                        height: isMobile ? 40 : 45,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Iconsax.add_circle, size: isMobile ? 16 : 18),
-                            SizedBox(width: isMobile ? 4 : 6),
-                            const Text('Available'),
-                          ],
-                        ),
-                      ),
-                      Tab(
-                        height: isMobile ? 40 : 45,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Iconsax.tick_circle, size: isMobile ? 16 : 18),
-                            SizedBox(width: isMobile ? 4 : 6),
-                            const Text('My Subjects'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: isMobile ? 12 : 16),
-
-              SizedBox(
-                height: isMobile ? 800 : 1200,
-                child: TabBarView(
-                  controller: _tabController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _buildAvailableTab(state),
-                    _buildMySubjectsTab(state),
-                  ],
-                ),
-              ),
-            ],
+          // Use SingleChildScrollView and Padding exactly like in my_subject_screen.dart
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            child: _buildContent(context, state),
           ),
         );
       },
     );
   }
 
-  // ============================================================================
-  // AVAILABLE TAB
-  // ============================================================================
-  Widget _buildAvailableTab(SubjectModuleState state) {
+  Widget _buildContent(BuildContext context, SubjectModuleState state) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isMobile = constraints.maxWidth < 600;
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Essential: Allows content to grow vertically
           children: [
-            if (selectedView != 'classes')
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 10 : 12,
-                  vertical: isMobile ? 8 : 10,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFFFF),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
+            // 🎨 SEXY GRADIENT HEADER
+            Container(
+              padding: EdgeInsets.all(isMobile ? 12 : 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppTheme.primaryGreen,
+                    AppTheme.accentGreen,
                   ],
                 ),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _AnimatedButton(
-                      onPressed: () {
-                        setState(() {
-                          selectedView = 'classes';
-                          selectedClassID = null;
-                          selectedSubjectID = null;
-                          expandedChapterId = null;
-                        });
-                        _fetchAvailableData();
-                      },
-                      icon: Iconsax.arrow_left_2,
-                      label: 'Back to Classes',
-                      isPrimary: false,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryGreen.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0.0, end: 1.0),
+                    duration: const Duration(milliseconds: 600),
+                    curve: Curves.elasticOut,
+                    builder: (context, value, child) {
+                      return Transform.scale(
+                        scale: value,
+                        child: Container(
+                          padding: EdgeInsets.all(isMobile ? 10 : 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFFFFF).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: const Color(0xFFFFFFFF).withOpacity(0.3),
+                              width: 2,
+                            ),
+                          ),
+                          child: Icon(
+                            Iconsax.book_1,
+                            color: const Color(0xFFFFFFFF),
+                            size: isMobile ? 20 : 28,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: isMobile ? 10 : 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Subject Module Manager',
+                          style: GoogleFonts.poppins(
+                            fontSize: isMobile ? 16 : 22,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFFFFFFFF),
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Manage subjects, chapters and learning materials',
+                          style: GoogleFonts.poppins(
+                            fontSize: isMobile ? 11 : 13,
+                            color: const Color(0xFFFFFFFF).withOpacity(0.9),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
-                    if (selectedView == 'chapters') ...[
-                      if (!isMobile)
-                        Icon(Iconsax.arrow_right_3, size: 14, color: AppTheme.bodyText),
-                      _AnimatedButton(
-                        onPressed: () {
-                          setState(() {
-                            selectedView = 'subjects';
-                            selectedSubjectID = null;
-                            expandedChapterId = null;
-                          });
-                          _fetchAvailableData();
-                        },
-                        icon: Iconsax.book,
-                        label: 'Back to Subjects',
-                        isPrimary: false,
+                  ),
+                  if (!isMobile) ...[
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFFFF),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Iconsax.calendar_1,
+                            size: 16,
+                            color: AppTheme.primaryGreen,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            widget.academicYear,
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primaryGreen,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            SizedBox(height: isMobile ? 12 : 16),
+
+            // 🎨 SEXY TABS
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFFFF),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: const Color(0xFFFFFFFF),
+                  unselectedLabelColor: AppTheme.bodyText,
+                  indicator: BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  indicatorPadding: const EdgeInsets.all(5),
+                  labelStyle: GoogleFonts.poppins(
+                    fontSize: isMobile ? 13 : 14,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.3,
+                  ),
+                  unselectedLabelStyle: GoogleFonts.poppins(
+                    fontSize: isMobile ? 13 : 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  tabs: [
+                    Tab(
+                      height: isMobile ? 40 : 45,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Iconsax.add_circle, size: isMobile ? 16 : 18),
+                          SizedBox(width: isMobile ? 4 : 6),
+                          const Text('Available'),
+                        ],
+                      ),
+                    ),
+                    Tab(
+                      height: isMobile ? 40 : 45,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Iconsax.tick_circle, size: isMobile ? 16 : 18),
+                          SizedBox(width: isMobile ? 4 : 6),
+                          const Text('My Subjects'),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            SizedBox(height: isMobile ? 10 : 12),
-            Flexible(
-              fit: FlexFit.loose,
-              child: _buildAvailableContent(state),
+            ),
+            SizedBox(height: isMobile ? 12 : 16),
+
+            // CRITICAL FIX: Use the custom DynamicTabBarView to handle dynamic height
+            _DynamicTabBarView(
+              controller: _tabController,
+              children: [
+                _buildAvailableTabContentWrapper(state),
+                _buildMySubjectsTabContentWrapper(state),
+              ],
             ),
           ],
         );
@@ -537,12 +598,94 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
     );
   }
 
+  // ============================================================================
+  // AVAILABLE TAB - WRAPPER
+  // ============================================================================
+  Widget _buildAvailableTabContentWrapper(SubjectModuleState state) {
+    return Column(
+      mainAxisSize: MainAxisSize.min, // Ensures content grows to full size
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 600;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (selectedView != 'classes')
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 10 : 12,
+                      vertical: isMobile ? 8 : 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFFFF),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _AnimatedButton(
+                          onPressed: () {
+                            setState(() {
+                              selectedView = 'classes';
+                              selectedClassID = null;
+                              selectedSubjectID = null;
+                              expandedChapterId = null;
+                            });
+                            _fetchAvailableData();
+                          },
+                          icon: Iconsax.arrow_left_2,
+                          label: 'Back to Classes',
+                          isPrimary: false,
+                        ),
+                        if (selectedView == 'chapters') ...[
+                          if (!isMobile)
+                            Icon(Iconsax.arrow_right_3, size: 14, color: AppTheme.bodyText),
+                          _AnimatedButton(
+                            onPressed: () {
+                              setState(() {
+                                selectedView = 'subjects';
+                                selectedSubjectID = null;
+                                expandedChapterId = null;
+                              });
+                              _fetchAvailableData();
+                            },
+                            icon: Iconsax.book,
+                            label: 'Back to Subjects',
+                            isPrimary: false,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                SizedBox(height: isMobile ? 10 : 12),
+              ],
+            );
+          },
+        ),
+        // Content list is built here
+        _buildAvailableContent(state),
+      ],
+    );
+  }
+
+  // Renamed to content builder
   Widget _buildAvailableContent(SubjectModuleState state) {
     if (state is SubjectModuleLoading) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
+            const SizedBox(height: 50),
             TweenAnimationBuilder<double>(
               tween: Tween(begin: 0.0, end: 1.0),
               duration: const Duration(milliseconds: 800),
@@ -579,6 +722,7 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
                 color: AppTheme.bodyText,
               ),
             ),
+            const SizedBox(height: 50),
           ],
         ),
       );
@@ -606,6 +750,7 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
         final effectiveCrossAxisCount = crossAxisCount < 1 ? 1 : crossAxisCount;
         return GridView.builder(
           shrinkWrap: true,
+          // Use NeverScrollableScrollPhysics to allow the parent SingleChildScrollView to scroll
           physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.only(bottom: 16),
           itemCount: availableClasses.length,
@@ -666,6 +811,7 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
         final effectiveCrossAxisCount = crossAxisCount < 1 ? 1 : crossAxisCount;
         return GridView.builder(
           shrinkWrap: true,
+          // Use NeverScrollableScrollPhysics to allow the parent SingleChildScrollView to scroll
           physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.only(bottom: 16),
           itemCount: availableSubjects.length,
@@ -721,6 +867,7 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
 
     return ListView.separated(
       shrinkWrap: true,
+      // Use NeverScrollableScrollPhysics to allow the parent SingleChildScrollView to scroll
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 16),
       itemCount: availableChapters.length,
@@ -949,77 +1096,81 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
   }
 
   // ============================================================================
-  // MY SUBJECTS TAB
+  // MY SUBJECTS TAB - WRAPPER
   // ============================================================================
-  Widget _buildMySubjectsTab(SubjectModuleState state) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 600;
-        return Column(
-          children: [
-            if (mySubjectsView != 'classes')
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 10 : 12,
-                  vertical: isMobile ? 8 : 10,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFFFF),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+  Widget _buildMySubjectsTabContentWrapper(SubjectModuleState state) {
+    return Column(
+      mainAxisSize: MainAxisSize.min, // Ensures content grows to full size
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 600;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (mySubjectsView != 'classes')
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 10 : 12,
+                      vertical: isMobile ? 8 : 10,
                     ),
-                  ],
-                ),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _AnimatedButton(
-                      onPressed: () {
-                        setState(() {
-                          mySubjectsView = 'classes';
-                          mySubjectsSelectedClassID = null;
-                          mySubjectsSelectedSubjectID = null;
-                          myExpandedChapterId = null;
-                        });
-                        _fetchMySubjectsData();
-                      },
-                      icon: Iconsax.arrow_left_2,
-                      label: 'Back to Classes',
-                      isPrimary: false,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFFFF),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    if (mySubjectsView == 'chapters') ...[
-                      if (!isMobile)
-                        Icon(Iconsax.arrow_right_3, size: 14, color: AppTheme.bodyText),
-                      _AnimatedButton(
-                        onPressed: () {
-                          setState(() {
-                            mySubjectsView = 'subjects';
-                            mySubjectsSelectedSubjectID = null;
-                            myExpandedChapterId = null;
-                          });
-                          _fetchMySubjectsData();
-                        },
-                        icon: Iconsax.book,
-                        label: 'Back to Subjects',
-                        isPrimary: false,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            SizedBox(height: isMobile ? 10 : 12),
-            Flexible(
-              fit: FlexFit.loose,
-              child: _buildMySubjectsContent(state),
-            ),
-          ],
-        );
-      },
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _AnimatedButton(
+                          onPressed: () {
+                            setState(() {
+                              mySubjectsView = 'classes';
+                              mySubjectsSelectedClassID = null;
+                              mySubjectsSelectedSubjectID = null;
+                              myExpandedChapterId = null;
+                            });
+                            _fetchMySubjectsData();
+                          },
+                          icon: Iconsax.arrow_left_2,
+                          label: 'Back to Classes',
+                          isPrimary: false,
+                        ),
+                        if (mySubjectsView == 'chapters') ...[
+                          if (!isMobile)
+                            Icon(Iconsax.arrow_right_3, size: 14, color: AppTheme.bodyText),
+                          _AnimatedButton(
+                            onPressed: () {
+                              setState(() {
+                                mySubjectsView = 'subjects';
+                                mySubjectsSelectedSubjectID = null;
+                                myExpandedChapterId = null;
+                              });
+                              _fetchMySubjectsData();
+                            },
+                            icon: Iconsax.book,
+                            label: 'Back to Subjects',
+                            isPrimary: false,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                SizedBox(height: isMobile ? 10 : 12),
+              ],
+            );
+          },
+        ),
+        // Content list is built here
+        _buildMySubjectsContent(state),
+      ],
     );
   }
 
@@ -1028,7 +1179,9 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
+            const SizedBox(height: 50),
             TweenAnimationBuilder<double>(
               tween: Tween(begin: 0.0, end: 1.0),
               duration: const Duration(milliseconds: 800),
@@ -1065,6 +1218,7 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
                 color: AppTheme.bodyText,
               ),
             ),
+            const SizedBox(height: 50),
           ],
         ),
       );
@@ -1096,6 +1250,7 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
         final effectiveCrossAxisCount = crossAxisCount < 1 ? 1 : crossAxisCount;
         return GridView.builder(
           shrinkWrap: true,
+          // Use NeverScrollableScrollPhysics to allow the parent SingleChildScrollView to scroll
           physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.only(bottom: 16),
           itemCount: myClasses.length,
@@ -1154,6 +1309,7 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
 
     return ListView.separated(
       shrinkWrap: true,
+      // Use NeverScrollableScrollPhysics to allow the parent SingleChildScrollView to scroll
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 16),
       itemCount: mySubjects.length,
@@ -1465,6 +1621,7 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
 
     return ListView.separated(
       shrinkWrap: true,
+      // Use NeverScrollableScrollPhysics to allow the parent SingleChildScrollView to scroll
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 16),
       itemCount: myChapters.length,
@@ -1738,7 +1895,7 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
     );
   }
 
-// In _SubjectModuleScreenState class
+// In SubjectModuleScreenState class
 
 // In SubjectModuleScreenState class
   void _showAddChapterDialog(AvailableChapterModel chapter) {
@@ -2421,6 +2578,7 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          const SizedBox(height: 50),
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
@@ -2460,6 +2618,7 @@ class _SubjectModuleScreenState extends State<SubjectModuleScreen>
               textAlign: TextAlign.center,
             ),
           ],
+          const SizedBox(height: 50),
         ],
       ),
     );
@@ -3917,7 +4076,3 @@ class _SSearchableDropdownState<T> extends State<_SSearchableDropdown<T>> {
     );
   }
 }
-
-
-
-

@@ -20,7 +20,7 @@ int _parseInt(dynamic value, {int defaultValue = 0}) {
 }
 
 class PublisherApiService {
-  final String _baseUrl = "http://10.100.2.119/AquareLMS/";
+  final String _baseUrl = "http://localhost/AquareLMS/";
   final String _imageUploadUrl = "https://www.aquare.co.in/mobileAPI/sachin/photogcp1.php";
   final String _logoBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
 

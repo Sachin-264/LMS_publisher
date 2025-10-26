@@ -1,3 +1,4 @@
+// main_layout.dart
 import 'package:flutter/material.dart'; // Import flutter/material.dart for SystemMouseCursors
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -19,6 +20,9 @@ import 'package:lms_publisher/screens/SubscriptionScreen/subscription_dart.dart'
 import 'package:lms_publisher/screens/LoginScreen/login_bloc.dart';
 import 'package:provider/provider.dart';
 
+import '../School_Panel/class_module/class_manage_screen.dart';
+
+// Enum to identify the active screen for the sidebar
 enum AppScreen {
   dashboard,
   schools,
@@ -32,10 +36,10 @@ enum AppScreen {
   mySubjects,
   analytics,
   myFavourites, // ✅ ADD THIS
+  // ✅ NEW ENTRY: M012 Class Module
+  classModule,
   settings
 }
-
-
 
 // ✅ State management for sidebar
 final ValueNotifier<bool> isSidebarCollapsed = ValueNotifier(true);
@@ -61,8 +65,7 @@ class _MainLayoutState extends State<MainLayout> {
     _scrollController = ScrollController();
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >= 0 &&
-          _scrollController.position.pixels % 100 < 1) {
-      }
+          _scrollController.position.pixels % 100 < 1) {}
     });
   }
 
@@ -82,7 +85,8 @@ class _MainLayoutState extends State<MainLayout> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
-      drawer: isMobile ? _MobileDrawer(activeScreen: widget.activeScreen) : null,
+      drawer:
+          isMobile ? _MobileDrawer(activeScreen: widget.activeScreen) : null,
       body: SafeArea(
         top: true,
         bottom: true,
@@ -91,7 +95,8 @@ class _MainLayoutState extends State<MainLayout> {
         child: ValueListenableBuilder<bool>(
           valueListenable: isSidebarCollapsed,
           builder: (context, isCollapsed, _) {
-            final double mainContentLeft = isMobile ? 0 : (isCollapsed ? 80 : 280);
+            final double mainContentLeft =
+                isMobile ? 0 : (isCollapsed ? 80 : 280);
 
             return Stack(
               children: [
@@ -115,31 +120,30 @@ class _MainLayoutState extends State<MainLayout> {
                           children: [
                             _Header(isMobile: isMobile),
                             SizedBox(
-                                height:
-                                isMobile ? 12 : AppTheme.defaultPadding * 1.5),
+                                height: isMobile
+                                    ? 12
+                                    : AppTheme.defaultPadding * 1.5),
 
                             // ✅ FIXED: Proper scrolling with debugging
                             Expanded(
                               child: LayoutBuilder(
                                 builder: (context, constraints) {
-
-
-                                  return NotificationListener<ScrollNotification>(
+                                  return NotificationListener<
+                                      ScrollNotification>(
                                     onNotification:
                                         (ScrollNotification notification) {
-                                      if (notification is ScrollStartNotification) {
-
+                                      if (notification
+                                          is ScrollStartNotification) {
                                       } else if (notification
-                                      is ScrollEndNotification) {
-                                        final percent = (_scrollController
-                                            .position.pixels /
-                                            _scrollController
-                                                .position.maxScrollExtent *
-                                            100)
-                                            .toStringAsFixed(0);
+                                          is ScrollEndNotification) {
+                                        final percent =
+                                            (_scrollController.position.pixels /
+                                                    _scrollController.position
+                                                        .maxScrollExtent *
+                                                    100)
+                                                .toStringAsFixed(0);
                                       } else if (notification
-                                      is OverscrollNotification) {
-                                      }
+                                          is OverscrollNotification) {}
                                       return false;
                                     },
                                     child: SingleChildScrollView(
@@ -150,8 +154,9 @@ class _MainLayoutState extends State<MainLayout> {
                                           // ✅ Measure child height after build
                                           WidgetsBinding.instance
                                               .addPostFrameCallback((_) {
-                                            final RenderBox? box = context
-                                                .findRenderObject() as RenderBox?;
+                                            final RenderBox? box =
+                                                context.findRenderObject()
+                                                    as RenderBox?;
                                             if (box != null && box.hasSize) {
                                               // print(
                                               //     '🎯 Child Content Height: ${box.size.height.toStringAsFixed(0)}');
@@ -180,7 +185,6 @@ class _MainLayoutState extends State<MainLayout> {
                     ),
                   ),
                 ),
-
                 if (!isMobile)
                   AnimatedPositioned(
                     duration: const Duration(milliseconds: 400),
@@ -228,7 +232,9 @@ class _MobileMenuItem extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: isActive ? AppTheme.primaryGreen.withOpacity(0.1) : Colors.transparent,
+        color: isActive
+            ? AppTheme.primaryGreen.withOpacity(0.1)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: onTap,
@@ -237,8 +243,9 @@ class _MobileMenuItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              border:
-              isActive ? Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)) : null,
+              border: isActive
+                  ? Border.all(color: AppTheme.primaryGreen.withOpacity(0.3))
+                  : null,
             ),
             child: Row(
               children: [
@@ -302,7 +309,8 @@ class _Header extends StatelessWidget {
                       ],
                     ),
                     child: IconButton(
-                      icon: const Icon(Iconsax.menu_1, color: AppTheme.primaryGreen),
+                      icon: const Icon(Iconsax.menu_1,
+                          color: AppTheme.primaryGreen),
                       onPressed: () {
                         Scaffold.of(context).openDrawer();
                       },
@@ -323,7 +331,8 @@ class _Header extends StatelessWidget {
                           offset: const Offset(0, 2),
                         ),
                       ],
-                      border: Border.all(color: AppTheme.borderGrey.withOpacity(0.1)),
+                      border: Border.all(
+                          color: AppTheme.borderGrey.withOpacity(0.1)),
                     ),
                     child: TextField(
                       decoration: InputDecoration(
@@ -414,7 +423,8 @@ class _Header extends StatelessWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
                           image: const DecorationImage(
-                            image: NetworkImage('https://picsum.photos/id/237/200/200'),
+                            image: NetworkImage(
+                                'https://picsum.photos/id/237/200/200'),
                             fit: BoxFit.cover,
                           ),
                         ),
@@ -455,6 +465,9 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
     // 🆕 ADDED: Consumer wrapper for UserProvider access
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
+        // Get schoolRecNo from UserProvider for passing to screens
+        final int schoolRecNo = int.tryParse(userProvider.userCode ?? '0') ?? 0;
+
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -467,9 +480,9 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
             ],
             borderRadius: isCollapsed
                 ? const BorderRadius.only(
-              topRight: Radius.circular(16),
-              bottomRight: Radius.circular(16),
-            )
+                    topRight: Radius.circular(16),
+                    bottomRight: Radius.circular(16),
+                  )
                 : BorderRadius.zero,
           ),
           child: Column(
@@ -530,7 +543,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
 
               // Toggle Button
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 16 : 24),
+                padding:
+                    EdgeInsets.symmetric(horizontal: isCollapsed ? 16 : 24),
                 child: _SidebarToggleButton(isCollapsed: isCollapsed),
               ),
               const SizedBox(height: 16),
@@ -538,7 +552,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
               // Navigation Menu
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 8 : 16),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: isCollapsed ? 8 : 16),
                   child: Column(
                     children: [
                       // Dashboard - M001
@@ -552,7 +567,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.dashboard) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (_) => const HomeScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => const HomeScreen()),
                               );
                             }
                           },
@@ -570,7 +586,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.schools) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (_) => const SchoolsScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => const SchoolsScreen()),
                               );
                             }
                           },
@@ -589,7 +606,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.students) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (_) => const StudentsScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => const StudentsScreen()),
                               );
                             }
                           },
@@ -608,7 +626,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.teachers) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (_) => const TeachersScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => const TeachersScreen()),
                               );
                             }
                           },
@@ -627,7 +646,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (_) => const SubscriptionsScreen()),
+                                    builder: (_) =>
+                                        const SubscriptionsScreen()),
                               );
                             }
                           },
@@ -685,7 +705,32 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (_) => const SchoolPanelDashboard()),
+                                    builder: (_) =>
+                                        const SchoolPanelDashboard()),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+
+                      // ✅ NEW MODULE: Class Module - M012
+                      if (userProvider.hasMenuAccess('M012')) ...[
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.building, // Icon for Class/Structure
+                          text: 'Class',
+                          isActive: activeScreen == AppScreen.classModule,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.classModule) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ClassManageScreen(
+                                    // <<< NEW SCREEN
+                                    schoolRecNo:
+                                        schoolRecNo, // Pass the schoolRecNo from UserProvider
+                                  ),
+                                ),
                               );
                             }
                           },
@@ -705,9 +750,9 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => const SubjectModuleScreen(
-                                    schoolRecNo: 1,
-                                    academicYear: '2025-26',
+                                  builder: (_) => SubjectModuleScreen(
+                                    schoolRecNo: schoolRecNo,
+                                    academicYear: '2025-26', // Placeholder
                                   ),
                                 ),
                               );
@@ -726,13 +771,13 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.mySubjects) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (_) => const MySubjectsScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => const MySubjectsScreen()),
                               );
                             }
                           },
                         ),
                       ],
-
 
                       if (userProvider.hasMenuAccess('M013')) ...[
                         _CollapsibleMenuItem(
@@ -744,7 +789,9 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.analytics) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (_) => const StudentAnalyticsDashboard()),
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const StudentAnalyticsDashboard()),
                               );
                             }
                           },
@@ -762,15 +809,13 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.myFavourites) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (_) => const MyFavouritesScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => const MyFavouritesScreen()),
                               );
                             }
                           },
                         ),
                       ],
-
-
-
 
                       const Spacer(),
 
@@ -888,44 +933,45 @@ class _CollapsibleMenuItemState extends State<_CollapsibleMenuItem>
                   color: widget.isActive
                       ? AppTheme.primaryGreen.withOpacity(0.1)
                       : (_isHovered
-                      ? AppTheme.borderGrey.withOpacity(0.2)
-                      : Colors.transparent),
+                          ? AppTheme.borderGrey.withOpacity(0.2)
+                          : Colors.transparent),
                   borderRadius:
-                  BorderRadius.circular(widget.isCollapsed ? 12 : 16),
+                      BorderRadius.circular(widget.isCollapsed ? 12 : 16),
                   border: widget.isActive
-                      ? Border.all(color: AppTheme.primaryGreen.withOpacity(0.2))
+                      ? Border.all(
+                          color: AppTheme.primaryGreen.withOpacity(0.2))
                       : null,
                 ),
                 child: widget.isCollapsed
                     ? Center(
-                  child: Icon(
-                    widget.icon,
-                    color: effectiveIconColor,
-                    size: 20,
-                  ),
-                )
-                    : Row(
-                  children: [
-                    Icon(
-                      widget.icon,
-                      color: effectiveIconColor,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        widget.text,
-                        style: GoogleFonts.inter(
-                          color: effectiveTextColor,
-                          fontWeight: widget.isActive
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                          fontSize: 14,
+                        child: Icon(
+                          widget.icon,
+                          color: effectiveIconColor,
+                          size: 20,
                         ),
+                      )
+                    : Row(
+                        children: [
+                          Icon(
+                            widget.icon,
+                            color: effectiveIconColor,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              widget.text,
+                              style: GoogleFonts.inter(
+                                color: effectiveTextColor,
+                                fontWeight: widget.isActive
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
               ),
             );
           },
@@ -1010,27 +1056,27 @@ class SmoothPageRoute<T> extends PageRouteBuilder<T> {
   final Widget page;
   SmoothPageRoute({required this.page})
       : super(
-    pageBuilder: (context, animation, secondaryAnimation) => page,
-    transitionDuration: const Duration(milliseconds: 400),
-    reverseTransitionDuration: const Duration(milliseconds: 400),
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      // ✅ Smooth fade + slide transition
-      final curvedAnimation = CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeInOutCubic,
-      );
-      return FadeTransition(
-        opacity: curvedAnimation,
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0.05, 0),
-            end: Offset.zero,
-          ).animate(curvedAnimation),
-          child: child,
-        ),
-      );
-    },
-  );
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionDuration: const Duration(milliseconds: 400),
+          reverseTransitionDuration: const Duration(milliseconds: 400),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            // ✅ Smooth fade + slide transition
+            final curvedAnimation = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOutCubic,
+            );
+            return FadeTransition(
+              opacity: curvedAnimation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.05, 0),
+                  end: Offset.zero,
+                ).animate(curvedAnimation),
+                child: child,
+              ),
+            );
+          },
+        );
 }
 
 // ✅ COMPLETELY REDESIGNED: Ultra-Modern Mobile Drawer
@@ -1060,6 +1106,10 @@ class _MobileDrawer extends StatelessWidget {
       backgroundColor: Colors.white,
       child: Consumer<UserProvider>(
         builder: (context, userProvider, child) {
+          // Get schoolRecNo from UserProvider for passing to screens
+          final int schoolRecNo =
+              int.tryParse(userProvider.userCode ?? '0') ?? 0;
+
           return Column(
             children: [
               // ✅ IMPROVED HEADER with better close button
@@ -1117,7 +1167,8 @@ class _MobileDrawer extends StatelessWidget {
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: AppTheme.mackColor.withOpacity(0.5),
+                                        color:
+                                            AppTheme.mackColor.withOpacity(0.5),
                                         blurRadius: 4,
                                         spreadRadius: 1,
                                       ),
@@ -1194,8 +1245,8 @@ class _MobileDrawer extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding:
-                          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
@@ -1270,7 +1321,8 @@ class _MobileDrawer extends StatelessWidget {
                         icon: Iconsax.building_4,
                         title: 'Schools',
                         isActive: activeScreen == AppScreen.schools,
-                        onTap: () => _navigateTo(context, const SchoolsScreen()),
+                        onTap: () =>
+                            _navigateTo(context, const SchoolsScreen()),
                       ),
 
                     // Students - M007
@@ -1280,7 +1332,8 @@ class _MobileDrawer extends StatelessWidget {
                         icon: Iconsax.profile_2user,
                         title: 'Students',
                         isActive: activeScreen == AppScreen.students,
-                        onTap: () => _navigateTo(context, const StudentsScreen()),
+                        onTap: () =>
+                            _navigateTo(context, const StudentsScreen()),
                       ),
 
                     // Teachers - M008
@@ -1290,7 +1343,8 @@ class _MobileDrawer extends StatelessWidget {
                         icon: Iconsax.teacher,
                         title: 'Teachers',
                         isActive: activeScreen == AppScreen.teachers,
-                        onTap: () => _navigateTo(context, const TeachersScreen()),
+                        onTap: () =>
+                            _navigateTo(context, const TeachersScreen()),
                       ),
 
                     if (userProvider.hasMenuAccess('M003'))
@@ -1298,7 +1352,8 @@ class _MobileDrawer extends StatelessWidget {
                         icon: Iconsax.receipt_text,
                         title: 'Subscriptions',
                         isActive: activeScreen == AppScreen.subscriptions,
-                        onTap: () => _navigateTo(context, const SubscriptionsScreen()),
+                        onTap: () =>
+                            _navigateTo(context, const SubscriptionsScreen()),
                       ),
 
                     if (userProvider.hasMenuAccess('M004'))
@@ -1306,7 +1361,8 @@ class _MobileDrawer extends StatelessWidget {
                         icon: Iconsax.book_1,
                         title: 'Academics',
                         isActive: activeScreen == AppScreen.academics,
-                        onTap: () => _navigateTo(context, const AcademicsScreen()),
+                        onTap: () =>
+                            _navigateTo(context, const AcademicsScreen()),
                       ),
 
                     if (userProvider.hasMenuAccess('M005'))
@@ -1314,7 +1370,8 @@ class _MobileDrawer extends StatelessWidget {
                         icon: Iconsax.user_square,
                         title: 'Publishers',
                         isActive: activeScreen == AppScreen.publishers,
-                        onTap: () => _navigateTo(context, const PublisherScreen()),
+                        onTap: () =>
+                            _navigateTo(context, const PublisherScreen()),
                       ),
 
                     // School Panel - M009
@@ -1324,7 +1381,22 @@ class _MobileDrawer extends StatelessWidget {
                         icon: Iconsax.monitor,
                         title: 'School Panel',
                         isActive: activeScreen == AppScreen.schoolPanel,
-                        onTap: () => _navigateTo(context, const SchoolPanelDashboard()),
+                        onTap: () =>
+                            _navigateTo(context, const SchoolPanelDashboard()),
+                      ),
+
+                    // ✅ NEW MODULE: Class Module - M012
+                    if (userProvider.hasMenuAccess('M012'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.building,
+                        title: 'Class',
+                        isActive: activeScreen == AppScreen.classModule,
+                        onTap: () => _navigateTo(
+                          context,
+                          ClassManageScreen(
+                            schoolRecNo: schoolRecNo,
+                          ),
+                        ),
                       ),
 
                     // Subject Module - M010
@@ -1336,8 +1408,8 @@ class _MobileDrawer extends StatelessWidget {
                         isActive: activeScreen == AppScreen.subjectModule,
                         onTap: () => _navigateTo(
                           context,
-                          const SubjectModuleScreen(
-                            schoolRecNo: 1,
+                          SubjectModuleScreen(
+                            schoolRecNo: schoolRecNo,
                             academicYear: '2025-26',
                           ),
                         ),
@@ -1347,7 +1419,8 @@ class _MobileDrawer extends StatelessWidget {
                         icon: Iconsax.book_1,
                         title: 'My Subjects',
                         isActive: activeScreen == AppScreen.mySubjects,
-                        onTap: () => _navigateTo(context, const MySubjectsScreen()),
+                        onTap: () =>
+                            _navigateTo(context, const MySubjectsScreen()),
                       ),
 
                     if (userProvider.hasMenuAccess('M013'))
@@ -1355,7 +1428,8 @@ class _MobileDrawer extends StatelessWidget {
                         icon: Iconsax.chart_21,
                         title: 'My Analytics',
                         isActive: activeScreen == AppScreen.analytics,
-                        onTap: () => _navigateTo(context, const StudentAnalyticsDashboard()),
+                        onTap: () => _navigateTo(
+                            context, const StudentAnalyticsDashboard()),
                       ),
 
                     if (userProvider.hasMenuAccess('M014'))
@@ -1363,13 +1437,13 @@ class _MobileDrawer extends StatelessWidget {
                         icon: Iconsax.heart,
                         title: 'My Favourites',
                         isActive: activeScreen == AppScreen.myFavourites,
-                        onTap: () => _navigateTo(context, const MyFavouritesScreen()),
+                        onTap: () =>
+                            _navigateTo(context, const MyFavouritesScreen()),
                       ),
 
-
-
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 8),
                       child: Divider(
                         color: Colors.grey.shade300,
                         thickness: 1,
@@ -1512,11 +1586,11 @@ class _SimpleMenuItem extends StatelessWidget {
             color: isActive ? AppTheme.primaryGreen.withOpacity(0.08) : null,
             border: isActive
                 ? Border(
-              left: BorderSide(
-                color: AppTheme.primaryGreen,
-                width: 4,
-              ),
-            )
+                    left: BorderSide(
+                      color: AppTheme.primaryGreen,
+                      width: 4,
+                    ),
+                  )
                 : null,
           ),
           child: Row(
@@ -1535,7 +1609,9 @@ class _SimpleMenuItem extends StatelessWidget {
                     fontSize: 15,
                     fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                     color: textColor ??
-                        (isActive ? AppTheme.primaryGreen : Colors.grey.shade800),
+                        (isActive
+                            ? AppTheme.primaryGreen
+                            : Colors.grey.shade800),
                   ),
                 ),
               ),
@@ -1563,17 +1639,16 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 4),
-      child: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: AppTheme.bodyText.withOpacity(0.5),
-          letterSpacing: 1.2,
-        ),
-      ),
-    );
+        padding: const EdgeInsets.only(left: 4, bottom: 4),
+        child: Text(
+          title,
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.bodyText.withOpacity(0.5),
+            letterSpacing: 1.2,
+          ),
+        ));
   }
 }
 
@@ -1607,19 +1682,21 @@ class _ModernMenuItem extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: isActive ? AppTheme.primaryGreen.withOpacity(0.1) : Colors.white,
+              color: isActive
+                  ? AppTheme.primaryGreen.withOpacity(0.1)
+                  : Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: isActive
                   ? Border.all(color: AppTheme.primaryGreen, width: 2)
                   : Border.all(color: AppTheme.borderGrey.withOpacity(0.2)),
               boxShadow: isActive
                   ? [
-                BoxShadow(
-                  color: AppTheme.primaryGreen.withOpacity(0.2),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
+                      BoxShadow(
+                        color: AppTheme.primaryGreen.withOpacity(0.2),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
                   : null,
             ),
             child: Row(

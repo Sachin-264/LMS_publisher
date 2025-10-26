@@ -9,6 +9,7 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import '../Theme/apptheme.dart';
 import '../screens/main_layout.dart';
 import 'dart:ui';
+import 'utils/academic_year.dart';
 
 // ============================================================================
 // MAIN DASHBOARD SCREEN
@@ -16,20 +17,34 @@ import 'dart:ui';
 class SchoolPanelDashboard extends StatelessWidget {
   const SchoolPanelDashboard({super.key});
 
+  int _resolveSchoolRecNo(UserProvider userProvider) {
+    // Try to read School_RecNo from login response if available; fallback to userCode
+    try {
+      final data = userProvider.loginResponse?.userData;
+      final rs0 = data?['resultSet_0'];
+      if (rs0 is List && rs0.isNotEmpty) {
+        final first = rs0.first;
+        final srn = first['School_RecNo'] ?? first['SchoolRecNo'];
+        if (srn != null) {
+          final parsed = int.tryParse(srn.toString());
+          if (parsed != null) return parsed;
+        }
+      }
+    } catch (_) {}
+    return int.tryParse(userProvider.userCode ?? '0') ?? 0;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 🔥 Get schoolRecNo from UserProvider
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final schoolRecNo = int.tryParse(userProvider.userCode ?? '0') ?? 0;
-
-    print("🔍 [SchoolPanelDashboard] UserCode from Provider: ${userProvider.userCode}");
-    print("🔍 [SchoolPanelDashboard] Parsed School_RecNo: $schoolRecNo");
+    final schoolRecNo = _resolveSchoolRecNo(userProvider);
+    final initialYear = computeCurrentAcademicYear();
 
     return BlocProvider(
       create: (context) => SchoolPanelBloc()
         ..add(LoadDashboardData(
-          schoolRecNo: schoolRecNo, // 🔥 Use from provider
-          academicYear: '2025-26',
+          schoolRecNo: schoolRecNo,
+          academicYear: initialYear,
         )),
       child: const MainLayout(
         activeScreen: AppScreen.schoolPanel,
@@ -42,93 +57,117 @@ class SchoolPanelDashboard extends StatelessWidget {
 // ============================================================================
 // DASHBOARD VIEW
 // ============================================================================
-class SchoolDashboardView extends StatelessWidget {
+class SchoolDashboardView extends StatefulWidget {
   const SchoolDashboardView({super.key});
 
   @override
+  State<SchoolDashboardView> createState() => _SchoolDashboardViewState();
+}
+
+class _SchoolDashboardViewState extends State<SchoolDashboardView> {
+  late String selectedAcademicYear;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedAcademicYear = computeCurrentAcademicYear();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final schoolRecNo = int.tryParse(userProvider.userCode ?? '0') ?? 0;
+
     return BlocBuilder<SchoolPanelBloc, SchoolPanelState>(
       builder: (context, state) {
         if (state is SchoolPanelLoading) {
-          return Center(
-            child: CircularProgressIndicator(
-              color: AppTheme.accentGreen,
+          // If loading, show indicator wrapped in a scrollable view for consistency
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: SizedBox(
+              height: MediaQuery.of(context).size.height * 0.8, // Ensure enough height for centering
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: AppTheme.accentGreen,
+                ),
+              ),
             ),
           );
         }
 
         if (state is SchoolPanelError) {
-          // 🔥 Get schoolRecNo for retry
-          final userProvider = Provider.of<UserProvider>(context, listen: false);
-          final schoolRecNo = int.tryParse(userProvider.userCode ?? '0') ?? 0;
-
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Iconsax.danger,
-                  size: 64,
-                  color: Colors.red.shade300,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Error Loading Dashboard',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.darkText,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    state.message,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: AppTheme.bodyText,
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: SizedBox(
+              height: MediaQuery.of(context).size.height * 0.8, // Ensure enough height for centering
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Iconsax.danger,
+                      size: 64,
+                      color: Colors.red.shade300,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _HoverButton(
-                  onPressed: () {
-                    context.read<SchoolPanelBloc>().add(
-                      RefreshDashboard(
-                        schoolRecNo: schoolRecNo, // 🔥 Use from provider
-                        academicYear: '2025-26',
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error Loading Dashboard',
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.darkText,
                       ),
-                    );
-                  },
-                  icon: Iconsax.refresh,
-                  label: 'Retry',
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        state.message,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: AppTheme.bodyText,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _HoverButton(
+                      onPressed: () {
+context.read<SchoolPanelBloc>().add(
+                          RefreshDashboard(
+                            schoolRecNo: schoolRecNo,
+                            academicYear: selectedAcademicYear,
+                          ),
+                        );
+                      },
+                      icon: Iconsax.refresh,
+                      label: 'Retry',
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           );
         }
 
         if (state is DashboardLoaded) {
-          // 🔥 Get schoolRecNo for refresh
-          final userProvider = Provider.of<UserProvider>(context, listen: false);
-          final schoolRecNo = int.tryParse(userProvider.userCode ?? '0') ?? 0;
-
+          // Main content when loaded
           return RefreshIndicator(
             color: AppTheme.accentGreen,
             onRefresh: () async {
-              context.read<SchoolPanelBloc>().add(
+context.read<SchoolPanelBloc>().add(
                 RefreshDashboard(
-                  schoolRecNo: schoolRecNo, // 🔥 Use from provider
-                  academicYear: '2025-26',
+                  schoolRecNo: schoolRecNo,
+                  academicYear: selectedAcademicYear,
                 ),
               );
             },
             child: LayoutBuilder(
               builder: (context, constraints) {
+                // Use SingleChildScrollView to enable scrolling and BouncingScrollPhysics
+                // as seen in my_subject_screen.dart
                 return SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
+                  physics: const BouncingScrollPhysics(),
                   child: Padding(
                     padding: EdgeInsets.all(_getResponsivePadding(constraints.maxWidth)),
                     child: Column(
@@ -141,6 +180,8 @@ class SchoolDashboardView extends StatelessWidget {
                         _buildChartsSection(context, state.data, constraints.maxWidth),
                         SizedBox(height: _getResponsiveSpacing(constraints.maxWidth)),
                         _buildBottomSection(context, state.data, constraints.maxWidth),
+                        // Add some extra space at the bottom for bouncing effect
+                        SizedBox(height: _getResponsiveSpacing(constraints.maxWidth)),
                       ],
                     ),
                   ),
@@ -177,92 +218,105 @@ class SchoolDashboardView extends StatelessWidget {
   // HEADER
   // ==========================================================================
   Widget _buildHeader(BuildContext context, double screenWidth) {
-    // 🔥 Get schoolRecNo for refresh button
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final schoolRecNo = int.tryParse(userProvider.userCode ?? '0') ?? 0;
 
     final isMobile = screenWidth < 600;
-    return isMobile
-        ? Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+
+    Widget yearSelector = Row(
       children: [
         Text(
-          'School Dashboard',
+          'Academic Year',
           style: GoogleFonts.poppins(
-            fontSize: screenWidth > 480 ? 24 : 20,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.primaryGreen,
+            fontSize: isMobile ? (screenWidth > 480 ? 13 : 11) : (screenWidth > 1024 ? 14 : 13),
+            color: AppTheme.bodyText,
           ),
         ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
-              child: Text(
-                'Academic Year 2025-26',
-                style: GoogleFonts.poppins(
-                  fontSize: screenWidth > 480 ? 13 : 11,
-                  color: AppTheme.bodyText,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            _HoverButton(
-              onPressed: () {
-                context.read<SchoolPanelBloc>().add(
-                  RefreshDashboard(
-                    schoolRecNo: schoolRecNo, // 🔥 Use from provider
-                    academicYear: '2025-26',
-                  ),
-                );
-              },
-              icon: Iconsax.refresh,
-              label: 'Refresh',
-              isCompact: true,
-            ),
-          ],
-        ),
-      ],
-    )
-        : Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'School Dashboard',
-              style: GoogleFonts.poppins(
-                fontSize: screenWidth > 1400 ? 32 : screenWidth > 1024 ? 30 : 28,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.primaryGreen,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Academic Year 2025-26',
-              style: GoogleFonts.poppins(
-                fontSize: screenWidth > 1024 ? 14 : 13,
-                color: AppTheme.bodyText,
-              ),
-            ),
-          ],
-        ),
-        _HoverButton(
-          onPressed: () {
+        const SizedBox(width: 8),
+        _AcademicYearDropdown(
+          initialYear: selectedAcademicYear,
+          onChanged: (year) {
+            setState(() => selectedAcademicYear = year);
             context.read<SchoolPanelBloc>().add(
               RefreshDashboard(
-                schoolRecNo: schoolRecNo, // 🔥 Use from provider
-                academicYear: '2025-26',
+                schoolRecNo: schoolRecNo,
+                academicYear: selectedAcademicYear,
               ),
             );
           },
-          icon: Iconsax.refresh,
-          label: 'Refresh',
         ),
       ],
     );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'School Dashboard',
+            style: GoogleFonts.poppins(
+              fontSize: screenWidth > 480 ? 24 : 20,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.primaryGreen,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(child: yearSelector),
+              const SizedBox(width: 8),
+              _HoverButton(
+                onPressed: () {
+                  context.read<SchoolPanelBloc>().add(
+                    RefreshDashboard(
+                      schoolRecNo: schoolRecNo,
+                      academicYear: selectedAcademicYear,
+                    ),
+                  );
+                },
+                icon: Iconsax.refresh,
+                label: 'Refresh',
+                isCompact: true,
+              ),
+            ],
+          ),
+        ],
+      );
+    } else {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'School Dashboard',
+                style: GoogleFonts.poppins(
+                  fontSize: screenWidth > 1400 ? 32 : screenWidth > 1024 ? 30 : 28,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primaryGreen,
+                ),
+              ),
+              const SizedBox(height: 4),
+              yearSelector,
+            ],
+          ),
+          _HoverButton(
+            onPressed: () {
+              context.read<SchoolPanelBloc>().add(
+                RefreshDashboard(
+                  schoolRecNo: schoolRecNo,
+                  academicYear: selectedAcademicYear,
+                ),
+              );
+            },
+            icon: Iconsax.refresh,
+            label: 'Refresh',
+          ),
+        ],
+      );
+    }
   }
 
   // ==========================================================================
@@ -1289,6 +1343,53 @@ class _HoverCardState extends State<_HoverCard> {
 // ============================================================================
 // HOVER BUTTON
 // ============================================================================
+class _AcademicYearDropdown extends StatefulWidget {
+  final String initialYear;
+  final ValueChanged<String> onChanged;
+  const _AcademicYearDropdown({required this.initialYear, required this.onChanged});
+
+  @override
+  State<_AcademicYearDropdown> createState() => _AcademicYearDropdownState();
+}
+
+class _AcademicYearDropdownState extends State<_AcademicYearDropdown> {
+  late String _year;
+  late List<String> _options;
+
+  @override
+  void initState() {
+    super.initState();
+    _year = widget.initialYear;
+    _options = generateAcademicYearOptions();
+    if (!_options.contains(_year)) {
+      _options.add(_year);
+      _options.sort();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _AcademicYearDropdown oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialYear != widget.initialYear) {
+      setState(() => _year = widget.initialYear);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButton<String>(
+      value: _year,
+      items: _options.map((y) => DropdownMenuItem<String>(value: y, child: Text(y))).toList(),
+      onChanged: (val) {
+        if (val == null) return;
+        setState(() => _year = val);
+        widget.onChanged(val);
+      },
+      underline: const SizedBox.shrink(),
+    );
+  }
+}
+
 class _HoverButton extends StatefulWidget {
   final VoidCallback onPressed;
   final IconData icon;
