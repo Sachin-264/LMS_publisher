@@ -8,7 +8,9 @@ import 'package:lms_publisher/School_Panel/School_panel_dashboard.dart';
 import 'package:lms_publisher/School_Panel/student_module/student_manage.dart';
 import 'package:lms_publisher/School_Panel/teacher_module/teacher_manage.dart';
 import 'package:lms_publisher/School_Panel/subject_module/subject_module_screen.dart';
+import 'package:lms_publisher/StudentPannel/MyFavourite/my_favourite_subject.dart';
 import 'package:lms_publisher/StudentPannel/MySubject/my_subject_screen.dart';
+import 'package:lms_publisher/StudentPannel/Student_analytics/student_analytics_dashboard.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/screens/AcademicsScreen/academics_screen.dart';
 import 'package:lms_publisher/screens/HomePage/HomePage.dart';
@@ -17,7 +19,6 @@ import 'package:lms_publisher/screens/SubscriptionScreen/subscription_dart.dart'
 import 'package:lms_publisher/screens/LoginScreen/login_bloc.dart';
 import 'package:provider/provider.dart';
 
-// Enum to identify the active screen for the sidebar
 enum AppScreen {
   dashboard,
   schools,
@@ -29,8 +30,12 @@ enum AppScreen {
   schoolPanel,
   subjectModule,
   mySubjects,
+  analytics,
+  myFavourites, // ✅ ADD THIS
   settings
 }
+
+
 
 // ✅ State management for sidebar
 final ValueNotifier<bool> isSidebarCollapsed = ValueNotifier(true);
@@ -73,7 +78,7 @@ class _MainLayoutState extends State<MainLayout> {
     final screenHeight = MediaQuery.of(context).size.height;
     final isMobile = screenWidth < 600;
     final padding = MediaQuery.of(context).padding;
-    print('🔔 Top Notch: ${padding.top}, 📱 Screen: $screenWidth x $screenHeight');
+    // print('🔔 Top Notch: ${padding.top}, 📱 Screen: $screenWidth x $screenHeight');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
@@ -148,10 +153,10 @@ class _MainLayoutState extends State<MainLayout> {
                                             final RenderBox? box = context
                                                 .findRenderObject() as RenderBox?;
                                             if (box != null && box.hasSize) {
-                                              print(
-                                                  '🎯 Child Content Height: ${box.size.height.toStringAsFixed(0)}');
-                                              print(
-                                                  '🎯 Child Content Width: ${box.size.width.toStringAsFixed(0)}');
+                                              // print(
+                                              //     '🎯 Child Content Height: ${box.size.height.toStringAsFixed(0)}');
+                                              // print(
+                                              //     '🎯 Child Content Width: ${box.size.width.toStringAsFixed(0)}');
                                             }
                                           });
 
@@ -710,7 +715,7 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                           },
                         ),
                       ],
-                      // My Subjects - M00 (Student Panel)
+                      // My Subjects - M011 (Student Panel)
                       if (userProvider.hasMenuAccess('M011')) ...[
                         _CollapsibleMenuItem(
                           icon: Iconsax.book_1,
@@ -727,6 +732,44 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                           },
                         ),
                       ],
+
+
+                      if (userProvider.hasMenuAccess('M013')) ...[
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.chart_21,
+                          text: 'My Analytics',
+                          isActive: activeScreen == AppScreen.analytics,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.analytics) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (_) => const StudentAnalyticsDashboard()),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+
+                      // My Favourites - M014
+                      if (userProvider.hasMenuAccess('M014')) ...[
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.heart,
+                          text: 'My Favourites',
+                          isActive: activeScreen == AppScreen.myFavourites,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.myFavourites) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (_) => const MyFavouritesScreen()),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+
+
 
 
                       const Spacer(),
@@ -1305,6 +1348,22 @@ class _MobileDrawer extends StatelessWidget {
                         title: 'My Subjects',
                         isActive: activeScreen == AppScreen.mySubjects,
                         onTap: () => _navigateTo(context, const MySubjectsScreen()),
+                      ),
+
+                    if (userProvider.hasMenuAccess('M013'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.chart_21,
+                        title: 'My Analytics',
+                        isActive: activeScreen == AppScreen.analytics,
+                        onTap: () => _navigateTo(context, const StudentAnalyticsDashboard()),
+                      ),
+
+                    if (userProvider.hasMenuAccess('M014'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.heart,
+                        title: 'My Favourites',
+                        isActive: activeScreen == AppScreen.myFavourites,
+                        onTap: () => _navigateTo(context, const MyFavouritesScreen()),
                       ),
 
 

@@ -165,6 +165,8 @@ class _SubjectChaptersScreenState extends State<SubjectChaptersScreen> {
               chapter: chapter,
               subjectColor: widget.subjectColor,
               subjectName: widget.subject.displaySubjectName,
+              // FIX: Pass the required subjectId
+              subjectId: widget.subject.subjectId,
             ),
           ),
         );

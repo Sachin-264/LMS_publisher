@@ -195,7 +195,7 @@ class MaterialsResponse {
   }
 }
 
-// ========== DATA MODELS ==========
+
 
 class MaterialFile {
   final int sno;
@@ -203,29 +203,43 @@ class MaterialFile {
   final String type;
   final String name;
 
+  // ✅ ADD THESE FIELDS TO MATCH API RESPONSE
+  final double? progress;
+  final int? lastPosition;
+  final bool? completed;
+  final int? viewCount;
+  final String? lastAccessed;
+
   MaterialFile({
     required this.sno,
     required this.path,
     required this.type,
     required this.name,
+    this.progress,
+    this.lastPosition,
+    this.completed,
+    this.viewCount,
+    this.lastAccessed,
   });
 
   factory MaterialFile.fromJson(Map<String, dynamic> json) {
     return MaterialFile(
-      sno: json['sno'] ?? 0,
-      path: json['path'] ?? '',
-      type: json['type'] ?? '',
-      name: json['name'] ?? '',
+      sno: json['sno'] as int,
+      path: json['path'] as String,
+      type: json['type'] as String,
+      name: json['name'] as String? ?? 'Unnamed File',
+      // ✅ Parse progress fields from API
+      progress: (json['progress'] as num?)?.toDouble(),
+      lastPosition: (json['last_position'] as num?)?.toInt(),
+      completed: json['completed'] as bool?,
+      viewCount: (json['view_count'] as num?)?.toInt(),
+      lastAccessed: json['last_accessed'] as String?,
     );
   }
 
-  String get fullUrl {
-    if (type == 'video' || path.startsWith('http')) {
-      return path;
-    }
-    return StudentSubjectService.getDocumentUrl(path);
-  }
+  String get fullUrl => 'https://storage.googleapis.com/upload-images-34/documents/LMS/$path';
 }
+
 
 class SubjectModel {
   final int subjectId;

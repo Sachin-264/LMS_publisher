@@ -23,7 +23,8 @@ class SubjectModuleApiService {
   static const String baseUrl = 'http://10.100.2.119/AquareLMS';
   static const String apiEndpoint = '$baseUrl/manage_school_academics.php';
 
-  // 🔥 Automatic access to userCode as School_RecNo (Integer)
+
+
   int get _schoolRecNo {
     print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     print("🔍 [_schoolRecNo GETTER] Called");
