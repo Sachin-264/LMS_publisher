@@ -238,7 +238,7 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
   @override
   Widget build(BuildContext context) {
     return MainLayout(
-      activeScreen: AppScreen.mySubjects,
+      activeScreen: AppScreen.myFavourites,
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.all(24),
