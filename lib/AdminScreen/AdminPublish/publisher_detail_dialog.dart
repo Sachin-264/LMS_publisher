@@ -794,15 +794,7 @@ class _PublisherDetailDialogState extends State<PublisherDetailDialog>
                         Colors.blue,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildCredentialChip(
-                        'Account',
-                        (_credentials!['IsBlocked'] ?? 0) == 0 ? 'Active' : 'Blocked',
-                        Iconsax.shield_tick,
-                        (_credentials!['IsBlocked'] ?? 0) == 0 ? Colors.green : Colors.red,
-                      ),
-                    ),
+
                   ],
                 ),
               ],
