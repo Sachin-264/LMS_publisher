@@ -11,7 +11,7 @@ class DashboardApiService {
   factory DashboardApiService() => _instance;
   DashboardApiService._internal();
 
-  static const String _baseUrl = "http://localhost/AquareLMS";
+  static const String _baseUrl = "https://aquare.co.in/mobileAPI/sachin/lms";
 
   // Automatic access to userCode as PubCode (Integer)
   int get _pubCode {

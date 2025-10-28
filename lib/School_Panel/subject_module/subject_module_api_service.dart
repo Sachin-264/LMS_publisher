@@ -20,7 +20,7 @@ class SubjectModuleApiService {
 
   SubjectModuleApiService._internal();
 
-  static const String baseUrl = 'http://localhost/AquareLMS';
+  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
   static const String apiEndpoint = '$baseUrl/manage_school_academics.php';
 
 

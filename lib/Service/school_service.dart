@@ -20,7 +20,7 @@ class SchoolApiService {
 
   SchoolApiService._internal();
 
-  final String _baseUrl = "http://localhost/AquareLMS/";
+  final String _baseUrl = "https://aquare.co.in/mobileAPI/sachin/lms/";
   final String _imageUploadUrl = "https://www.aquare.co.in/mobileAPI/sachin/photogcp1.php";
 
   // 🔥 Automatic access to userCode from anywhere!

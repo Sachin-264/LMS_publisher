@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class StudentSubjectService {
   // API URLs
-  static const String baseUrl = 'http://localhost/AquareLMS';
+  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
   static const String documentBaseUrl = "https://storage.googleapis.com/upload-images-34/documents/LMS/";
 
   // Helper function to get YouTube thumbnail

@@ -26,7 +26,7 @@ class CityModel {
 
 
 class TeacherApiService {
-  static const String baseUrl =  'http://localhost/AquareLMS';
+  static const String baseUrl =  'https://aquare.co.in/mobileAPI/sachin/lms';
 
   static const String _imageUploadUrl = "https://www.aquare.co.in/mobileAPI/sachin/photogcp1.php";
   static const String _imageBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";

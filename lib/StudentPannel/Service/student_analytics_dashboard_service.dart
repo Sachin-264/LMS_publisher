@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 class StudentAnalyticsDashboardService {
   // API URLs
-  static const String baseUrl = 'http://10.100.2.119/AquareLMS';
+  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
   static const String logoBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
 
   /// Get complete analytics dashboard data

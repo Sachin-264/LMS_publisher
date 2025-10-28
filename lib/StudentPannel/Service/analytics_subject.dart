@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class AnalyticsService {
   // API URLs (using same base URL as StudentSubjectService)
-  static const String baseUrl = 'http://10.100.2.119/AquareLMS';
+  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
 
   static Future<Map<String, dynamic>> updateChapterProgress({
     required String userCode,

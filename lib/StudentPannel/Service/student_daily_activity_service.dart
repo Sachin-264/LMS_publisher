@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
 class StudentDailyActivityService {
-  static const String baseUrl = 'http://10.100.2.119/AquareLMS';
+  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
 
   /// Record daily activity (called periodically + on chapter exit)
   static Future<bool> recordDailyActivity({
