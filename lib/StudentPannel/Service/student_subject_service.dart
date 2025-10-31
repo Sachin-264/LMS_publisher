@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class StudentSubjectService {
   // API URLs
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl = 'http://localhost/AquareLMS';
   static const String documentBaseUrl = "https://storage.googleapis.com/upload-images-34/documents/LMS/";
 
   // Helper function to get YouTube thumbnail
@@ -105,6 +105,255 @@ class StudentSubjectService {
     } catch (e) {
       throw Exception('Error fetching materials: $e');
     }
+  }
+
+  static Future<TeacherStudentNotesResponse> getStudentNotes({
+    required String studentId,
+    int? chapterId,
+    int? subjectId,
+    int? isPrivate,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/teacher_student_api.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'action': 'GET_STUDENT_NOTES',
+          'Student_ID': studentId,
+          if (chapterId != null) 'ChapterID': chapterId,
+          if (subjectId != null) 'SubjectID': subjectId,
+          if (isPrivate != null) 'IsPrivate': isPrivate,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return TeacherStudentNotesResponse.fromJson(data);
+      } else {
+        throw Exception('Failed to load notes: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching notes: $e');
+    }
+  }
+
+  static Future<TeacherMaterialsResponse> getTeacherMaterials({
+    required String teacherCode,
+    int? chapterId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/teacher_student_api.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'action': 'GET_TEACHER_MATERIALS',
+          'TeacherCode': teacherCode,
+          if (chapterId != null) 'ChapterID': chapterId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return TeacherMaterialsResponse.fromJson(data);
+      } else {
+        throw Exception('Failed to load materials: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching teacher materials: $e');
+    }
+  }
+}
+
+
+class TeacherStudentNotesResponse {
+  final String status;
+  final List<TeacherNoteModel> notes;
+  final int count;
+
+  TeacherStudentNotesResponse({
+    required this.status,
+    required this.notes,
+    required this.count,
+  });
+
+  factory TeacherStudentNotesResponse.fromJson(Map<String, dynamic> json) {
+    return TeacherStudentNotesResponse(
+      status: json['status'] ?? '',
+      notes: (json['notes'] as List?)
+          ?.map((item) => TeacherNoteModel.fromJson(item))
+          .toList() ??
+          [],
+      count: json['count'] ?? 0,
+    );
+  }
+}
+
+class TeacherNoteModel {
+  final int recNo;
+  final int studentRecNo;
+  final int teacherRecNo;
+  final int? subjectId;
+  final int? chapterId;
+  final String noteText;
+  final String noteCategory;
+  final String noteDate;
+  final bool isPrivate;
+  final String createdDate;
+  final String? modifiedDate;
+  final String studentId;
+  final String studentName;
+  final String? rollNumber;
+  final String teacherCode;
+  final String teacherName;
+  final String? teacherEmail;
+  final String? subjectName;
+  final String? chapterName;
+
+  TeacherNoteModel({
+    required this.recNo,
+    required this.studentRecNo,
+    required this.teacherRecNo,
+    this.subjectId,
+    this.chapterId,
+    required this.noteText,
+    required this.noteCategory,
+    required this.noteDate,
+    required this.isPrivate,
+    required this.createdDate,
+    this.modifiedDate,
+    required this.studentId,
+    required this.studentName,
+    this.rollNumber,
+    required this.teacherCode,
+    required this.teacherName,
+    this.teacherEmail,
+    this.subjectName,
+    this.chapterName,
+  });
+
+  factory TeacherNoteModel.fromJson(Map<String, dynamic> json) {
+    return TeacherNoteModel(
+      recNo: json['RecNo'] ?? 0,
+      studentRecNo: json['StudentRecNo'] ?? 0,
+      teacherRecNo: json['TeacherRecNo'] ?? 0,
+      subjectId: json['SubjectID'],
+      chapterId: json['ChapterID'],
+      noteText: json['NoteText'] ?? '',
+      noteCategory: json['NoteCategory'] ?? '',
+      noteDate: json['NoteDate'] ?? '',
+      isPrivate: json['IsPrivate'] == 1 || json['IsPrivate'] == true,
+      createdDate: json['Created_Date'] ?? '',
+      modifiedDate: json['Modified_Date'],
+      studentId: json['Student_ID'] ?? '',
+      studentName: json['StudentName'] ?? '',
+      rollNumber: json['Roll_Number'],
+      teacherCode: json['TeacherCode'] ?? '',
+      teacherName: json['TeacherName'] ?? '',
+      teacherEmail: json['TeacherEmail'],
+      subjectName: json['SubjectName'],
+      chapterName: json['ChapterName'],
+    );
+  }
+}
+
+class TeacherMaterialsResponse {
+  final String status;
+  final List<TeacherMaterialModel> materials;
+  final int count;
+
+  TeacherMaterialsResponse({
+    required this.status,
+    required this.materials,
+    required this.count,
+  });
+
+  factory TeacherMaterialsResponse.fromJson(Map<String, dynamic> json) {
+    return TeacherMaterialsResponse(
+      status: json['status'] ?? '',
+      materials: (json['materials'] as List?)
+          ?.map((item) => TeacherMaterialModel.fromJson(item))
+          .toList() ??
+          [],
+      count: json['count'] ?? 0,
+    );
+  }
+}
+
+ const String documentBaseUrl = "https://storage.googleapis.com/upload-images-34/documents/LMS/";
+
+class TeacherMaterialModel {
+  final int recNo;
+  final int teacherRecNo;
+  final int chapterId;
+  final String materialType;
+  final String materialTitle;
+  final String? materialPath;
+  final String? materialLink;
+  final String? scheduleReleaseDate;
+  final String? actualReleaseDate;
+  final String? description;
+  final int viewCount;
+  final String createdDate;
+  final bool isActive;
+  final String teacherCode;
+  final String teacherName;
+  final String chapterName;
+  final int chapterOrder;
+  final int subjectId;
+  final String subjectName;
+  final String? subjectCode;
+
+  TeacherMaterialModel({
+    required this.recNo,
+    required this.teacherRecNo,
+    required this.chapterId,
+    required this.materialType,
+    required this.materialTitle,
+    this.materialPath,
+    this.materialLink,
+    this.scheduleReleaseDate,
+    this.actualReleaseDate,
+    this.description,
+    required this.viewCount,
+    required this.createdDate,
+    required this.isActive,
+    required this.teacherCode,
+    required this.teacherName,
+    required this.chapterName,
+    required this.chapterOrder,
+    required this.subjectId,
+    required this.subjectName,
+    this.subjectCode,
+  });
+
+  factory TeacherMaterialModel.fromJson(Map<String, dynamic> json) {
+    return TeacherMaterialModel(
+      recNo: json['RecNo'] ?? 0,
+      teacherRecNo: json['TeacherRecNo'] ?? 0,
+      chapterId: json['ChapterID'] ?? 0,
+      materialType: json['MaterialType'] ?? '',
+      materialTitle: json['MaterialTitle'] ?? '',
+      materialPath: json['MaterialPath'],
+      materialLink: json['MaterialLink'],
+      scheduleReleaseDate: json['ScheduleReleaseDate'],
+      actualReleaseDate: json['ActualReleaseDate'],
+      description: json['Description'],
+      viewCount: json['ViewCount'] ?? 0,
+      createdDate: json['Created_Date'] ?? '',
+      isActive: json['IsActive'] == 1 || json['IsActive'] == true,
+      teacherCode: json['TeacherCode'] ?? '',
+      teacherName: json['TeacherName'] ?? '',
+      chapterName: json['ChapterName'] ?? '',
+      chapterOrder: json['ChapterOrder'] ?? 0,
+      subjectId: json['SubjectID'] ?? 0,
+      subjectName: json['SubjectName'] ?? '',
+      subjectCode: json['SubjectCode'],
+    );
+  }
+
+  String get fullMaterialUrl {
+    if (materialPath == null || materialPath!.isEmpty) return '';
+    return '$documentBaseUrl$materialPath';
   }
 }
 

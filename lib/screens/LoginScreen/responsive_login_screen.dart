@@ -32,6 +32,7 @@ class _ResponsiveLoginScreenContent extends StatelessWidget {
     return BlocListener<LoginBloc, LoginState>(
       listener: (context, state) {
         if (state is! LoginLoading) {
+
           OverlayLoader.hide();
         }
 

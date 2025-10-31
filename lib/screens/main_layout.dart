@@ -12,6 +12,7 @@ import 'package:lms_publisher/School_Panel/subject_module/subject_module_screen.
 import 'package:lms_publisher/StudentPannel/MyFavourite/my_favourite_subject.dart';
 import 'package:lms_publisher/StudentPannel/MySubject/my_subject_screen.dart';
 import 'package:lms_publisher/StudentPannel/Student_analytics/student_analytics_dashboard.dart';
+import 'package:lms_publisher/Teacher_Panel/teacher_dashboard.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/screens/AcademicsScreen/academics_screen.dart';
 import 'package:lms_publisher/screens/HomePage/HomePage.dart';
@@ -35,9 +36,12 @@ enum AppScreen {
   subjectModule,
   mySubjects,
   analytics,
-  myFavourites, // ✅ ADD THIS
-  // ✅ NEW ENTRY: M012 Class Module
+  myFavourites,
   classModule,
+  teacherDashboard,  // ✅ ADD THIS
+  teacherClasses,    // ✅ ADD THIS
+  teacherStudents,   // ✅ ADD THIS
+  teacherAnalytics,  // ✅ ADD THIS
   settings
 }
 
@@ -817,6 +821,47 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                         ),
                       ],
 
+                      // ✅ NEW: Teacher Panel - M015 (Teacher Dashboard)
+                      if (userProvider.hasMenuAccess('M015')) ...[
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.teacher,
+                          text: 'Teacher Dashboard',
+                          isActive: activeScreen == AppScreen.teacherDashboard,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.teacherDashboard) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const TeacherDashboard(),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+
+// ✅ NEW: My Classes - M016
+                      if (userProvider.hasMenuAccess('M016')) ...[
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.book_square,
+                          text: 'My Classes',
+                          isActive: activeScreen == AppScreen.teacherClasses,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.teacherClasses) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const  TeacherDashboard(),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+
+
                       const Spacer(),
 
                       // Bottom section
@@ -1440,6 +1485,24 @@ class _MobileDrawer extends StatelessWidget {
                         onTap: () =>
                             _navigateTo(context, const MyFavouritesScreen()),
                       ),
+
+                    // Teacher Panel Menu Items
+                    if (userProvider.hasMenuAccess('M015'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.teacher,
+                        title: 'Teacher Dashboard',
+                        isActive: activeScreen == AppScreen.teacherDashboard,
+                        onTap: () => _navigateTo(context, const TeacherDashboard()),
+                      ),
+
+                    if (userProvider.hasMenuAccess('M016'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.book_square,
+                        title: 'My Classes',
+                        isActive: activeScreen == AppScreen.teacherClasses,
+                        onTap: () => _navigateTo(context, const TeacherDashboard()),
+                      ),
+
 
                     Padding(
                       padding: const EdgeInsets.symmetric(
