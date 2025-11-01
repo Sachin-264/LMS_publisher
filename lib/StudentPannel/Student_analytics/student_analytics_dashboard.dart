@@ -304,6 +304,11 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
   }
 
   Widget _buildPremiumHeader() {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final isParent = userProvider.isParent;
+    final studentName = _analyticsData['student_name'] ?? 'Student';
+    final parentName = userProvider.userName ?? 'Parent'; // Parent's name
+
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
@@ -311,7 +316,13 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
+          colors: isParent
+              ? [
+            const Color(0xFF8B5CF6), // Purple for parent
+            const Color(0xFF6366F1),
+            const Color(0xFF06B6D4),
+          ]
+              : [
             const Color(0xFF6366F1),
             const Color(0xFF8B5CF6),
             const Color(0xFF06B6D4),
@@ -319,187 +330,304 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6366F1).withOpacity(0.4),
+            color: isParent
+                ? const Color(0xFF8B5CF6).withOpacity(0.4)
+                : const Color(0xFF6366F1).withOpacity(0.4),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          // School Logo Section
-          Column(
+          // ✅ PARENT BADGE (only show if parent mode)
+          if (isParent)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Iconsax.shield_security,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Parent Panel',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                    ),
+                    child: Text(
+                      'Monitoring $studentName',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.amber.shade100,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    width: 80,
-                    height: 80,
+              // School Logo Section
+              Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+                        ),
+                        child: (_analyticsData['school_logo'] != null &&
+                            _analyticsData['school_logo'].toString().isNotEmpty)
+                            ? ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: Image.network(
+                            _analyticsData['school_logo'],
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Iconsax.building,
+                                color: Colors.white,
+                                size: 36,
+                              );
+                            },
+                          ),
+                        )
+                            : const Icon(
+                          Iconsax.building,
+                          color: Colors.white,
+                          size: 36,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withOpacity(0.3)),
                     ),
-                    child: (_analyticsData['school_logo'] != null &&
-                        _analyticsData['school_logo'].toString().isNotEmpty)
-                        ? ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: Image.network(
-                        _analyticsData['school_logo'],
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(
-                            Iconsax.building,
-                            color: Colors.white,
-                            size: 36,
-                          );
-                        },
+                    child: Text(
+                      'School Logo',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
                       ),
-                    )
-                        : const Icon(
-                      Iconsax.building,
-                      color: Colors.white,
-                      size: 36,
                     ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.3)),
-                ),
-                child: Text(
-                  'School Logo',
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
+              const SizedBox(width: 24),
 
-          const SizedBox(width: 24),
-
-          // Student Info Section
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _analyticsData['school_name'] ?? 'School Name',
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withOpacity(0.9),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Welcome back, ${_analyticsData['student_name'] ?? 'Student'}!',
-                  style: GoogleFonts.inter(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: -1,
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
+              // ✅ UPDATED: Student Info Section (showing parent context if applicable)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildInfoChip('${_analyticsData['class']} • ${_analyticsData['section']}'),
-                    const SizedBox(width: 12),
-                    if ((_analyticsData['streak_days'] ?? 0) > 0)
-                      _buildInfoChip('🔥 ${_analyticsData['streak_days']} Days Streak'),
+                    Text(
+                      _analyticsData['school_name'] ?? 'School Name',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // ✅ Show different greeting based on parent/student
+                    if (isParent) ...[
+                      Text(
+                        'Welcome $parentName!',
+                        style: GoogleFonts.inter(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Viewing $studentName's progress",
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withOpacity(0.85),
+                        ),
+                      ),
+                    ] else ...[
+                      Text(
+                        'Welcome back, ${studentName}!',
+                        style: GoogleFonts.inter(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: -1,
+                          height: 1.1,
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _buildInfoChip('${_analyticsData['class']} • ${_analyticsData['section']}'),
+                        const SizedBox(width: 12),
+                        if ((_analyticsData['streak_days'] ?? 0) > 0)
+                          _buildInfoChip('🔥 ${_analyticsData['streak_days']} Days Streak'),
+
+                        // ✅ Add parent indicator chip
+                        if (isParent) ...[
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Iconsax.eye,
+                                  color: Colors.amber,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Parent View',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.amber.shade100,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+              const SizedBox(width: 24),
 
-          const SizedBox(width: 24),
-
-          // Student Photo Section
-          Column(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    width: 80,
-                    height: 80,
+              // Student Photo Section
+              Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+                        ),
+                        child: (_analyticsData['student_photo'] != null &&
+                            _analyticsData['student_photo'].toString().isNotEmpty)
+                            ? ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: Image.network(
+                            _analyticsData['student_photo'],
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Iconsax.user,
+                                color: Colors.white,
+                                size: 36,
+                              );
+                            },
+                          ),
+                        )
+                            : const Icon(
+                          Iconsax.user,
+                          color: Colors.white,
+                          size: 36,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withOpacity(0.3)),
                     ),
-                    child: (_analyticsData['student_photo'] != null &&
-                        _analyticsData['student_photo'].toString().isNotEmpty)
-                        ? ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: Image.network(
-                        _analyticsData['student_photo'],
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(
-                            Iconsax.user,
-                            color: Colors.white,
-                            size: 36,
-                          );
-                        },
+                    child: Text(
+                      isParent ? 'Student Photo' : 'My Photo',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
                       ),
-                    )
-                        : const Icon(
-                      Iconsax.user,
-                      color: Colors.white,
-                      size: 36,
                     ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.3)),
-                ),
-                child: Text(
-                  'Student Photo',
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
+              const SizedBox(width: 24),
+
+              // Controls
+              Column(
+                children: [
+                  _buildGlassSelector(),
+                  const SizedBox(height: 12),
+                  _buildGlassButton(Iconsax.refresh, _loadDashboardData),
+                ],
               ),
-            ],
-          ),
-
-          const SizedBox(width: 24),
-
-          // Controls
-          Column(
-            children: [
-              _buildGlassSelector(),
-              const SizedBox(height: 12),
-              _buildGlassButton(Iconsax.refresh, _loadDashboardData),
             ],
           ),
         ],
       ),
     );
   }
+
 
   Widget _buildInfoChip(String text) {
     return Container(

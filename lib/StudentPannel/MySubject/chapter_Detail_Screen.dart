@@ -80,6 +80,8 @@ class _ChapterDetailsScreenState extends State<ChapterDetailsScreen>
   void initState() {
     super.initState();
 
+
+
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/StudentPannel/MySubject/chapter_Detail_Screen.dart';
 import 'package:lms_publisher/StudentPannel/Service/student_subject_service.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/Util/beautiful_loader.dart';
 import 'package:lms_publisher/Util/custom_snackbar.dart';
 import 'package:lms_publisher/screens/main_layout.dart';
-
+import 'package:provider/provider.dart';
 
 class SubjectChaptersScreen extends StatefulWidget {
   final SubjectModel subject;
@@ -22,17 +23,21 @@ class SubjectChaptersScreen extends StatefulWidget {
   });
 
   @override
-  State<SubjectChaptersScreen> createState() => _SubjectChaptersScreenState();
+  State createState() => _SubjectChaptersScreenState();
 }
 
 class _SubjectChaptersScreenState extends State<SubjectChaptersScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   ChaptersResponse? _chaptersData;
+  late bool _isParent; // ✅ ADD THIS
 
   @override
   void initState() {
     super.initState();
+    // ✅ Initialize isParent once
+    _isParent = Provider.of<UserProvider>(context, listen: false).isParent;
+    print('👨‍👩‍👧 SubjectChaptersScreen - isParent: $_isParent');
     _loadChapters();
   }
 
@@ -53,8 +58,6 @@ class _SubjectChaptersScreenState extends State<SubjectChaptersScreen> {
           _chaptersData = response;
           _isLoading = false;
         });
-
-
       }
     } catch (e) {
       if (mounted) {
@@ -62,7 +65,6 @@ class _SubjectChaptersScreenState extends State<SubjectChaptersScreen> {
           _errorMessage = e.toString().replaceAll('Exception: ', '');
           _isLoading = false;
         });
-
         CustomSnackbar.showError(context, _errorMessage!, title: 'Error');
       }
     }
@@ -80,7 +82,6 @@ class _SubjectChaptersScreenState extends State<SubjectChaptersScreen> {
           children: [
             _buildHeader(),
             const SizedBox(height: 32),
-
             if (_isLoading)
               _buildLoadingState()
             else if (_errorMessage != null)
@@ -93,50 +94,136 @@ class _SubjectChaptersScreenState extends State<SubjectChaptersScreen> {
     );
   }
 
+  // ✅ UPDATED Header with Parent View Indicator
   Widget _buildHeader() {
-    return Row(
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final studentName = userProvider.selectedStudentName ?? 'Student';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Material(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          child: InkWell(
-            onTap: () => Navigator.pop(context),
-            borderRadius: BorderRadius.circular(14),
+        // ✅ Parent indicator badge
+        if (_isParent)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
             child: Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                border: Border.all(color: AppTheme.borderGrey.withOpacity(0.2)),
-                borderRadius: BorderRadius.circular(14),
+                color: Colors.amber.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.amber.withOpacity(0.3),
+                  width: 1.5,
+                ),
               ),
-              child: const Icon(Iconsax.arrow_left, size: 20),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Iconsax.shield_security,
+                    color: Colors.amber,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Viewing $studentName\'s Chapters',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.amber.shade700,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 20),
 
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.subject.displaySubjectName,
-                style: GoogleFonts.inter(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.darkText,
+        // Main header row
+        Row(
+          children: [
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                onTap: () => Navigator.pop(context),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppTheme.borderGrey.withOpacity(0.2)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Iconsax.arrow_left, size: 20),
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '${_chaptersData?.chapters.length ?? 0} Chapters Available',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: widget.subjectColor,
-                  fontWeight: FontWeight.w600,
-                ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.subject.displaySubjectName,
+                          style: GoogleFonts.inter(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                      ),
+                      // ✅ Parent badge on side
+                      if (_isParent)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: widget.subjectColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: widget.subjectColor.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Iconsax.eye,
+                                size: 12,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Parent View',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${_chaptersData?.chapters.length ?? 0} Chapters Available',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: widget.subjectColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
@@ -155,9 +242,11 @@ class _SubjectChaptersScreenState extends State<SubjectChaptersScreen> {
     );
   }
 
+  // ✅ UPDATED Chapter Card with Parent Styling
   Widget _buildChapterCard(ChapterModel chapter) {
     return InkWell(
       onTap: () {
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -165,8 +254,8 @@ class _SubjectChaptersScreenState extends State<SubjectChaptersScreen> {
               chapter: chapter,
               subjectColor: widget.subjectColor,
               subjectName: widget.subject.displaySubjectName,
-              // FIX: Pass the required subjectId
               subjectId: widget.subject.subjectId,
+              isParent: userProvider.isParent, // ✅ PASS isParent HERE
             ),
           ),
         );
@@ -177,10 +266,17 @@ class _SubjectChaptersScreenState extends State<SubjectChaptersScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: widget.subjectColor.withOpacity(0.2)),
+          border: Border.all(
+            color: _isParent
+                ? widget.subjectColor.withOpacity(0.3)
+                : widget.subjectColor.withOpacity(0.2),
+            width: _isParent ? 2 : 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: widget.subjectColor.withOpacity(0.08),
+              color: _isParent
+                  ? widget.subjectColor.withOpacity(0.15)
+                  : widget.subjectColor.withOpacity(0.08),
               blurRadius: 15,
               offset: const Offset(0, 6),
             ),
@@ -191,24 +287,53 @@ class _SubjectChaptersScreenState extends State<SubjectChaptersScreen> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: widget.subjectColor.withOpacity(0.12),
+                color: widget.subjectColor.withOpacity(_isParent ? 0.2 : 0.12),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(Iconsax.book_1, color: widget.subjectColor, size: 24),
+              child: Icon(
+                Iconsax.book_1,
+                color: widget.subjectColor,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 16),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    chapter.displayChapterName,
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.darkText,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          chapter.displayChapterName,
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                      ),
+                      // ✅ Parent monitoring badge
+                      if (_isParent)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Review',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -221,8 +346,11 @@ class _SubjectChaptersScreenState extends State<SubjectChaptersScreen> {
                 ],
               ),
             ),
-
-            Icon(Iconsax.arrow_right_3, color: widget.subjectColor, size: 20),
+            Icon(
+              Iconsax.arrow_right_3,
+              color: _isParent ? widget.subjectColor : widget.subjectColor,
+              size: 20,
+            ),
           ],
         ),
       ),

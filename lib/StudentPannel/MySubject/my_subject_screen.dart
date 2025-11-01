@@ -14,25 +14,32 @@ class MySubjectsScreen extends StatefulWidget {
   const MySubjectsScreen({super.key});
 
   @override
-  State<MySubjectsScreen> createState() => _MySubjectsScreenState();
+  State createState() => _MySubjectsScreenState();
 }
 
-class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerProviderStateMixin {
+class _MySubjectsScreenState extends State<MySubjectsScreen>
+    with SingleTickerProviderStateMixin {
   bool _isLoading = true;
   String? _errorMessage;
   List<SubjectModel> _subjects = [];
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+  late bool _isParent; // ✅ ADD THIS
 
   @override
   void initState() {
     super.initState();
+
+    // ✅ Initialize isParent once
+    _isParent = Provider.of<UserProvider>(context, listen: false).isParent;
+    print('👨‍👩‍👧 MySubjectsScreen - isParent: $_isParent');
 
     // Setup fade animation
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
+
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
       curve: Curves.easeInOut,
@@ -61,20 +68,15 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
         throw Exception('Student ID not found. Please login again.');
       }
 
-      final response = await StudentSubjectService.getStudentSubjects(studentId);
+      final response =
+      await StudentSubjectService.getStudentSubjects(studentId);
 
       if (mounted) {
         setState(() {
           _subjects = response.subjects;
           _isLoading = false;
         });
-
         _fadeController.forward();
-
-        // Show success snackbar
-        if (_subjects.isNotEmpty) {
-
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -83,7 +85,6 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
           _isLoading = false;
         });
 
-        // Show error snackbar
         CustomSnackbar.showError(
           context,
           _errorMessage!,
@@ -103,16 +104,10 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Page Header
             _buildPageHeader(),
-            // const SizedBox(height: 32),
-
-            // Stats Overview
             if (!_isLoading && _subjects.isNotEmpty) ...[
               const SizedBox(height: 32),
             ],
-
-            // Content
             if (_isLoading)
               _buildLoadingState()
             else if (_errorMessage != null)
@@ -127,62 +122,137 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
     );
   }
 
-  // ========== PAGE HEADER ==========
+  // ========== PAGE HEADER with Parent Indicator ==========
   Widget _buildPageHeader() {
     final userProvider = Provider.of<UserProvider>(context);
-    final firstName = userProvider.userName?.split(' ').first ?? 'Student';
+    final firstName =
+        userProvider.userName?.split(' ').first ?? 'Student';
+    final studentName = userProvider.selectedStudentName ?? firstName;
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // // Icon with gradient background
-        // Container(
-        //   padding: const EdgeInsets.all(18),
-        //   decoration: BoxDecoration(
-        //     gradient: const LinearGradient(
-        //       colors: [AppTheme.primaryGreen, AppTheme.accentGreen],
-        //       begin: Alignment.topLeft,
-        //       end: Alignment.bottomRight,
-        //     ),
-        //     borderRadius: BorderRadius.circular(18),
-        //     boxShadow: [
-        //       BoxShadow(
-        //         color: AppTheme.primaryGreen.withOpacity(0.4),
-        //         blurRadius: 16,
-        //         offset: const Offset(0, 6),
-        //       ),
-        //     ],
-        //   ),
-        //   child: const Icon(Iconsax.book_1, color: Colors.white, size: 32),
-        // ),
-        // const SizedBox(width: 24),
-
-        // Title and subtitle
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'My Subjects',
-                style: GoogleFonts.inter(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.darkText,
-                  letterSpacing: -0.5,
+        // ✅ Parent indicator badge
+        if (_isParent)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.amber.withOpacity(0.3),
+                  width: 1.5,
                 ),
               ),
-            ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Iconsax.shield_security,
+                    color: Colors.amber,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Monitoring $studentName\'s Learning',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.amber.shade700,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
 
-        // Action buttons
+        // Main header row
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Refresh button
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _isParent ? 'Subject Overview' : 'My Subjects',
+                          style: GoogleFonts.inter(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.darkText,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                      // ✅ Parent badge on side
+                      if (_isParent)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.blue.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Iconsax.eye,
+                                size: 12,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Parent View',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _isParent
+                        ? 'Review ${studentName}\'s course progress'
+                        : '${_subjects.length} subjects to explore',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: AppTheme.bodyText.withOpacity(0.7),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // ✅ Refresh button (enhanced for parent)
             _buildActionButton(
               icon: Iconsax.refresh,
               onTap: () {
                 _loadSubjects();
-                CustomSnackbar.showInfo(context, 'Refreshing subjects...');
+                CustomSnackbar.showInfo(
+                  context,
+                  _isParent
+                      ? 'Refreshing student progress...'
+                      : 'Refreshing subjects...',
+                );
               },
               tooltip: 'Refresh',
               isPrimary: true,
@@ -230,9 +300,6 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
     );
   }
 
-
-
-
   // ========== SUBJECTS GRID ==========
   Widget _buildSubjectsGrid() {
     return FadeTransition(
@@ -245,14 +312,17 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
             .entries
             .map((entry) => TweenAnimationBuilder<double>(
           duration: Duration(milliseconds: 400 + (entry.key * 100)),
-          tween: Tween(begin: 0.0, end: 1.0),
+          tween: Tween<double>(begin: 0.0, end: 1.0),
           curve: Curves.easeOutCubic,
           builder: (context, value, child) {
             return Transform.translate(
               offset: Offset(0, 20 * (1 - value)),
               child: Opacity(
                 opacity: value,
-                child: _SubjectCard(subject: entry.value),
+                child: _SubjectCard(
+                  subject: entry.value,
+                  isParent: _isParent,
+                ),
               ),
             );
           },
@@ -276,7 +346,9 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
           ),
           const SizedBox(height: 24),
           Text(
-            'Loading your subjects...',
+            _isParent
+                ? 'Loading student progress...'
+                : 'Loading your subjects...',
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -303,11 +375,9 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const SizedBox(height: 120),
-
-          // Animated error icon
           TweenAnimationBuilder<double>(
             duration: const Duration(milliseconds: 600),
-            tween: Tween(begin: 0.0, end: 1.0),
+            tween: Tween<double>(begin: 0.0, end: 1.0),
             curve: Curves.elasticOut,
             builder: (context, value, child) {
               return Transform.scale(
@@ -322,12 +392,15 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
                       width: 2,
                     ),
                   ),
-                  child: const Icon(Iconsax.danger, size: 72, color: Colors.red),
+                  child: const Icon(
+                    Iconsax.danger,
+                    size: 72,
+                    color: Colors.red,
+                  ),
                 ),
               );
             },
           ),
-
           const SizedBox(height: 28),
           Text(
             'Oops! Something Went Wrong',
@@ -351,8 +424,6 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
             ),
           ),
           const SizedBox(height: 32),
-
-          // Try again button
           ElevatedButton.icon(
             onPressed: _loadSubjects,
             icon: const Icon(Iconsax.refresh, size: 20),
@@ -366,7 +437,10 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryGreen,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 32,
+                vertical: 16,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -386,11 +460,9 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const SizedBox(height: 120),
-
-          // Animated empty icon
           TweenAnimationBuilder<double>(
             duration: const Duration(milliseconds: 800),
-            tween: Tween(begin: 0.0, end: 1.0),
+            tween: Tween<double>(begin: 0.0, end: 1.0),
             curve: Curves.easeOutCubic,
             builder: (context, value, child) {
               return Transform.scale(
@@ -417,7 +489,6 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
               );
             },
           ),
-
           const SizedBox(height: 28),
           Text(
             'No Subjects Found',
@@ -429,7 +500,9 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
           ),
           const SizedBox(height: 12),
           Text(
-            'You haven\'t been enrolled in any subjects yet.\nPlease contact your administrator.',
+            _isParent
+                ? 'No subjects available for this student yet.'
+                : 'You haven\'t been enrolled in any subjects yet.\nPlease contact your administrator.',
             style: GoogleFonts.inter(
               fontSize: 14,
               color: AppTheme.bodyText.withOpacity(0.7),
@@ -438,8 +511,6 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
-
-          // Refresh button
           OutlinedButton.icon(
             onPressed: _loadSubjects,
             icon: const Icon(Iconsax.refresh, size: 18),
@@ -452,8 +523,11 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppTheme.primaryGreen,
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-              side: BorderSide(color: AppTheme.primaryGreen.withOpacity(0.3)),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+              side: BorderSide(
+                color: AppTheme.primaryGreen.withOpacity(0.3),
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -468,13 +542,19 @@ class _MySubjectsScreenState extends State<MySubjectsScreen> with SingleTickerPr
 // ========== SUBJECT CARD WIDGET ==========
 class _SubjectCard extends StatefulWidget {
   final SubjectModel subject;
-  const _SubjectCard({required this.subject});
+  final bool isParent; // ✅ ADD THIS
+
+  const _SubjectCard({
+    required this.subject,
+    required this.isParent, // ✅ ADD THIS
+  });
 
   @override
   State<_SubjectCard> createState() => _SubjectCardState();
 }
 
-class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderStateMixin {
+class _SubjectCardState extends State<_SubjectCard>
+    with SingleTickerProviderStateMixin {
   bool _isHovered = false;
   late AnimationController _scaleController;
   late Animation<double> _scaleAnimation;
@@ -500,6 +580,7 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
       vsync: this,
       duration: const Duration(milliseconds: 200),
     );
+
     _scaleAnimation = Tween<double>(begin: 1.0, end: 1.03).animate(
       CurvedAnimation(parent: _scaleController, curve: Curves.easeOut),
     );
@@ -527,12 +608,11 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            SubjectChaptersScreen(
-              subject: widget.subject,
-              subjectColor: _subjectColor,
-              studentId: studentId,
-            ),
+        builder: (context) => SubjectChaptersScreen(
+          subject: widget.subject,
+          subjectColor: _subjectColor,
+          studentId: studentId,
+        ),
       ),
     );
   }
@@ -570,14 +650,14 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: _isHovered
-                  ? _subjectColor.withOpacity(0.5)
+                  ? _subjectColor.withOpacity(widget.isParent ? 0.5 : 0.4)
                   : AppTheme.borderGrey.withOpacity(0.12),
               width: _isHovered ? 2.5 : 1.5,
             ),
             boxShadow: [
               BoxShadow(
                 color: _isHovered
-                    ? _subjectColor.withOpacity(0.25)
+                    ? _subjectColor.withOpacity(widget.isParent ? 0.3 : 0.25)
                     : Colors.black.withOpacity(0.03),
                 blurRadius: _isHovered ? 32 : 12,
                 offset: Offset(0, _isHovered ? 16 : 8),
@@ -585,7 +665,7 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
               ),
               if (_isHovered)
                 BoxShadow(
-                  color: _subjectColor.withOpacity(0.1),
+                  color: _subjectColor.withOpacity(widget.isParent ? 0.15 : 0.1),
                   blurRadius: 60,
                   offset: const Offset(0, 24),
                   spreadRadius: -8,
@@ -614,6 +694,46 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
                     ),
                   ),
                 ),
+
+                // ✅ Parent monitoring overlay
+                if (widget.isParent)
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.blue.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Iconsax.eye,
+                            size: 12,
+                            color: Colors.blue,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Monitoring',
+                            style: GoogleFonts.inter(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                 // Main content
                 Padding(
                   padding: const EdgeInsets.all(28),
@@ -624,7 +744,8 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
                       const SizedBox(height: 24),
                       if (subject.currentChapterName != null)
                         _buildCurrentChapterSection(subject),
-                      const SizedBox(height: 24),
+                      if (subject.currentChapterName != null)
+                        const SizedBox(height: 24),
                       _buildProgressSection(subject),
                       const SizedBox(height: 18),
                       _buildStatsRow(subject),
@@ -646,10 +767,9 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
   Widget _buildCardHeader(SubjectModel subject) {
     return Row(
       children: [
-        // Enhanced animated icon with glassmorphism
         TweenAnimationBuilder<double>(
           duration: const Duration(milliseconds: 400),
-          tween: Tween(begin: 0.0, end: _isHovered ? 1.0 : 0.0),
+          tween: Tween<double>(begin: 0.0, end: _isHovered ? 1.0 : 0.0),
           builder: (context, value, child) {
             return Transform.rotate(
               angle: value * 0.1,
@@ -681,7 +801,7 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
                       ),
                     ],
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Iconsax.book_1,
                     color: Colors.white,
                     size: 28,
@@ -692,7 +812,6 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
           },
         ),
         const SizedBox(width: 18),
-        // Subject info
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -731,7 +850,8 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
                         subject.teacherNames!,
                         style: GoogleFonts.inter(
                           fontSize: 13,
-                          color: AppTheme.bodyText.withOpacity(0.75),
+                          color:
+                          AppTheme.bodyText.withOpacity(0.75),
                           fontWeight: FontWeight.w600,
                         ),
                         maxLines: 1,
@@ -791,7 +911,7 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'CONTINUE READING',
+                  widget.isParent ? 'CURRENT CHAPTER' : 'CONTINUE READING',
                   style: GoogleFonts.inter(
                     fontSize: 10,
                     color: _subjectColor.withOpacity(0.75),
@@ -824,7 +944,6 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
     );
   }
 
-
   Widget _buildProgressSection(SubjectModel subject) {
     return Column(
       children: [
@@ -832,7 +951,9 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Overall Progress',
+              widget.isParent
+                  ? 'Student Progress'
+                  : 'Overall Progress',
               style: GoogleFonts.inter(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -841,7 +962,8 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -868,7 +990,6 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
           ],
         ),
         const SizedBox(height: 14),
-        // Enhanced progress bar with gradient
         Stack(
           children: [
             Container(
@@ -908,7 +1029,6 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
     );
   }
 
-
   Widget _buildStatsRow(SubjectModel subject) {
     return Row(
       children: [
@@ -916,7 +1036,8 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
           child: _buildStatItem(
             icon: Iconsax.book_square,
             label: 'Chapters',
-            value: '${subject.completedChapters}/${subject.totalChapters}',
+            value:
+            '${subject.completedChapters}/${subject.totalChapters}',
             color: _subjectColor,
           ),
         ),
@@ -925,7 +1046,8 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
           child: _buildStatItem(
             icon: Iconsax.clock,
             label: 'Study Time',
-            value: '${subject.totalTimeSpentMinutes ~/ 60}h ${subject.totalTimeSpentMinutes % 60}m',
+            value:
+            '${subject.totalTimeSpentMinutes ~/ 60}h ${subject.totalTimeSpentMinutes % 60}m',
             color: _subjectColor,
           ),
         ),
@@ -992,7 +1114,6 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
     );
   }
 
-
   Widget _buildActionButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
@@ -1026,10 +1147,15 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Iconsax.play_circle, size: 22),
+              Icon(
+                widget.isParent
+                    ? Iconsax.eye
+                    : Iconsax.play_circle,
+                size: 22,
+              ),
               const SizedBox(width: 12),
               Text(
-                'Continue Learning',
+                widget.isParent ? 'Review Chapters' : 'Continue Learning',
                 style: GoogleFonts.inter(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -1065,7 +1191,9 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
               ),
               const SizedBox(width: 6),
               Text(
-                'Last studied ${subject.lastStudiedDisplay}',
+                widget.isParent
+                    ? 'Last studied ${subject.lastStudiedDisplay}'
+                    : 'Last studied ${subject.lastStudiedDisplay}',
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   color: AppTheme.bodyText.withOpacity(0.6),
@@ -1079,7 +1207,3 @@ class _SubjectCardState extends State<_SubjectCard> with SingleTickerProviderSta
     );
   }
 }
-
-
-
-

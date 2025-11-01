@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:lms_publisher/AdminScreen/AdminPublish/publisher_screen.dart';
+import 'package:lms_publisher/ParentPannel/select_child_screen.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/School_Panel/School_panel_dashboard.dart';
 import 'package:lms_publisher/School_Panel/student_module/student_manage.dart';
@@ -42,7 +43,7 @@ enum AppScreen {
   teacherClasses,    // ✅ ADD THIS
   teacherStudents,   // ✅ ADD THIS
   teacherAnalytics,  // ✅ ADD THIS
-  settings
+  settings, parentChildren
 }
 
 // ✅ State management for sidebar
@@ -861,6 +862,27 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                         ),
                       ],
 
+                      // ✅ UPDATED: Parent Module - M000 (Select Child)
+                      if (userProvider.hasMenuAccess('M000')) ...{
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.profile_2user,
+                          text: 'My Children',
+                          isActive: activeScreen == AppScreen.parentChildren,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.parentChildren) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SelectChildScreen(),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      },
+
+
 
                       const Spacer(),
 
@@ -1501,6 +1523,14 @@ class _MobileDrawer extends StatelessWidget {
                         title: 'My Classes',
                         isActive: activeScreen == AppScreen.teacherClasses,
                         onTap: () => _navigateTo(context, const TeacherDashboard()),
+                      ),
+
+                    if (userProvider.hasMenuAccess('M000'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.profile_2user,
+                        title: 'My Children',
+                        isActive: activeScreen == AppScreen.parentChildren,
+                        onTap: () => _navigateTo(context, const SelectChildScreen() ),
                       ),
 
 

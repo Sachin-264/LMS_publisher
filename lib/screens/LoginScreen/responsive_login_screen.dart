@@ -3,8 +3,10 @@ import 'dart:ui';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/Service/user_right_service.dart';
+import 'package:lms_publisher/Util/navigation_helper.dart';
 import 'package:lms_publisher/screens/HomePage/HomePage.dart';
 import 'package:lms_publisher/screens/LoginScreen/login_bloc.dart';
+import 'package:provider/provider.dart';
 import '../../Theme/apptheme.dart';
 import '../../Util/custom_snackbar.dart';
 import '../../Util/beautiful_loader.dart';
@@ -52,10 +54,8 @@ class _ResponsiveLoginScreenContent extends StatelessWidget {
             title: 'Login Successful',
           );
           Future.delayed(const Duration(milliseconds: 500), () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
-            );
+            final userProvider = Provider.of<UserProvider>(context, listen: false);
+            NavigationHelper.navigateToFirstScreen(context, userProvider);
           });
         } else if (state is LoginFailure) {
           OverlayLoader.hide();

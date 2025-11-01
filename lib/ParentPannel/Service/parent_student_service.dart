@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ParentStudentService {
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl = 'http://localhost/AquareLMS';
 
   /// Fetch all students/children for a parent using ParentID (UserCode)
   Future<List<StudentChild>> getStudentsByParentId({

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:lms_publisher/AdminScreen/AdminPublish/Publisher_bloc.dart';
+import 'package:lms_publisher/ParentPannel/select_child_screen.dart';
 import 'package:lms_publisher/Provider/ConnectivityProvider.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/School_Panel/student_module/student_bloc.dart';
@@ -14,6 +15,7 @@ import 'package:lms_publisher/Service/dashboard_service.dart' show DashboardApiS
 import 'package:lms_publisher/Service/publisher_api_service.dart';
 import 'package:lms_publisher/Service/user_right_service.dart';
 import 'package:lms_publisher/Service/navigation_service.dart';
+import 'package:lms_publisher/Teacher_Panel/teacher_dashboard.dart';
 import 'package:lms_publisher/screens/HomePage/HomePage.dart';
 import 'package:lms_publisher/screens/HomePage/dashboard_bloc.dart';
 import 'package:lms_publisher/screens/LoginScreen/login_bloc.dart';
@@ -37,11 +39,18 @@ import 'package:lms_publisher/screens/AcademicsScreen/academics_screen.dart';
 import 'package:lms_publisher/AdminScreen/AdminPublish/publisher_screen.dart';
 import 'package:lms_publisher/School_Panel/School_panel_dashboard.dart';
 import 'package:lms_publisher/School_Panel/subject_module/subject_module_screen.dart';
-// Class Module Imports
-import 'package:lms_publisher/School_Panel/class_module/class_manage_screen.dart'; // Import ClassManageScreen
-import 'package:lms_publisher/School_Panel/class_module/class_service.dart'; // Import ClassApiService
-import 'package:lms_publisher/School_Panel/class_module/class_bloc.dart'; // Import ClassBloc
 
+// ✅ Student Panel Imports
+import 'package:lms_publisher/StudentPannel/MySubject/my_subject_screen.dart';
+import 'package:lms_publisher/StudentPannel/Student_analytics/student_analytics_dashboard.dart';
+import 'package:lms_publisher/StudentPannel/MyFavourite/my_favourite_subject.dart';
+
+
+
+// Class Module Imports
+import 'package:lms_publisher/School_Panel/class_module/class_manage_screen.dart';
+import 'package:lms_publisher/School_Panel/class_module/class_service.dart';
+import 'package:lms_publisher/School_Panel/class_module/class_bloc.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -94,7 +103,7 @@ class MyApp extends StatelessWidget {
           RepositoryProvider(
             create: (context) => TeacherApiService(),
           ),
-          // ✅ ADDED: Class Service
+          // ✅ Class Service
           RepositoryProvider(
             create: (context) => ClassApiService(),
           ),
@@ -104,53 +113,53 @@ class MyApp extends StatelessWidget {
             // Login BLoC
             BlocProvider(
               create: (context) => LoginBloc(
-                userRightsService: context.read(),
-                userProvider: context.read(),
+                userRightsService: context.read<UserRightsService>(),
+                userProvider: context.read<UserProvider>(),
               ),
             ),
             // Dashboard BLoC
             BlocProvider(
               create: (context) => DashboardBloc(
-                dashboardApiService: context.read(),
+                dashboardApiService: context.read<DashboardApiService>(),
               ),
             ),
             // School Management BLoC
             BlocProvider(
               create: (context) => SchoolManageBloc(
-                schoolApiService: context.read(),
+                schoolApiService: context.read<SchoolApiService>(),
               ),
             ),
             // Add/Edit School BLoC
             BlocProvider(
               create: (context) => AddEditSchoolBloc(
-                schoolApiService: context.read(),
+                schoolApiService: context.read<SchoolApiService>(),
               ),
             ),
             // Publisher BLoC
             BlocProvider(
               create: (context) => PublisherBloc(
-                context.read(),
+                context.read<PublisherApiService>(),
               ),
             ),
             // Subject Module BLoC
             BlocProvider(
               create: (context) => SubjectModuleBloc(
-                context.read(),
+                context.read<SubjectModuleApiService>(),
               ),
             ),
             // Student BLoC
             BlocProvider(
               create: (context) => StudentBloc(
-                apiService: RepositoryProvider.of(context),
+                apiService: RepositoryProvider.of<StudentApiService>(context),
               ),
             ),
             // Teacher BLoC
             BlocProvider(
               create: (context) => TeacherBloc(
-                apiService: RepositoryProvider.of(context),
+                apiService: RepositoryProvider.of<TeacherApiService>(context),
               ),
             ),
-            // ✅ ADDED: Class BLoC (to resolve ProviderNotFoundException in ClassAllotmentDialog)
+            // ✅ Class BLoC
             BlocProvider(
               create: (context) => ClassBloc(
                 apiService: RepositoryProvider.of<ClassApiService>(context),
@@ -224,63 +233,77 @@ class MyApp extends StatelessWidget {
     );
   }
 
-  // ✅ NEW: Function to get the default homepage based on lowest sequence number
+  // ✅ UPDATED: Function to get the default homepage based on lowest sequence number
   Widget _getDefaultHomePage(UserProvider userProvider) {
-    // Get all visible menus
-    final visibleMenus = userProvider.getVisibleMenus();
+    // Get the menu with the lowest sequence number
+    final firstMenu = userProvider.getLowestSequenceMenu();
 
-    if (visibleMenus.isEmpty) {
+    if (firstMenu == null) {
       // Fallback to HomeScreen if no menus are available
+      print('⚠️ No menus found, falling back to HomeScreen');
       return const HomeScreen();
     }
 
-    // Sort menus by sequence number (sNo) and get the first one
-    visibleMenus.sort((a, b) {
-      final aNum = int.tryParse(a.sNo) ?? 999999;
-      final bNum = int.tryParse(b.sNo) ?? 999999;
-      return aNum.compareTo(bNum);
-    });
-
-    final firstMenu = visibleMenus.first;
+    print('✅ Default home page based on SNo: ${firstMenu.sNo}');
+    print('   MenuCode: ${firstMenu.menuCode}');
+    print('   MenuText: ${firstMenu.menuText}');
 
     // Route to the appropriate screen based on menuCode
-    return _getScreenByMenuCode(firstMenu.menuCode);
+    return _getScreenByMenuCode(firstMenu.menuCode, userProvider);
   }
 
-  // ✅ NEW: Helper function to map menuCode to Widget
-  Widget _getScreenByMenuCode(String menuCode) {
-    // Use dummy IDs for ClassManageScreen as it's the default behavior when navigating
-    const int dummySchoolRecNo = 1;
+  // ✅ UPDATED: Helper function to map menuCode to Widget
+  Widget _getScreenByMenuCode(String menuCode, UserProvider userProvider) {
+    // Get userCode for screens that need it
+    final userCode = userProvider.userCode ?? '';
+    final schoolRecNo = int.tryParse(userCode) ?? 1;
     const String defaultAcademicYear = '2025-26';
 
     switch (menuCode) {
-      case 'M001':
+      case 'M001': // Dashboard
         return const HomeScreen();
-      case 'M002':
+      case 'M002': // Schools
         return const SchoolsScreen();
-      case 'M007':
+      case 'M007': // Students
         return const StudentsScreen();
-      case 'M008':
+      case 'M008': // Teachers
         return const TeachersScreen();
-      case 'M003':
+      case 'M003': // Subscriptions
         return const SubscriptionsScreen();
-      case 'M004':
+      case 'M004': // Academics
         return const AcademicsScreen();
-      case 'M005':
+      case 'M005': // Publishers
         return const PublisherScreen();
-      case 'M009':
+      case 'M009': // School Panel Dashboard
         return const SchoolPanelDashboard();
-      case 'M010':
-        return const SubjectModuleScreen(
-          schoolRecNo: dummySchoolRecNo,
+      case 'M010': // Subject Module
+        return SubjectModuleScreen(
+          schoolRecNo: schoolRecNo,
           academicYear: defaultAcademicYear,
         );
-      case 'M012': // Assuming this is the code for Class Management
-        return const ClassManageScreen(
-          schoolRecNo: dummySchoolRecNo,
+      case 'M012': // Class Module
+        return ClassManageScreen(
+          schoolRecNo: schoolRecNo,
         );
+    // ✅ STUDENT PANEL ROUTES
+      case 'M011': // My Subjects
+        return const MySubjectsScreen();
+      case 'M013': // My Analytics
+        return const StudentAnalyticsDashboard();
+      case 'M014': // My Favourites
+        return const MyFavouritesScreen();
+    // ✅ TEACHER PANEL ROUTES
+      case 'M015': // Teacher Dashboard
+        return const TeacherDashboard();
+    // ✅ PARENT PANEL ROUTES
+      case 'M000': // Select Child (Parent)
+        return const SelectChildScreen();
+    // ✅ SETTINGS
+      case 'M006': // Settings
+        return const HomeScreen(); // Replace with actual Settings screen when available
       default:
       // Fallback to Dashboard if menuCode doesn't match
+        print('⚠️ Unknown menuCode: $menuCode, falling back to HomeScreen');
         return const HomeScreen();
     }
   }
