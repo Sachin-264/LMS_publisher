@@ -17,7 +17,7 @@ class SubscriptionApiService {
 
   SubscriptionApiService._internal();
 
-  final String _baseUrl = "https://aquare.co.in/mobileAPI/sachin/lms";
+  final String _baseUrl = "http://localhost/AquareLMS";
   final String _planUrl = "/AddSubPlan.php"; // URL for CUD operations
   final String _fetchUrl = "/GetSchool.php";
 

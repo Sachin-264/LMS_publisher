@@ -206,19 +206,19 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
       lastAccessedDisplay: favorite.lastAccessedDisplay,
     );
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ChapterDetailsScreen(
-          chapter: chapterModel,
-          subjectColor: _getSubjectColor(favorite.subjectId),
-          subjectName: favorite.subjectName,
-          subjectId: favorite.subjectId,
-        ),
-      ),
-    ).then((_) {
-      _loadFavorites();
-    });
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(
+    //     builder: (context) => ChapterDetailsScreen(
+    //       chapter: chapterModel,
+    //       subjectColor: _getSubjectColor(favorite.subjectId),
+    //       subjectName: favorite.subjectName,
+    //       subjectId: favorite.subjectId,
+    //     ),
+    //   ),
+    // ).then((_) {
+    //   _loadFavorites();
+    // });
   }
 
   Color _getSubjectColor(int subjectId) {

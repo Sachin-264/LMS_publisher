@@ -13,6 +13,7 @@ import 'package:lms_publisher/School_Panel/subject_module/subject_module_screen.
 import 'package:lms_publisher/StudentPannel/MyFavourite/my_favourite_subject.dart';
 import 'package:lms_publisher/StudentPannel/MySubject/my_subject_screen.dart';
 import 'package:lms_publisher/StudentPannel/Student_analytics/student_analytics_dashboard.dart';
+import 'package:lms_publisher/Teacher_Panel/MyClass/teacher_classes_screen.dart';
 import 'package:lms_publisher/Teacher_Panel/teacher_dashboard.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/screens/AcademicsScreen/academics_screen.dart';
@@ -854,7 +855,7 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => const  TeacherDashboard(),
+                                  builder: (_) => const TeacherClassesScreen(),
                                 ),
                               );
                             }
