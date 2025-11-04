@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 class TeacherPanelService {
   // Base URL for Teacher Panel API
-  static const String baseUrl = 'http://localhost/AquareLMS';
+  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
 
   /// Get Teacher Dashboard Summary
   static Future<Map<String, dynamic>> getDashboardSummary({

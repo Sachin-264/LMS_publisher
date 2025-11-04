@@ -28,7 +28,6 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
-  // Data from API
   Map<String, dynamic> _analyticsData = {};
   List<Map<String, dynamic>> _subjectsData = [];
   List<Map<String, dynamic>> _weeklyData = [];
@@ -153,12 +152,12 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
 
   Color _getSubjectColor(int subjectId) {
     final colors = [
-      const Color(0xFF6366F1),
-      const Color(0xFFEC4899),
-      const Color(0xFF10B981),
-      const Color(0xFFF59E0B),
-      const Color(0xFF8B5CF6),
-      const Color(0xFF06B6D4),
+      AppTheme.primaryGreen,
+      AppTheme.accentGreen,
+      AppTheme.mackColor,
+      AppTheme.cleoColor,
+      AppTheme.darkText.withOpacity(0.7),
+      AppTheme.bodyText,
     ];
     return colors[subjectId % colors.length];
   }
@@ -181,16 +180,7 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
     return MainLayout(
       activeScreen: AppScreen.analytics,
       child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFFF8FAFC),
-              const Color(0xFFE0E7FF).withOpacity(0.3),
-            ],
-          ),
-        ),
+        color: AppTheme.lightGrey,
         child: _isLoading
             ? _buildLoadingState()
             : _errorMessage != null
@@ -208,15 +198,14 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
           BeautifulLoader(
             type: LoaderType.pulse,
             size: 80,
-            color: const Color(0xFF6366F1),
+            color: AppTheme.primaryGreen,
           ),
           const SizedBox(height: 24),
           Text(
             'Loading your analytics...',
-            style: GoogleFonts.inter(
+            style: AppTheme.bodyText1.copyWith(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: AppTheme.bodyText,
             ),
           ),
         ],
@@ -240,17 +229,12 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
           const SizedBox(height: 28),
           Text(
             'Failed to Load Analytics',
-            style: GoogleFonts.inter(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.darkText,
-            ),
+            style: AppTheme.headline1.copyWith(fontSize: 22),
           ),
           const SizedBox(height: 12),
           Text(
             _errorMessage ?? 'Unknown error occurred',
-            style: GoogleFonts.inter(
-              fontSize: 14,
+            style: AppTheme.bodyText1.copyWith(
               color: AppTheme.bodyText.withOpacity(0.7),
             ),
             textAlign: TextAlign.center,
@@ -259,15 +243,135 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
           ElevatedButton.icon(
             onPressed: _loadDashboardData,
             icon: const Icon(Iconsax.refresh, size: 20),
-            label: Text('Try Again', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600)),
+            label: Text('Try Again', style: AppTheme.buttonText.copyWith(fontSize: 15)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6366F1),
+              backgroundColor: AppTheme.primaryGreen,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(borderRadius: AppTheme.defaultBorderRadius),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSchoolHeader() {
+    final String schoolName = _analyticsData['school_name'] ?? 'School Name';
+    final String? schoolLogo = _analyticsData['school_logo'];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.background.withOpacity(0.7),
+        borderRadius: AppTheme.defaultBorderRadius,
+        border: Border.all(color: AppTheme.background.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 600) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    _buildSchoolLogo(schoolLogo),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        schoolName,
+                        style: AppTheme.headline1.copyWith(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    _buildGlassSelector(),
+                    const SizedBox(width: 12),
+                    _buildGlassButton(Iconsax.refresh, _loadDashboardData),
+                  ],
+                ),
+              ],
+            );
+          }
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  _buildSchoolLogo(schoolLogo),
+                  const SizedBox(width: 16),
+                  Text(
+                    schoolName,
+                    style: AppTheme.headline1.copyWith(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  _buildGlassSelector(),
+                  const SizedBox(width: 12),
+                  _buildGlassButton(Iconsax.refresh, _loadDashboardData),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSchoolLogo(String? schoolLogo) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: (schoolLogo != null && schoolLogo.isNotEmpty)
+          ? Image.network(
+        schoolLogo,
+        width: 40,
+        height: 40,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _logoPlaceholder(Iconsax.building);
+        },
+      )
+          : _logoPlaceholder(Iconsax.building),
+    );
+  }
+
+  Widget _logoPlaceholder(IconData icon) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: AppTheme.borderGrey,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(
+        icon,
+        color: AppTheme.bodyText,
+        size: 24,
       ),
     );
   }
@@ -277,25 +381,41 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
       opacity: _fadeAnimation,
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppTheme.defaultPadding * 1.5),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _buildSchoolHeader(),
+            const SizedBox(height: 24),
+
             _buildPremiumHeader(),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             _buildMetricsRow(),
-            const SizedBox(height: 32),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 2, child: _buildChartsColumn()),
-                const SizedBox(width: 24),
-                Expanded(child: _buildStatsColumn()),
-              ],
+            const SizedBox(height: 24),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth < 700) {
+                  return Column(
+                    children: [
+                      _buildChartsColumn(),
+                      const SizedBox(height: 24),
+                      _buildStatsColumn(),
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 2, child: _buildChartsColumn()),
+                    const SizedBox(width: 24),
+                    Expanded(child: _buildStatsColumn()),
+                  ],
+                );
+              },
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             _buildSubjectsSection(),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             _buildActivityHeatmap(),
           ],
         ),
@@ -305,326 +425,282 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
 
   Widget _buildPremiumHeader() {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final isParent = userProvider.isParent;
-    final studentName = _analyticsData['student_name'] ?? 'Student';
-    final parentName = userProvider.userName ?? 'Parent'; // Parent's name
 
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(AppTheme.defaultPadding * 1.5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isParent
-              ? [
-            const Color(0xFF8B5CF6), // Purple for parent
-            const Color(0xFF6366F1),
-            const Color(0xFF06B6D4),
-          ]
-              : [
-            const Color(0xFF6366F1),
-            const Color(0xFF8B5CF6),
-            const Color(0xFF06B6D4),
-          ],
-        ),
+        gradient: AppTheme.primaryGradient,
         boxShadow: [
           BoxShadow(
-            color: isParent
-                ? const Color(0xFF8B5CF6).withOpacity(0.4)
-                : const Color(0xFF6366F1).withOpacity(0.4),
+            color: AppTheme.accentGreen.withOpacity(0.4),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          // ✅ PARENT BADGE (only show if parent mode)
-          if (isParent)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.25),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 750) {
+            return _buildHeaderMobileLayout(context, userProvider);
+          }
+          else {
+            return _buildHeaderDesktopLayout(context, userProvider);
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildHeaderDesktopLayout(BuildContext context, UserProvider userProvider) {
+    final isParent = userProvider.isParent;
+    final studentName = _analyticsData['student_name'] ?? 'Student';
+
+    return Column(
+      children: [
+        if (isParent)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: _buildParentBadgeRow(studentName),
+          ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildHeaderWelcomeInfo(context, userProvider),
+            ),
+            const SizedBox(width: 24),
+            _buildHeaderLogo(
+              imageUrl: _analyticsData['student_photo'],
+              icon: Iconsax.user,
+              label: isParent ? 'Student Photo' : 'My Photo',
+              size: 80,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderMobileLayout(BuildContext context, UserProvider userProvider) {
+    final isParent = userProvider.isParent;
+    final studentName = _analyticsData['student_name'] ?? 'Student';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (isParent)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _buildParentBadgeRow(studentName),
+          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeaderLogo(
+              imageUrl: _analyticsData['student_photo'],
+              icon: Iconsax.user,
+              label: isParent ? 'Student Photo' : 'My Photo',
+              size: 60,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildHeaderWelcomeInfo(context, userProvider, isMobile: true),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildParentBadgeRow(String studentName) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.25),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Iconsax.shield_security,
+                color: Colors.white,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Parent Panel',
+                style: AppTheme.buttonText.copyWith(
+                  fontSize: 12,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.amber.withOpacity(0.25),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.amber.withOpacity(0.4)),
+          ),
+          child: Text(
+            'Monitoring $studentName',
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.amber.shade100,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderWelcomeInfo(BuildContext context, UserProvider userProvider, {bool isMobile = false}) {
+    final isParent = userProvider.isParent;
+    final studentName = _analyticsData['student_name'] ?? 'Student';
+    final parentName = userProvider.userName ?? 'Parent';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (isParent) ...[
+          Text(
+            'Welcome $parentName!',
+            style: AppTheme.headline2.copyWith(
+              fontSize: isMobile ? 20 : 24,
+              letterSpacing: -0.5,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "Viewing $studentName's progress",
+            style: AppTheme.bodyText1.copyWith(
+                color: Colors.white.withOpacity(0.85),
+                fontSize: isMobile ? 13 : 14
+            ),
+          ),
+        ] else ...[
+          Text(
+            'Welcome back, ${studentName}!',
+            style: AppTheme.headline2.copyWith(
+              fontSize: isMobile ? 24 : 32,
+              letterSpacing: -1,
+              height: 1.1,
+            ),
+          ),
+        ],
+
+        const SizedBox(height: 12),
+
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            _buildInfoChip('${_analyticsData['class']} • ${_analyticsData['section']}'),
+            if ((_analyticsData['streak_days'] ?? 0) > 0)
+              _buildInfoChip('🔥 ${_analyticsData['streak_days']} Days Streak'),
+
+            if (isParent) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Iconsax.eye,
+                      color: Colors.amber,
+                      size: 16,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Iconsax.shield_security,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Parent Panel',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.25),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.amber.withOpacity(0.4)),
-                    ),
-                    child: Text(
-                      'Monitoring $studentName',
+                    const SizedBox(width: 6),
+                    Text(
+                      'Parent View',
                       style: GoogleFonts.inter(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: Colors.amber.shade100,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-
-          Row(
-            children: [
-              // School Logo Section
-              Column(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
-                        ),
-                        child: (_analyticsData['school_logo'] != null &&
-                            _analyticsData['school_logo'].toString().isNotEmpty)
-                            ? ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
-                          child: Image.network(
-                            _analyticsData['school_logo'],
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(
-                                Iconsax.building,
-                                color: Colors.white,
-                                size: 36,
-                              );
-                            },
-                          ),
-                        )
-                            : const Icon(
-                          Iconsax.building,
-                          color: Colors.white,
-                          size: 36,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withOpacity(0.3)),
-                    ),
-                    child: Text(
-                      'School Logo',
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 24),
-
-              // ✅ UPDATED: Student Info Section (showing parent context if applicable)
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _analyticsData['school_name'] ?? 'School Name',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withOpacity(0.9),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // ✅ Show different greeting based on parent/student
-                    if (isParent) ...[
-                      Text(
-                        'Welcome $parentName!',
-                        style: GoogleFonts.inter(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          letterSpacing: -0.5,
-                          height: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Viewing $studentName's progress",
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.85),
-                        ),
-                      ),
-                    ] else ...[
-                      Text(
-                        'Welcome back, ${studentName}!',
-                        style: GoogleFonts.inter(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: -1,
-                          height: 1.1,
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _buildInfoChip('${_analyticsData['class']} • ${_analyticsData['section']}'),
-                        const SizedBox(width: 12),
-                        if ((_analyticsData['streak_days'] ?? 0) > 0)
-                          _buildInfoChip('🔥 ${_analyticsData['streak_days']} Days Streak'),
-
-                        // ✅ Add parent indicator chip
-                        if (isParent) ...[
-                          const SizedBox(width: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.withOpacity(0.25),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.amber.withOpacity(0.4)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Iconsax.eye,
-                                  color: Colors.amber,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Parent View',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.amber.shade100,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: 24),
-
-              // Student Photo Section
-              Column(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
-                        ),
-                        child: (_analyticsData['student_photo'] != null &&
-                            _analyticsData['student_photo'].toString().isNotEmpty)
-                            ? ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
-                          child: Image.network(
-                            _analyticsData['student_photo'],
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(
-                                Iconsax.user,
-                                color: Colors.white,
-                                size: 36,
-                              );
-                            },
-                          ),
-                        )
-                            : const Icon(
-                          Iconsax.user,
-                          color: Colors.white,
-                          size: 36,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withOpacity(0.3)),
-                    ),
-                    child: Text(
-                      isParent ? 'Student Photo' : 'My Photo',
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 24),
-
-              // Controls
-              Column(
-                children: [
-                  _buildGlassSelector(),
-                  const SizedBox(height: 12),
-                  _buildGlassButton(Iconsax.refresh, _loadDashboardData),
-                ],
-              ),
             ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderLogo({
+    required String? imageUrl,
+    required IconData icon,
+    required String label,
+    required double size,
+  }) {
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+              ),
+              child: (imageUrl != null && imageUrl.isNotEmpty)
+                  ? ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
+                      icon,
+                      color: Colors.white,
+                      size: size * 0.45,
+                    );
+                  },
+                ),
+              )
+                  : Icon(
+                icon,
+                color: Colors.white,
+                size: size * 0.45,
+              ),
+            ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withOpacity(0.3)),
+          ),
+          child: Text(
+            label,
+            style: AppTheme.buttonText.copyWith(fontSize: 10),
+          ),
+        ),
+      ],
     );
   }
 
@@ -639,10 +715,9 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
       ),
       child: Text(
         text,
-        style: GoogleFonts.inter(
+        style: AppTheme.buttonText.copyWith(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
         ),
       ),
     );
@@ -656,20 +731,16 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
+            color: AppTheme.primaryGreen.withOpacity(0.1),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
+            border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _selectedTimeRange,
-              dropdownColor: const Color(0xFF6366F1),
-              icon: const Icon(Iconsax.arrow_down_1, color: Colors.white, size: 18),
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
+              dropdownColor: AppTheme.background,
+              icon: const Icon(Iconsax.arrow_down_1, color: AppTheme.darkText, size: 18),
+              style: AppTheme.bodyText1.copyWith(fontSize: 14, color: AppTheme.darkText),
               items: ['This Week', 'This Month', 'All Time']
                   .map((range) => DropdownMenuItem(value: range, child: Text(range)))
                   .toList(),
@@ -692,16 +763,16 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Material(
-          color: Colors.white.withOpacity(0.2),
+          color: AppTheme.primaryGreen.withOpacity(0.1),
           child: InkWell(
             onTap: onTap,
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.white.withOpacity(0.3)),
+                border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: Colors.white, size: 22),
+              child: Icon(icon, color: AppTheme.primaryGreen, size: 22), // ERROR FIXED: Removed 'const'
             ),
           ),
         ),
@@ -710,48 +781,76 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
   }
 
   Widget _buildMetricsRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildMetricCard(
-            icon: Iconsax.chart_21,
-            title: 'Overall Progress',
-            value: '${(_analyticsData['overall_progress'] ?? 0.0).toStringAsFixed(1)}%',
-            subtitle: '+${(_analyticsData['weekly_progress'] ?? 0.0).toStringAsFixed(1)}% this week',
-            colors: [const Color(0xFF6366F1), const Color(0xFF4F46E5)],
-          ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: _buildMetricCard(
-            icon: Iconsax.clock,
-            title: 'Study Time',
-            value: '${(_analyticsData['total_study_hours'] ?? 0.0).toStringAsFixed(0)}h',
-            subtitle: '+${(_analyticsData['weekly_study_hours'] ?? 0.0).toStringAsFixed(0)}h this week',
-            colors: [const Color(0xFFEC4899), const Color(0xFFDB2777)],
-          ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: _buildMetricCard(
-            icon: Iconsax.medal_star,
-            title: 'Average Score',
-            value: '${(_analyticsData['average_score'] ?? 0.0).toStringAsFixed(1)}%',
-            subtitle: 'Excellent performance!',
-            colors: [const Color(0xFF10B981), const Color(0xFF059669)],
-          ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: _buildMetricCard(
-            icon: Iconsax.book_1,
-            title: 'Chapters',
-            value: '${_analyticsData['completed_chapters']}/${_analyticsData['total_chapters']}',
-            subtitle: '${_analyticsData['subjects_enrolled']} subjects',
-            colors: [const Color(0xFFF59E0B), const Color(0xFFD97706)],
-          ),
-        ),
-      ],
+    final List<Map<String, dynamic>> metrics = [
+      {
+        'icon': Iconsax.chart_21,
+        'title': 'Overall Progress',
+        'value': '${(_analyticsData['overall_progress'] ?? 0.0).toStringAsFixed(1)}%',
+        'subtitle': '+${(_analyticsData['weekly_progress'] ?? 0.0).toStringAsFixed(1)}% this week',
+        'colors': [AppTheme.accentGreen, AppTheme.primaryGreen],
+      },
+      {
+        'icon': Iconsax.clock,
+        'title': 'Study Time',
+        'value': '${(_analyticsData['total_study_hours'] ?? 0.0).toStringAsFixed(0)}h',
+        'subtitle': '+${(_analyticsData['weekly_study_hours'] ?? 0.0).toStringAsFixed(0)}h this week',
+        'colors': [AppTheme.mackColor, AppTheme.mackBorder],
+      },
+      {
+        'icon': Iconsax.medal_star,
+        'title': 'Average Score',
+        'value': '${(_analyticsData['average_score'] ?? 0.0).toStringAsFixed(1)}%',
+        'subtitle': 'Excellent performance!',
+        'colors': [AppTheme.cleoColor, AppTheme.cleoBorder],
+      },
+      {
+        'icon': Iconsax.book_1,
+        'title': 'Chapters',
+        'value': '${_analyticsData['completed_chapters']}/${_analyticsData['total_chapters']}',
+        'subtitle': '${_analyticsData['subjects_enrolled']} subjects',
+        'colors': [AppTheme.bodyText.withOpacity(0.8), AppTheme.darkText],
+      },
+    ];
+
+    final List<Widget> metricCards = metrics.map((m) {
+      return _buildMetricCard(
+        icon: m['icon'],
+        title: m['title'],
+        value: m['value'],
+        subtitle: m['subtitle'],
+        colors: m['colors'],
+      );
+    }).toList();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 800) {
+          return GridView( // ERROR FIXED: Switched to GridView to use gridDelegate
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              mainAxisExtent: 180, // ERROR FIXED: mainAxisExtent correctly placed here
+            ),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: metricCards,
+          );
+        }
+        else {
+          return Row(
+            children: [
+              Expanded(child: metricCards[0]),
+              const SizedBox(width: 20),
+              Expanded(child: metricCards[1]),
+              const SizedBox(width: 20),
+              Expanded(child: metricCards[2]),
+              const SizedBox(width: 20),
+              Expanded(child: metricCards[3]),
+            ],
+          );
+        }
+      },
     );
   }
 
@@ -762,60 +861,67 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
     required String subtitle,
     required List<Color> colors,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: colors),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: colors[0].withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 180;
+
+        return Container(
+          padding: EdgeInsets.all(isMobile ? 16 : 24), // ERROR FIXED: Removed 'const'
+          decoration: BoxDecoration(
+            color: AppTheme.background.withOpacity(0.7),
+            borderRadius: AppTheme.defaultBorderRadius.copyWith(
+              bottomRight: const Radius.circular(24),
+              topLeft: const Radius.circular(24),
             ),
-            child: Icon(icon, color: Colors.white, size: 24),
+            border: Border.all(color: AppTheme.background.withOpacity(0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            value,
-            style: GoogleFonts.inter(
-              fontSize: 36,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: -1.5,
-              height: 1,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: EdgeInsets.all(isMobile ? 8 : 12),
+                decoration: BoxDecoration(
+                  color: colors[0],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: Colors.white, size: isMobile ? 18 : 24),
+              ),
+              SizedBox(height: isMobile ? 12 : 16),
+              Text(
+                value,
+                style: AppTheme.headline1.copyWith(
+                  fontSize: isMobile ? 28 : 36,
+                  letterSpacing: -1.5,
+                  height: 1,
+                  color: colors[0],
+                ),
+              ),
+              SizedBox(height: isMobile ? 4 : 8),
+              Text(
+                title,
+                style: AppTheme.labelText.copyWith(fontSize: isMobile ? 12 : 14),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: AppTheme.bodyText1.copyWith(
+                    fontSize: isMobile ? 10 : 12,
+                    fontWeight: FontWeight.w400
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.white.withOpacity(0.9),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: Colors.white.withOpacity(0.75),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -837,9 +943,12 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
+        color: AppTheme.background.withOpacity(0.7),
+        borderRadius: AppTheme.defaultBorderRadius.copyWith(
+          bottomRight: const Radius.circular(24),
+          topLeft: const Radius.circular(24),
+        ),
+        border: Border.all(color: AppTheme.background.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -853,10 +962,9 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
         children: [
           Text(
             title,
-            style: GoogleFonts.inter(
+            style: AppTheme.headline1.copyWith(
               fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.darkText,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 20),
@@ -871,7 +979,7 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
       return Center(
         child: Text(
           'No weekly data available',
-          style: GoogleFonts.inter(fontSize: 14, color: AppTheme.bodyText.withOpacity(0.6)),
+          style: AppTheme.bodyText1.copyWith(color: AppTheme.bodyText.withOpacity(0.6)),
         ),
       );
     }
@@ -880,17 +988,15 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
       plotAreaBorderWidth: 0,
       primaryXAxis: CategoryAxis(
         majorGridLines: const MajorGridLines(width: 0),
-        labelStyle: GoogleFonts.inter(fontSize: 12, color: AppTheme.bodyText.withOpacity(0.6)),
+        labelStyle: AppTheme.bodyText1.copyWith(fontSize: 12, color: AppTheme.bodyText.withOpacity(0.6)),
       ),
       primaryYAxis: NumericAxis(
         axisLine: const AxisLine(width: 0),
         majorTickLines: const MajorTickLines(size: 0),
-        labelStyle: GoogleFonts.inter(fontSize: 11, color: AppTheme.bodyText.withOpacity(0.6)),
+        labelStyle: AppTheme.bodyText1.copyWith(fontSize: 11, color: AppTheme.bodyText.withOpacity(0.6)),
         title: AxisTitle(
           text: 'Study Hours',
-          textStyle: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+          textStyle: AppTheme.labelText.copyWith(
             color: AppTheme.bodyText.withOpacity(0.7),
           ),
         ),
@@ -901,18 +1007,17 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
           xValueMapper: (data, _) => data['day'] as String,
           yValueMapper: (data, _) => data['hours'] as double,
           name: 'Study Hours',
-          gradient: const LinearGradient(
-            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+          gradient: AppTheme.primaryGradient,
+          borderRadius: AppTheme.defaultBorderRadius.copyWith(
+              bottomLeft: Radius.zero,
+              bottomRight: Radius.zero
           ),
-          borderRadius: BorderRadius.circular(8),
         ),
       ],
       legend: Legend(
         isVisible: true,
         position: LegendPosition.bottom,
-        textStyle: GoogleFonts.inter(fontSize: 12),
+        textStyle: AppTheme.bodyText1.copyWith(fontSize: 12),
       ),
       tooltipBehavior: TooltipBehavior(enable: true),
     );
@@ -940,7 +1045,7 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
                 radiusFactor: 0.8,
                 axisLineStyle: gauges.AxisLineStyle(
                   thickness: 0.2,
-                  color: Colors.grey.shade200,
+                  color: AppTheme.borderGrey.withOpacity(0.5),
                   thicknessUnit: gauges.GaugeSizeUnit.factor,
                 ),
                 pointers: <gauges.GaugePointer>[
@@ -949,7 +1054,7 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
                     width: 0.2,
                     sizeUnit: gauges.GaugeSizeUnit.factor,
                     gradient: const SweepGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFFEC4899), Color(0xFF8B5CF6)],
+                      colors: [AppTheme.cleoColor, AppTheme.accentGreen, AppTheme.primaryGreen],
                     ),
                     cornerStyle: gauges.CornerStyle.bothCurve,
                   ),
@@ -961,19 +1066,18 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
                       children: [
                         Text(
                           '${progress.toStringAsFixed(0)}%',
-                          style: GoogleFonts.inter(
+                          style: AppTheme.headline1.copyWith(
                             fontSize: 48,
                             fontWeight: FontWeight.w900,
                             foreground: Paint()
                               ..shader = const LinearGradient(
-                                colors: [Color(0xFF6366F1), Color(0xFFEC4899)],
+                                colors: [AppTheme.primaryGreen, AppTheme.mackColor],
                               ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
                           ),
                         ),
                         Text(
                           'Complete',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
+                          style: AppTheme.bodyText1.copyWith(
                             color: AppTheme.bodyText.withOpacity(0.6),
                             fontWeight: FontWeight.w600,
                           ),
@@ -992,9 +1096,9 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildProgressStat('Completed', '$completed', const Color(0xFF10B981)),
+            _buildProgressStat('Completed', '$completed', AppTheme.accentGreen),
             const SizedBox(width: 40),
-            _buildProgressStat('Remaining', '${total - completed}', const Color(0xFF6366F1)),
+            _buildProgressStat('Remaining', '${total - completed}', AppTheme.mackColor),
           ],
         ),
       ],
@@ -1006,15 +1110,14 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
       children: [
         Text(
           value,
-          style: GoogleFonts.inter(
+          style: AppTheme.headline1.copyWith(
             fontSize: 24,
-            fontWeight: FontWeight.w800,
             color: color,
           ),
         ),
         Text(
           label,
-          style: GoogleFonts.inter(
+          style: AppTheme.bodyText1.copyWith(
             fontSize: 12,
             color: AppTheme.bodyText.withOpacity(0.6),
           ),
@@ -1031,11 +1134,7 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
       children: [
         Text(
           'Subject Performance',
-          style: GoogleFonts.inter(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: AppTheme.darkText,
-          ),
+          style: AppTheme.headline1.copyWith(fontSize: 24),
         ),
         const SizedBox(height: 20),
         Wrap(
@@ -1054,9 +1153,12 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
       width: 320,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
+        color: AppTheme.background.withOpacity(0.7),
+        borderRadius: AppTheme.defaultBorderRadius.copyWith(
+          topLeft: const Radius.circular(20),
+          bottomRight: const Radius.circular(20),
+        ),
+        border: Border.all(color: AppTheme.background.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
             color: subject['color'].withOpacity(0.1),
@@ -1087,17 +1189,13 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
                   children: [
                     Text(
                       subject['name'],
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.darkText,
-                      ),
+                      style: AppTheme.labelText.copyWith(fontSize: 16),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       '${subject['completed']} / ${subject['total']} chapters',
-                      style: GoogleFonts.inter(
+                      style: AppTheme.bodyText1.copyWith(
                         fontSize: 12,
                         color: AppTheme.bodyText.withOpacity(0.6),
                       ),
@@ -1113,10 +1211,9 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
                 ),
                 child: Text(
                   '${subject['score'].toStringAsFixed(0)}%',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: subject['color'],
+                  style: AppTheme.labelText.copyWith(
+                      color: subject['color'],
+                      fontSize: 14
                   ),
                 ),
               ),
@@ -1189,7 +1286,7 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
                 child: Text(
                   day,
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
+                  style: AppTheme.bodyText1.copyWith(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.bodyText.withOpacity(0.5),
@@ -1212,7 +1309,7 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
                   width: 40,
                   child: Text(
                     'W${weekIndex + 1}',
-                    style: GoogleFonts.inter(
+                    style: AppTheme.bodyText1.copyWith(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: AppTheme.bodyText.withOpacity(0.5),
@@ -1231,7 +1328,7 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
                         borderRadius: BorderRadius.circular(8),
                         boxShadow: intensity > 0.5 ? [
                           BoxShadow(
-                            color: const Color(0xFF6366F1).withOpacity(0.3),
+                            color: AppTheme.primaryGreen.withOpacity(0.3),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -1240,9 +1337,8 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
                       child: Center(
                         child: Text(
                           day['day'].toString(),
-                          style: GoogleFonts.inter(
+                          style: AppTheme.labelText.copyWith(
                             fontSize: 11,
-                            fontWeight: FontWeight.w600,
                             color: intensity > 0.5
                                 ? Colors.white
                                 : AppTheme.darkText.withOpacity(0.6),
@@ -1261,18 +1357,18 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
   }
 
   Color _getHeatmapColor(double intensity) {
-    if (intensity == 0) return Colors.grey.shade100;
-    if (intensity < 0.25) return const Color(0xFF6366F1).withOpacity(0.2);
-    if (intensity < 0.5) return const Color(0xFF6366F1).withOpacity(0.4);
-    if (intensity < 0.75) return const Color(0xFF6366F1).withOpacity(0.7);
-    return const Color(0xFF6366F1);
+    if (intensity == 0) return AppTheme.borderGrey.withOpacity(0.4);
+    if (intensity < 0.25) return AppTheme.primaryGreen.withOpacity(0.2);
+    if (intensity < 0.5) return AppTheme.primaryGreen.withOpacity(0.4);
+    if (intensity < 0.75) return AppTheme.primaryGreen.withOpacity(0.7);
+    return AppTheme.primaryGreen;
   }
 
   Widget _buildHeatmapLegend() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text('Less', style: GoogleFonts.inter(fontSize: 11, color: AppTheme.bodyText.withOpacity(0.5))),
+        Text('Less', style: AppTheme.bodyText1.copyWith(fontSize: 11, color: AppTheme.bodyText.withOpacity(0.5))),
         const SizedBox(width: 8),
         ...List.generate(5, (index) {
           return Container(
@@ -1286,7 +1382,7 @@ class _StudentAnalyticsDashboardState extends State<StudentAnalyticsDashboard>
           );
         }),
         const SizedBox(width: 8),
-        Text('More', style: GoogleFonts.inter(fontSize: 11, color: AppTheme.bodyText.withOpacity(0.5))),
+        Text('More', style: AppTheme.bodyText1.copyWith(fontSize: 11, color: AppTheme.bodyText.withOpacity(0.5))),
       ],
     );
   }

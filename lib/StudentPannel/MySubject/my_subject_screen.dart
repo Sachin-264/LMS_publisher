@@ -24,29 +24,24 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
   bool _isLoading = true;
   String? _errorMessage;
   List<SubjectModel> _subjects = [];
-  ClassInfo? _classInfo;  // CHANGED from: Map<String, dynamic>? _classInfo;
-
+  ClassInfo? _classInfo;
   late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;  // CHANGED from: late Animation _fadeAnimation;
+  late Animation<double> _fadeAnimation;
   late bool _isParent;
-
 
   @override
   void initState() {
     super.initState();
     _isParent = Provider.of<UserProvider>(context, listen: false).isParent;
-    print('👨👩👧 MySubjectsScreen - isParent: $_isParent');
-
+    print('👨‍👩‍👧 MySubjectsScreen - isParent: $_isParent');
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
       curve: Curves.easeInOut,
     );
-
     _loadSubjects();
   }
 
@@ -106,14 +101,15 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildPageHeader(),
-            if (!_isLoading && _classInfo != null) ...{
-              const SizedBox(height: 24),
+            if (!_isLoading && _classInfo != null) ...[
               _buildClassInfoSection(),
-            },
-            if (!_isLoading && _subjects.isNotEmpty) ...{
+              const SizedBox(height: 24),
+              _buildPageHeader(),
+            ] else
+              _buildPageHeader(),
+            if (!_isLoading && _subjects.isNotEmpty) ...[
               const SizedBox(height: 32),
-            },
+            ],
             if (_isLoading)
               _buildLoadingState()
             else if (_errorMessage != null)
@@ -262,7 +258,7 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
     );
   }
 
-  // ========== CLASS INFO SECTION (NEW) ==========
+// ========== RESPONSIVE CLASS INFO HEADER ==========
   Widget _buildClassInfoSection() {
     if (_classInfo == null) return const SizedBox.shrink();
 
@@ -277,120 +273,592 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
     final teacherPhoto = _classInfo!.classTeacherPhoto;
     final teacherExperience = _classInfo!.classTeacherExperienceYears;
 
+    final isWeb = MediaQuery.of(context).size.width > 900;
+
+    // Responsive values
+    final iconSize = isWeb ? 26.0 : 20.0;
+    final classNameFontSize = isWeb ? 26.0 : 18.0;
+    final teacherNameFontSize = isWeb ? 16.0 : 14.0;
+    final padding = isWeb ? 28.0 : 20.0;
+    final spacing = isWeb ? 18.0 : 14.0;
+    final photoSize = isWeb ? 65.0 : 50.0;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
             AppTheme.primaryGreen.withOpacity(0.08),
-            AppTheme.primaryGreen.withOpacity(0.04),
+            AppTheme.primaryGreen.withOpacity(0.03),
           ],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: AppTheme.primaryGreen.withOpacity(0.2),
+          color: AppTheme.primaryGreen.withOpacity(0.15),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryGreen.withOpacity(0.1),
+            color: AppTheme.primaryGreen.withOpacity(0.08),
             blurRadius: 16,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Class Header
+          // Top row - Class name and code
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Icon
+              Container(
+                padding: EdgeInsets.all(isWeb ? 12 : 10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.primaryGreen,
+                      AppTheme.primaryGreen.withOpacity(0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryGreen.withOpacity(0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Iconsax.building_3,
+                  color: Colors.white,
+                  size: iconSize,
+                ),
+              ),
+              SizedBox(width: spacing),
+              // Class name and code
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                AppTheme.primaryGreen,
-                                AppTheme.primaryGreen.withOpacity(0.75),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primaryGreen.withOpacity(0.3),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Iconsax.building_3,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              className,
-                              style: GoogleFonts.inter(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.darkText,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Section $sectionName • $academicYear',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: AppTheme.bodyText.withOpacity(0.7),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                    Text(
+                      className,
+                      style: GoogleFonts.inter(
+                        fontSize: classNameFontSize,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.darkText,
+                        letterSpacing: -0.3,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Code: $classCode',
+                      style: GoogleFonts.inter(
+                        fontSize: isWeb ? 12.0 : 11.0,
+                        color: AppTheme.bodyText.withOpacity(0.6),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
               ),
+              // Badges
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isWeb ? 14 : 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryGreen.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppTheme.primaryGreen.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: AppTheme.primaryGreen.withOpacity(0.3),
+                    color: AppTheme.primaryGreen.withOpacity(0.2),
+                    width: 1,
                   ),
                 ),
                 child: Text(
-                  classCode,
+                  'Sec $sectionName',
                   style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    fontSize: isWeb ? 12.0 : 11.0,
                     color: AppTheme.primaryGreen,
-                    letterSpacing: 1,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isWeb ? 14 : 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.blue.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  academicYear,
+                  style: GoogleFonts.inter(
+                    fontSize: isWeb ? 12.0 : 11.0,
+                    color: Colors.blue.shade600,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          // Class Teacher Info
-          _buildClassTeacherCard(
+          SizedBox(height: isWeb ? 16 : 14),
+          // Teacher info row
+          Row(
+            children: [
+              // Teacher photo
+              Container(
+                width: photoSize,
+                height: photoSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppTheme.primaryGreen.withOpacity(0.25),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryGreen.withOpacity(0.15),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                  image: teacherPhoto != null
+                      ? DecorationImage(
+                    image: NetworkImage('$_imageBaseUrl$teacherPhoto'),
+                    fit: BoxFit.cover,
+                  )
+                      : null,
+                ),
+                child: teacherPhoto == null
+                    ? Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.primaryGreen,
+                        AppTheme.primaryGreen.withOpacity(0.7),
+                      ],
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Iconsax.teacher,
+                      color: Colors.white,
+                      size: isWeb ? 28 : 22,
+                    ),
+                  ),
+                )
+                    : null,
+              ),
+              SizedBox(width: spacing),
+              // Teacher details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      teacherName,
+                      style: GoogleFonts.inter(
+                        fontSize: teacherNameFontSize,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.darkText,
+                        letterSpacing: -0.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            teacherDesignation,
+                            style: GoogleFonts.inter(
+                              fontSize: isWeb ? 12.0 : 11.0,
+                              color: AppTheme.primaryGreen,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (teacherExperience > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: Colors.amber.withOpacity(0.2),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Text(
+                              '$teacherExperience y',
+                              style: GoogleFonts.inter(
+                                fontSize: isWeb ? 10.0 : 9.0,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.amber.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Info button
+              GestureDetector(
+                onTap: () => _showClassTeacherDetailsModal(
+                  teacherName: teacherName,
+                  teacherMobile: teacherMobile,
+                  teacherEmail: teacherEmail,
+                  teacherDesignation: teacherDesignation,
+                  teacherPhoto: teacherPhoto,
+                  teacherExperience: teacherExperience,
+                ),
+                child: Container(
+                  padding: EdgeInsets.all(isWeb ? 10 : 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppTheme.primaryGreen.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(
+                    Iconsax.info_circle,
+                    color: AppTheme.primaryGreen,
+                    size: isWeb ? 20.0 : 18.0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+
+// ========== PREMIUM WEB HEADER (Inspired by Analytics Dashboard) ==========
+  Widget _buildWebClassHeader({
+    required String className,
+    required String classCode,
+    required String sectionName,
+    required String academicYear,
+    required String teacherName,
+    required String teacherMobile,
+    required String teacherEmail,
+    required String teacherDesignation,
+    required String? teacherPhoto,
+    required int teacherExperience,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.95),
+            Colors.white.withOpacity(0.85),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.5),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6366F1).withOpacity(0.15),
+            blurRadius: 32,
+            offset: const Offset(0, 12),
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: const Color(0xFF6366F1).withOpacity(0.06),
+            blurRadius: 60,
+            offset: const Offset(0, 24),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // LEFT: Icon + Class Info
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF6366F1),
+                  const Color(0xFF8B5CF6),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6366F1).withOpacity(0.4),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                  spreadRadius: 2,
+                ),
+              ],
+              border: Border.all(
+                color: Colors.white.withOpacity(0.3),
+                width: 1.5,
+              ),
+            ),
+            child: const Icon(
+              Iconsax.building_3,
+              color: Colors.white,
+              size: 32,
+            ),
+          ),
+          const SizedBox(width: 28),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  className,
+                  style: GoogleFonts.inter(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF0F172A),
+                    letterSpacing: -0.8,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  spacing: 12,
+                  children: [
+                    // Class Code
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.purple.withOpacity(0.15),
+                            Colors.purple.withOpacity(0.08),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.purple.withOpacity(0.3),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.purple.withOpacity(0.1),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Iconsax.code,
+                            size: 16,
+                            color: Colors.purple.shade600,
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Code',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  color: Colors.purple.withOpacity(0.7),
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                              Text(
+                                classCode,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.purple.shade600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Section
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppTheme.primaryGreen.withOpacity(0.15),
+                            AppTheme.primaryGreen.withOpacity(0.08),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.primaryGreen.withOpacity(0.3),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryGreen.withOpacity(0.1),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Iconsax.box,
+                            size: 16,
+                            color: AppTheme.primaryGreen,
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Section',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  color: AppTheme.primaryGreen.withOpacity(0.7),
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                              Text(
+                                sectionName,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.primaryGreen,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Year
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.blue.withOpacity(0.15),
+                            Colors.blue.withOpacity(0.08),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.blue.withOpacity(0.3),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.withOpacity(0.1),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Iconsax.calendar_1,
+                            size: 16,
+                            color: Colors.blue.shade600,
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Year',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  color: Colors.blue.withOpacity(0.7),
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                              Text(
+                                academicYear,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.blue.shade600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 32),
+          // RIGHT: Teacher Info Card
+          _buildWebTeacherCard(
             teacherName: teacherName,
             teacherMobile: teacherMobile,
             teacherEmail: teacherEmail,
@@ -403,8 +871,8 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
     );
   }
 
-  // Class Teacher Card
-  Widget _buildClassTeacherCard({
+// ========== WEB TEACHER CARD ==========
+  Widget _buildWebTeacherCard({
     required String teacherName,
     required String teacherMobile,
     required String teacherEmail,
@@ -413,26 +881,50 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
     required int teacherExperience,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.5),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFFEC4899).withOpacity(0.1),
+            const Color(0xFFF59E0B).withOpacity(0.08),
+          ],
+        ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppTheme.borderGrey.withOpacity(0.1),
+          color: const Color(0xFFEC4899).withOpacity(0.2),
+          width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFEC4899).withOpacity(0.1),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Teacher Photo
+          // Teacher photo
           Container(
-            width: 70,
-            height: 70,
+            width: 90,
+            height: 90,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: AppTheme.primaryGreen.withOpacity(0.3),
-                width: 2,
+                color: const Color(0xFFEC4899).withOpacity(0.3),
+                width: 2.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFEC4899).withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
               image: teacherPhoto != null
                   ? DecorationImage(
                 image: NetworkImage('$_imageBaseUrl$teacherPhoto'),
@@ -446,8 +938,8 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   colors: [
-                    AppTheme.primaryGreen,
-                    AppTheme.primaryGreen.withOpacity(0.7),
+                    const Color(0xFFEC4899),
+                    const Color(0xFFF59E0B),
                   ],
                 ),
               ),
@@ -455,77 +947,102 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
                 child: Icon(
                   Iconsax.teacher,
                   color: Colors.white,
-                  size: 32,
+                  size: 40,
                 ),
               ),
             )
                 : null,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Class Teacher',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: AppTheme.bodyText.withOpacity(0.6),
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  teacherName,
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.darkText,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        teacherDesignation,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: AppTheme.primaryGreen,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (teacherExperience > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '$teacherExperience y exp',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.amber.shade700,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
+          const SizedBox(height: 14),
+          // Teacher name
+          Text(
+            teacherName,
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF0F172A),
+              letterSpacing: -0.2,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          // Designation
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEC4899).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: const Color(0xFFEC4899).withOpacity(0.25),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              teacherDesignation,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFFEC4899),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(height: 10),
+          // Contact info
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Iconsax.call,
+                size: 13,
+                color: Colors.blue.withOpacity(0.6),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                teacherMobile.isNotEmpty ? teacherMobile : 'N/A',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF0F172A).withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+          if (teacherExperience > 0) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.amber.withOpacity(0.2),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Iconsax.award,
+                    size: 12,
+                    color: Colors.amber.shade700,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    '$teacherExperience years exp',
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.amber.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          // Info button
           GestureDetector(
             onTap: () => _showClassTeacherDetailsModal(
               teacherName: teacherName,
@@ -536,18 +1053,38 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
               teacherExperience: teacherExperience,
             ),
             child: Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: AppTheme.primaryGreen.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFEC4899).withOpacity(0.2),
+                    const Color(0xFFEC4899).withOpacity(0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: AppTheme.primaryGreen.withOpacity(0.3),
+                  color: const Color(0xFFEC4899).withOpacity(0.3),
+                  width: 1.5,
                 ),
               ),
-              child: Icon(
-                Iconsax.info_circle,
-                color: AppTheme.primaryGreen,
-                size: 20,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Iconsax.info_circle,
+                    size: 14,
+                    color: const Color(0xFFEC4899),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'View',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFEC4899),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -556,7 +1093,525 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
     );
   }
 
-  // Class Teacher Details Modal (NEW)
+
+// ========== WEB VERSION - EXPANDED LAYOUT ==========
+  Widget _buildWebClassInfoSection({
+    required String className,
+    required String classCode,
+    required String sectionName,
+    required String academicYear,
+    required String teacherName,
+    required String teacherMobile,
+    required String teacherEmail,
+    required String teacherDesignation,
+    required String? teacherPhoto,
+    required int teacherExperience,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primaryGreen.withOpacity(0.09),
+            AppTheme.primaryGreen.withOpacity(0.03),
+            Colors.blue.withOpacity(0.02),
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: AppTheme.primaryGreen.withOpacity(0.18),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryGreen.withOpacity(0.1),
+            blurRadius: 32,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top section with class info
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Icon with glow effect
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppTheme.primaryGreen,
+                      AppTheme.primaryGreen.withOpacity(0.75),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryGreen.withOpacity(0.4),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                      spreadRadius: 2,
+                    ),
+                  ],
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.25),
+                    width: 1.5,
+                  ),
+                ),
+                child: const Icon(
+                  Iconsax.building_3,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 28),
+              // Class details section
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Class name
+                    Text(
+                      className,
+                      style: GoogleFonts.inter(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.darkText,
+                        letterSpacing: -0.5,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Info chips
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 12,
+                      children: [
+                        _buildWebBadge(
+                          icon: Iconsax.code,
+                          label: 'Class Code',
+                          value: classCode,
+                          color: Colors.purple,
+                        ),
+                        _buildWebBadge(
+                          icon: Iconsax.box,
+                          label: 'Section',
+                          value: sectionName,
+                          color: AppTheme.primaryGreen,
+                        ),
+                        _buildWebBadge(
+                          icon: Iconsax.calendar_1,
+                          label: 'Year',
+                          value: academicYear,
+                          color: Colors.blue,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 32),
+              // Quick stats on the right
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Class Information',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: AppTheme.bodyText.withOpacity(0.6),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppTheme.borderGrey.withOpacity(0.12),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'Status',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: AppTheme.bodyText.withOpacity(0.55),
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.green.shade400,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.green.withOpacity(0.4),
+                                      blurRadius: 8,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Active',
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.green.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          // Divider
+          Container(
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppTheme.primaryGreen.withOpacity(0.15),
+                  AppTheme.primaryGreen.withOpacity(0.0),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+          // Teacher section on web
+          Text(
+            'Class Teacher',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.bodyText.withOpacity(0.7),
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              // Large teacher photo
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppTheme.primaryGreen.withOpacity(0.3),
+                    width: 2.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryGreen.withOpacity(0.25),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                  image: teacherPhoto != null
+                      ? DecorationImage(
+                    image: NetworkImage('$_imageBaseUrl$teacherPhoto'),
+                    fit: BoxFit.cover,
+                  )
+                      : null,
+                ),
+                child: teacherPhoto == null
+                    ? Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.primaryGreen,
+                        AppTheme.primaryGreen.withOpacity(0.7),
+                      ],
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Iconsax.teacher,
+                      color: Colors.white,
+                      size: 44,
+                    ),
+                  ),
+                )
+                    : null,
+              ),
+              const SizedBox(width: 32),
+              // Teacher details cards
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            teacherName,
+                            style: GoogleFonts.inter(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.darkText,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: AppTheme.primaryGreen.withOpacity(0.25),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Text(
+                              teacherDesignation,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: AppTheme.primaryGreen,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 32),
+                    // Teacher contact cards
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _buildWebTeacherContactCard(
+                            icon: Iconsax.call,
+                            label: 'Phone',
+                            value: teacherMobile.isNotEmpty
+                                ? teacherMobile
+                                : 'N/A',
+                            color: Colors.blue,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildWebTeacherContactCard(
+                            icon: Iconsax.sms,
+                            label: 'Email',
+                            value: teacherEmail.isNotEmpty
+                                ? teacherEmail
+                                : 'N/A',
+                            color: Colors.orange,
+                          ),
+                          if (teacherExperience > 0) ...[
+                            const SizedBox(height: 12),
+                            _buildWebTeacherContactCard(
+                              icon: Iconsax.award,
+                              label: 'Experience',
+                              value: '$teacherExperience years',
+                              color: Colors.amber,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+// ========== WEB BADGE HELPER ==========
+  Widget _buildWebBadge({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withOpacity(0.15),
+            color.withOpacity(0.06),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  color: color.withOpacity(0.7),
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+// ========== WEB TEACHER CONTACT CARD ==========
+  Widget _buildWebTeacherContactCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withOpacity(0.1),
+            color.withOpacity(0.04),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.2),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: color.withOpacity(0.25),
+              ),
+            ),
+            child: Icon(
+              icon,
+              size: 14,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 9,
+                  color: AppTheme.bodyText.withOpacity(0.5),
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.darkText,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+
+// ========== COMPACT CLASS TEACHER DETAILS MODAL ==========
   void _showClassTeacherDetailsModal({
     required String teacherName,
     required String teacherMobile,
@@ -570,20 +1625,20 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.85,
-        minChildSize: 0.85,
-        maxChildSize: 0.95,
+        initialChildSize: 0.75,
+        minChildSize: 0.75,
+        maxChildSize: 0.9,
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(28),
+              top: Radius.circular(24),
             ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.1),
-                blurRadius: 32,
-                offset: const Offset(0, -8),
+                blurRadius: 24,
+                offset: const Offset(0, -6),
               ),
             ],
           ),
@@ -593,32 +1648,38 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
               // Handle bar
               Center(
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 20),
+                  padding: const EdgeInsets.only(top: 10, bottom: 16),
                   child: Container(
-                    width: 40,
+                    width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppTheme.bodyText.withOpacity(0.2),
+                      color: AppTheme.bodyText.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
               ),
-              // Content
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   children: [
-                    // Large teacher photo
+                    // Photo
                     Container(
-                      width: 140,
-                      height: 140,
+                      width: 110,
+                      height: 110,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: AppTheme.primaryGreen.withOpacity(0.3),
-                          width: 3,
+                          color: AppTheme.primaryGreen.withOpacity(0.25),
+                          width: 2,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryGreen.withOpacity(0.15),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                         image: teacherPhoto != null
                             ? DecorationImage(
                           image: NetworkImage('$_imageBaseUrl$teacherPhoto'),
@@ -641,77 +1702,74 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
                           child: Icon(
                             Iconsax.teacher,
                             color: Colors.white,
-                            size: 60,
+                            size: 50,
                           ),
                         ),
                       )
                           : null,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     // Name
                     Text(
                       teacherName,
                       style: GoogleFonts.inter(
-                        fontSize: 24,
+                        fontSize: 20,
                         fontWeight: FontWeight.w800,
                         color: AppTheme.darkText,
                       ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
-                    // Designation
+                    // Designation badge
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
+                        horizontal: 12,
+                        vertical: 6,
                       ),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryGreen.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: AppTheme.primaryGreen.withOpacity(0.3),
+                          color: AppTheme.primaryGreen.withOpacity(0.2),
+                          width: 1,
                         ),
                       ),
                       child: Text(
                         teacherDesignation,
                         style: GoogleFonts.inter(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppTheme.primaryGreen,
                         ),
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // Info Grid
-                    Column(
-                      children: [
-                        _buildDetailRow(
-                          icon: Iconsax.call,
-                          label: 'Mobile',
-                          value: teacherMobile.isNotEmpty
-                              ? teacherMobile
-                              : 'Not provided',
-                          color: Colors.blue,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildDetailRow(
-                          icon: Iconsax.sms,
-                          label: 'Email',
-                          value: teacherEmail.isNotEmpty
-                              ? teacherEmail
-                              : 'Not provided',
-                          color: Colors.orange,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildDetailRow(
-                          icon: Iconsax.award,
-                          label: 'Experience',
-                          value: '$teacherExperience years',
-                          color: Colors.amber,
-                        ),
-                      ],
+                    // Info details
+                    _buildCompactDetailRow(
+                      icon: Iconsax.call,
+                      label: 'Phone',
+                      value: teacherMobile.isNotEmpty
+                          ? teacherMobile
+                          : 'Not provided',
+                      color: Colors.blue,
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 14),
+                    _buildCompactDetailRow(
+                      icon: Iconsax.sms,
+                      label: 'Email',
+                      value: teacherEmail.isNotEmpty
+                          ? teacherEmail
+                          : 'Not provided',
+                      color: Colors.orange,
+                    ),
+                    const SizedBox(height: 14),
+                    _buildCompactDetailRow(
+                      icon: Iconsax.award,
+                      label: 'Experience',
+                      value: '$teacherExperience years',
+                      color: Colors.amber,
+                    ),
+                    const SizedBox(height: 28),
                     // Close button
                     SizedBox(
                       width: double.infinity,
@@ -720,21 +1778,21 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primaryGreen,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                         child: Text(
                           'Close',
                           style: GoogleFonts.inter(
-                            fontSize: 15,
+                            fontSize: 14,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -744,6 +1802,351 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
       ),
     );
   }
+
+// ========== COMPACT DETAIL ROW HELPER ==========
+  Widget _buildCompactDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: color.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: 16,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  color: AppTheme.bodyText.withOpacity(0.55),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.darkText,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+// ========== IMPROVED CLASS TEACHER CARD ==========
+  Widget _buildClassTeacherCard({
+    required String teacherName,
+    required String teacherMobile,
+    required String teacherEmail,
+    required String teacherDesignation,
+    required String? teacherPhoto,
+    required int teacherExperience,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.95),
+            Colors.white.withOpacity(0.75),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: AppTheme.borderGrey.withOpacity(0.15),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            // Teacher photo with decorative border
+            Stack(
+              children: [
+                Container(
+                  width: 78,
+                  height: 78,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppTheme.primaryGreen.withOpacity(0.35),
+                      width: 2.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryGreen.withOpacity(0.2),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
+                        spreadRadius: 1,
+                      ),
+                    ],
+                    image: teacherPhoto != null
+                        ? DecorationImage(
+                      image: NetworkImage('$_imageBaseUrl$teacherPhoto'),
+                      fit: BoxFit.cover,
+                    )
+                        : null,
+                  ),
+                  child: teacherPhoto == null
+                      ? Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppTheme.primaryGreen,
+                          AppTheme.primaryGreen.withOpacity(0.65),
+                        ],
+                      ),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Iconsax.teacher,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                    ),
+                  )
+                      : null,
+                ),
+                // Verification badge
+                Positioned(
+                  bottom: -4,
+                  right: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.green.shade400,
+                          Colors.green.shade600,
+                        ],
+                      ),
+                      border: Border.all(
+                        color: Colors.white,
+                        width: 3,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.green.withOpacity(0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Iconsax.check,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 20),
+            // Teacher info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Label
+                  Text(
+                    'CLASS TEACHER',
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: AppTheme.bodyText.withOpacity(0.55),
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  // Name
+                  Text(
+                    teacherName,
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.darkText,
+                      letterSpacing: -0.3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  // Designation and experience
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.primaryGreen.withOpacity(0.15),
+                                AppTheme.primaryGreen.withOpacity(0.08),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: AppTheme.primaryGreen.withOpacity(0.25),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Text(
+                            teacherDesignation,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: AppTheme.primaryGreen,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.1,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      if (teacherExperience > 0) ...[
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.amber.withOpacity(0.18),
+                                Colors.amber.withOpacity(0.1),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.amber.withOpacity(0.3),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.amber.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Iconsax.star,
+                                size: 13,
+                                color: Colors.amber.shade700,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                '$teacherExperience yrs',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.amber.shade700,
+                                  letterSpacing: -0.1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Info button
+            GestureDetector(
+              onTap: () => _showClassTeacherDetailsModal(
+                teacherName: teacherName,
+                teacherMobile: teacherMobile,
+                teacherEmail: teacherEmail,
+                teacherDesignation: teacherDesignation,
+                teacherPhoto: teacherPhoto,
+                teacherExperience: teacherExperience,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.primaryGreen.withOpacity(0.15),
+                      AppTheme.primaryGreen.withOpacity(0.08),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppTheme.primaryGreen.withOpacity(0.3),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryGreen.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Iconsax.info_circle,
+                  color: AppTheme.primaryGreen,
+                  size: 22,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+
 
   Widget _buildDetailRow({
     required IconData icon,
@@ -810,7 +2213,7 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
         children: _subjects
             .asMap()
             .entries
-            .map((entry) => TweenAnimationBuilder(
+            .map((entry) => TweenAnimationBuilder<double>(
           duration: Duration(milliseconds: 400 + (entry.key * 100)),
           tween: Tween(begin: 0.0, end: 1.0),
           curve: Curves.easeOutCubic,
@@ -912,7 +2315,7 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const SizedBox(height: 120),
-          TweenAnimationBuilder(
+          TweenAnimationBuilder<double>(
             duration: const Duration(milliseconds: 600),
             tween: Tween(begin: 0.0, end: 1.0),
             curve: Curves.elasticOut,
@@ -997,7 +2400,7 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const SizedBox(height: 120),
-          TweenAnimationBuilder(
+          TweenAnimationBuilder<double>(
             duration: const Duration(milliseconds: 800),
             tween: Tween(begin: 0.0, end: 1.0),
             curve: Curves.easeOutCubic,
@@ -1078,8 +2481,7 @@ class _MySubjectsScreenState extends State<MySubjectsScreen>
   }
 }
 
-// ============ CHUNK 2: IMPROVED SUBJECT CARD WIDGET ============
-
+// ============ SUBJECT CARD WIDGET ============
 class _SubjectCard extends StatefulWidget {
   final SubjectModel subject;
   final bool isParent;
@@ -1101,14 +2503,14 @@ class _SubjectCardState extends State<_SubjectCard>
 
   Color get _subjectColor {
     final colors = [
-      const Color(0xFF6366F1),    // Indigo
-      const Color(0xFFEC4899),    // Pink
-      const Color(0xFF10B981),    // Emerald
-      const Color(0xFFF59E0B),    // Amber
-      const Color(0xFF8B5CF6),    // Purple
-      const Color(0xFF06B6D4),    // Cyan
-      const Color(0xFFEF4444),    // Red
-      const Color(0xFF14B8A6),    // Teal
+      const Color(0xFF6366F1), // Indigo
+      const Color(0xFFEC4899), // Pink
+      const Color(0xFF10B981), // Emerald
+      const Color(0xFFF59E0B), // Amber
+      const Color(0xFF8B5CF6), // Purple
+      const Color(0xFF06B6D4), // Cyan
+      const Color(0xFFEF4444), // Red
+      const Color(0xFF14B8A6), // Teal
     ];
     return colors[widget.subject.subjectId % colors.length];
   }
@@ -1131,10 +2533,9 @@ class _SubjectCardState extends State<_SubjectCard>
     super.dispose();
   }
 
-// ============================================
-// UPDATED _navigateToChapters METHOD
-// ============================================
-
+  // ============================================
+  // UPDATED _navigateToChapters METHOD WITH FIX
+  // ============================================
   void _navigateToChapters(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final studentId = userProvider.userCode;
@@ -1149,6 +2550,16 @@ class _SubjectCardState extends State<_SubjectCard>
     }
 
     try {
+      // Check if subject has teachers
+      if (widget.subject.teachers.isEmpty) {
+        CustomSnackbar.showWarning(
+          context,
+          'No teachers assigned to this subject yet. Please contact your administrator.',
+          title: 'Teachers Not Available',
+        );
+        return;
+      }
+
       // Get complete navigation data with teacher details
       final navigationData = widget.subject.getNavigationData(_subjectColor);
 
@@ -1161,26 +2572,22 @@ class _SubjectCardState extends State<_SubjectCard>
       print('   Other Teachers Count: ${navigationData.otherTeachers.length}');
 
       Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (context) => SubjectChaptersScreen(
-                // Subject data
-                  subject: navigationData.subject,
-                  subjectColor: navigationData.subjectColor,
-                  studentId: studentId,
-
-                  // Selected Teacher (full details)
-                  selectedTeacher: navigationData.selectedTeacher as dynamic,
-
-                  // All Teachers (full details)
-                  allTeachers: navigationData.allTeachers as dynamic,
-
-                  // Other Teachers (full details)
-                  otherTeachers: navigationData.otherTeachers as dynamic,
-              ),
+        context,
+        MaterialPageRoute(
+          builder: (context) => SubjectChaptersScreen(
+            // Subject data
+            subject: navigationData.subject,
+            subjectColor: navigationData.subjectColor,
+            studentId: studentId,
+            // Selected Teacher (full details)
+            selectedTeacher: navigationData.selectedTeacher as dynamic,
+            // All Teachers (full details)
+            allTeachers: navigationData.allTeachers as dynamic,
+            // Other Teachers (full details)
+            otherTeachers: navigationData.otherTeachers as dynamic,
           ),
-              );
-
+        ),
+      );
     } catch (e) {
       CustomSnackbar.showError(
         context,
@@ -1189,7 +2596,6 @@ class _SubjectCardState extends State<_SubjectCard>
       );
     }
   }
-
 
   void _showAllTeachersModal() {
     final teachers = widget.subject.teachers;
@@ -1266,7 +2672,6 @@ class _SubjectCardState extends State<_SubjectCard>
                     ...teachers.asMap().entries.map((entry) {
                       final teacher = entry.value;
                       final isLast = entry.key == teachers.length - 1;
-
                       return Column(
                         children: [
                           _buildEnhancedTeacherTile(teacher),
@@ -1980,6 +3385,7 @@ class _SubjectCardState extends State<_SubjectCard>
   @override
   Widget build(BuildContext context) {
     final subject = widget.subject;
+
     return MouseRegion(
       onEnter: (_) {
         setState(() => _isHovered = true);
@@ -2690,11 +4096,6 @@ class _SubjectCardState extends State<_SubjectCard>
   }
 }
 
-// ============ CHUNK 1: NEW MODEL FOR NAVIGATION ============
-// Add this to your models file (student_subject_service.dart or models.dart)
-
-// ============================================
-// CHUNK 1: NEW TEACHER DATA MODEL FOR NAVIGATION
 // ============================================
 
 class TeacherNavigationData {
@@ -2764,9 +4165,6 @@ class SubjectNavigationDataWithTeachers {
   });
 }
 
-// ============================================
-// CHUNK 3: EXTENSION METHODS FOR EASY ACCESS
-// ============================================
 
 extension SubjectModelTeacherExtension on SubjectModel {
   /// Get selected teacher with full details
@@ -2844,5 +4242,3 @@ extension SubjectModelExtension on SubjectModel {
     };
   }
 }
-
-

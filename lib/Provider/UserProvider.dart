@@ -26,6 +26,15 @@ class UserProvider with ChangeNotifier {
 
   List<StudentChild> get allChildren => _allChildren;
 
+  String _fixedAcademicYear = '2025-26';
+  String get academicYear => _fixedAcademicYear;
+
+  void setAcademicYear(String year) {
+    _fixedAcademicYear = year;
+    notifyListeners();
+  }
+
+
   // ✅ User data getters with DETAILED LOGGING
   String? get userCode {
     final originalCode = _loginResponse?.userData['resultSet_0']?.isNotEmpty == true

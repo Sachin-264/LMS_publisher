@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/StudentPannel/MySubject/chapter_Detail_Screen.dart';
+import 'package:lms_publisher/StudentPannel/MySubject/my_subject_screen.dart';
 import 'package:lms_publisher/StudentPannel/Service/student_subject_service.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/Util/beautiful_loader.dart';
@@ -189,7 +190,18 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
     }
   }
 
-  void _openChapterDetails(FavoriteChapter favorite) {
+  String buildFullName(String? first, String? middle, String? last) {
+    final parts = <String>[];
+    if (first != null && first.trim().isNotEmpty) parts.add(first.trim());
+    if (middle != null && middle.trim().isNotEmpty) parts.add(middle.trim());
+    if (last != null && last.trim().isNotEmpty) parts.add(last.trim());
+    return parts.join(' ');
+  }
+
+
+
+  void openChapterDetails(FavoriteChapter favorite) {
+    // 1) Map FavoriteChapter to ChapterModel (unchanged)
     final chapterModel = ChapterModel(
       chapterId: favorite.chapterId,
       chapterName: favorite.chapterName,
@@ -206,20 +218,111 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
       lastAccessedDisplay: favorite.lastAccessedDisplay,
     );
 
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (context) => ChapterDetailsScreen(
-    //       chapter: chapterModel,
-    //       subjectColor: _getSubjectColor(favorite.subjectId),
-    //       subjectName: favorite.subjectName,
-    //       subjectId: favorite.subjectId,
-    //     ),
-    //   ),
-    // ).then((_) {
-    //   _loadFavorites();
-    // });
+    // 2) Build TeacherNavigationData list from teachersRaw
+    TeacherNavigationData mapTeacher(Map<String, dynamic> t) {
+      DateTime? doj;
+      final dojStr = (t['DateOfJoining'] ?? '').toString();
+      if (dojStr.isNotEmpty) {
+        try { doj = DateTime.parse(dojStr); } catch (_) { doj = null; }
+      }
+      final String computedFullName = [
+        (t['FirstName'] ?? '').toString().trim(),
+        (t['MiddleName'] ?? '').toString().trim(),
+        (t['LastName'] ?? '').toString().trim(),
+      ].where((e) => e.isNotEmpty).join(' ').trim();
+
+      final String displayFullName = (t['TeacherFullName'] ?? '').toString().trim().isNotEmpty
+          ? (t['TeacherFullName'] as String).trim()
+          : (computedFullName.isNotEmpty ? computedFullName : 'Teacher');
+
+      final bool isCurrent = (t['Is_Current_Teacher'] == true) || (t['Is_Current_Teacher'] == 1);
+
+      return TeacherNavigationData(
+        teacherCode: (t['TeacherCode'] ?? '').toString(),
+        teacherFullName: displayFullName,
+        teacherPhoto: (t['TeacherPhoto']?.toString().isNotEmpty ?? false) ? t['TeacherPhoto'].toString() : null,
+        designation: (t['Designation'] ?? 'Teacher').toString(),
+        department: (t['Department'] ?? 'Not Assigned').toString(),
+        mobileNumber: (t['MobileNumber'] ?? '').toString(),
+        institutionalEmail: (t['InstitutionalEmail'] ?? '').toString(),
+        experienceYears: int.tryParse((t['ExperienceYears'] ?? '').toString()) ?? 0,
+        employeeCode: (t['EmployeeCode'] ?? '').toString(),
+        isCurrentTeacher: isCurrent, // bool
+        dateOfJoining: doj,
+        employeeStatus: (t['EmployeeStatus'] ?? 'Active').toString(),
+      );
+    }
+
+    final List<TeacherNavigationData> allTeachers =
+    favorite.teachersRaw.map(mapTeacher).toList();
+
+    // 3) Choose selectedTeacher (current if any, else first, else fallback)
+    TeacherNavigationData? selectedTeacher;
+    if (allTeachers.isNotEmpty) {
+      selectedTeacher = allTeachers.firstWhere(
+            (x) => x.isCurrentTeacher == true,
+        orElse: () => allTeachers.first,
+      );
+    } else {
+      // fallback from single teacher fields if API had none
+      selectedTeacher = TeacherNavigationData(
+        teacherCode: favorite.teacherCode ?? '',
+        teacherFullName: [
+          favorite.firstName?.trim() ?? '',
+          favorite.middleName?.trim() ?? '',
+          favorite.lastName?.trim() ?? ''
+        ].where((e) => e.isNotEmpty).join(' ').isNotEmpty
+            ? [
+          favorite.firstName?.trim() ?? '',
+          favorite.middleName?.trim() ?? '',
+          favorite.lastName?.trim() ?? ''
+        ].where((e) => e.isNotEmpty).join(' ')
+            : (favorite.teacherFullName ?? 'Teacher'),
+        teacherPhoto: favorite.teacherPhoto,
+        designation: favorite.designation ?? 'Teacher',
+        department: favorite.department ?? 'Not Assigned',
+        mobileNumber: favorite.mobileNumber ?? '',
+        institutionalEmail: favorite.institutionalEmail,
+        experienceYears: favorite.experienceYears ?? 0,
+        employeeCode: favorite.employeeCode,
+        isCurrentTeacher: (favorite.isCurrentTeacher ?? 0) == 1, // bool
+        dateOfJoining: (favorite.dateOfJoining != null && favorite.dateOfJoining!.isNotEmpty)
+            ? DateTime.tryParse(favorite.dateOfJoining!)
+            : null,
+        employeeStatus: favorite.employeeStatus ?? 'Active',
+      );
+    }
+
+    final List<TeacherNavigationData> otherTeachers = allTeachers
+        .where((t) => t.teacherCode != selectedTeacher!.teacherCode)
+        .toList();
+
+    // 4) Subject color + academic year
+    final Color subjectColor = _getSubjectColor(favorite.subjectId);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final String academicYear = userProvider.academicYear ?? '';
+
+    // 5) Navigate
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChapterDetailsScreen(
+          chapter: chapterModel,
+          subjectColor: subjectColor,
+          subjectName: favorite.subjectName,
+          subjectId: favorite.subjectId,
+          selectedTeacher: selectedTeacher!,
+          allTeachers: allTeachers.isNotEmpty ? allTeachers : [selectedTeacher!],
+          otherTeachers: otherTeachers,
+          academicYear: academicYear,
+        ),
+      ),
+    ).then((_) => _loadFavorites());
   }
+
+
+
+
 
   Color _getSubjectColor(int subjectId) {
     final colors = [
@@ -552,7 +655,7 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
                 child: _EnhancedFavoriteCard(
                   favorite: entry.value,
                   index: entry.key,
-                  onTap: () => _openChapterDetails(entry.value),
+                  onTap: () => openChapterDetails(entry.value),
                   onRemove: () => _removeFavorite(
                     entry.value.chapterId,
                     entry.key,
@@ -1192,7 +1295,7 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
   }
 }
 
-// ========== FAVORITE CHAPTER MODEL ==========
+
 class FavoriteChapter {
   final int recNo;
   final int chapterId;
@@ -1200,11 +1303,37 @@ class FavoriteChapter {
   final int chapterOrder;
   final int subjectId;
   final String subjectName;
-  final double progressPercentage;
-  final String completionStatus;
-  final String? lastAccessedDate;
-  final String lastAccessedDisplay;
-  final String? favoritedDate;
+
+  // Progress
+  final double progressPercentage; // from Progress_Percentage
+  final String completionStatus;   // 0 -> Not Started, 100 -> Completed, else In Progress
+
+  // Dates
+  final String? lastAccessedDate;   // from Last_Accessed_Date (yyyy-MM-dd HH:mm:ss)
+  final String lastAccessedDisplay; // from Last_Studied_Display
+  final String? favoritedDate;      // from Favorited_Date
+
+  // Single selected teacher snapshot (for quick card display/fallbacks)
+  final int? allotmentRecNo;
+  final int? isCurrentTeacher; // 1 if current, else 0
+  final int? teacherRecNo;
+  final String? teacherCode;
+  final String? employeeCode;
+  final String? firstName;
+  final String? middleName;
+  final String? lastName;
+  final String? teacherFullName;
+  final String? designation;
+  final String? department;
+  final String? mobileNumber;
+  final String? institutionalEmail;
+  final String? teacherPhoto;
+  final int? experienceYears;
+  final String? dateOfJoining; // raw string
+  final String? employeeStatus;
+
+  // Full decoded teachers array for navigation/services usage
+  final List<Map<String, dynamic>> teachersRaw;
 
   FavoriteChapter({
     required this.recNo,
@@ -1218,21 +1347,117 @@ class FavoriteChapter {
     this.lastAccessedDate,
     required this.lastAccessedDisplay,
     this.favoritedDate,
+    this.allotmentRecNo,
+    this.isCurrentTeacher,
+    this.teacherRecNo,
+    this.teacherCode,
+    this.employeeCode,
+    this.firstName,
+    this.middleName,
+    this.lastName,
+    this.teacherFullName,
+    this.designation,
+    this.department,
+    this.mobileNumber,
+    this.institutionalEmail,
+    this.teacherPhoto,
+    this.experienceYears,
+    this.dateOfJoining,
+    this.employeeStatus,
+    required this.teachersRaw,
   });
 
   factory FavoriteChapter.fromJson(Map<String, dynamic> json) {
+    double parseDouble(dynamic v) {
+      if (v == null) return 0.0;
+      if (v is num) return v.toDouble();
+      return double.tryParse(v.toString()) ?? 0.0;
+    }
+
+    int? parseIntOrNull(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+
+    // teachers is a JSON-encoded string (e.g., "[]", "[{...}]")
+    List<Map<String, dynamic>> teachersList = [];
+    final teachersRawStr = json['teachers'];
+    if (teachersRawStr is String && teachersRawStr.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(teachersRawStr);
+        if (decoded is List) {
+          teachersList = decoded
+              .whereType<Map<String, dynamic>>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+      } catch (_) {
+        teachersList = [];
+      }
+    }
+
+    Map<String, dynamic>? chosenTeacher;
+    if (teachersList.isNotEmpty) {
+      try {
+        chosenTeacher = teachersList.firstWhere(
+              (t) => t['Is_Current_Teacher'] == true || t['Is_Current_Teacher'] == 1,
+          orElse: () => teachersList.first,
+        );
+      } catch (_) {
+        chosenTeacher = teachersList.first;
+      }
+    }
+
+    final double prog = parseDouble(json['Progress_Percentage']);
+    final String status = prog >= 100
+        ? 'Completed'
+        : (prog > 0 ? 'In Progress' : 'Not Started');
+
     return FavoriteChapter(
-      recNo: json['RecNo'] ?? 0,
-      chapterId: json['ChapterID'] ?? 0,
-      chapterName: json['ChapterName'] ?? '',
-      chapterOrder: json['ChapterOrder'] ?? 0,
-      subjectId: json['SubjectID'] ?? 0,
-      subjectName: json['SubjectName'] ?? '',
-      progressPercentage: (json['Progress_Percentage'] ?? 0).toDouble(),
-      completionStatus: json['Completion_Status'] ?? 'Not Started',
-      lastAccessedDate: json['Last_Accessed_Date'],
-      lastAccessedDisplay: json['Last_Accessed_Display'] ?? 'Never',
-      favoritedDate: json['Favorited_Date'],
+      recNo: parseIntOrNull(json['RecNo']) ?? 0,
+      chapterId: parseIntOrNull(json['ChapterID']) ?? 0,
+      chapterName: (json['ChapterName'] ?? '').toString(),
+      chapterOrder: parseIntOrNull(json['ChapterOrder']) ?? 0,
+      subjectId: parseIntOrNull(json['SubjectID']) ?? 0,
+      subjectName: (json['SubjectName'] ?? '').toString(),
+      progressPercentage: prog,
+      completionStatus: status,
+
+      lastAccessedDate: (json['Last_Accessed_Date'] ?? '').toString().isNotEmpty
+          ? json['Last_Accessed_Date'].toString()
+          : null,
+      lastAccessedDisplay: (json['Last_Studied_Display'] ?? 'Never').toString(),
+      favoritedDate: (json['Favorited_Date'] ?? '').toString().isNotEmpty
+          ? json['Favorited_Date'].toString()
+          : null,
+
+      // Selected teacher snapshot (optional)
+      allotmentRecNo: chosenTeacher != null ? parseIntOrNull(chosenTeacher['Allotment_RecNo']) : null,
+      isCurrentTeacher: chosenTeacher != null
+          ? ((chosenTeacher['Is_Current_Teacher'] == true || chosenTeacher['Is_Current_Teacher'] == 1) ? 1 : 0)
+          : null,
+      teacherRecNo: chosenTeacher != null ? parseIntOrNull(chosenTeacher['TeacherRecNo']) : null,
+      teacherCode: chosenTeacher?['TeacherCode']?.toString(),
+      employeeCode: chosenTeacher?['EmployeeCode']?.toString(),
+      firstName: chosenTeacher?['FirstName']?.toString(),
+      middleName: chosenTeacher?['MiddleName']?.toString(),
+      lastName: chosenTeacher?['LastName']?.toString(),
+      teacherFullName: chosenTeacher?['TeacherFullName']?.toString(),
+      designation: chosenTeacher?['Designation']?.toString(),
+      department: chosenTeacher?['Department']?.toString(),
+      mobileNumber: chosenTeacher?['MobileNumber']?.toString(),
+      institutionalEmail: chosenTeacher?['InstitutionalEmail']?.toString(),
+      teacherPhoto: chosenTeacher?['TeacherPhoto']?.toString(),
+      experienceYears: parseIntOrNull(chosenTeacher?['ExperienceYears']),
+      dateOfJoining: chosenTeacher?['DateOfJoining']?.toString(),
+      employeeStatus: chosenTeacher?['EmployeeStatus']?.toString(),
+
+      // Full list preserved
+      teachersRaw: teachersList,
     );
   }
 }
+
+
+

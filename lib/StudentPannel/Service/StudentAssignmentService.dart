@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class StudentAssignmentService {
   // Base URL from your other services
-  static const String baseUrl = 'http://localhost/AquareLMS';
+  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
 
   /// Calls the SP_SubmitAssignment stored procedure via the API.
   /// This is called *after* the file has been uploaded.
