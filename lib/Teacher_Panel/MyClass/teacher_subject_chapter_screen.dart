@@ -11,6 +11,7 @@ class TeacherSubjectChaptersScreen extends StatefulWidget {
   final String subjectName;
   final Color subjectColor;
   final String teacherCode;
+  final int classRecNo;
 
   const TeacherSubjectChaptersScreen({
     super.key,
@@ -18,6 +19,7 @@ class TeacherSubjectChaptersScreen extends StatefulWidget {
     required this.subjectName,
     required this.subjectColor,
     required this.teacherCode,
+    required this.classRecNo,
   });
 
   @override
@@ -221,6 +223,7 @@ class _TeacherSubjectChaptersScreenState
               chapterId: chapterId,
               chapterName: chapterName,
               subjectName: widget.subjectName,
+              classRecNo: widget.classRecNo,
             ),
           ),
         );

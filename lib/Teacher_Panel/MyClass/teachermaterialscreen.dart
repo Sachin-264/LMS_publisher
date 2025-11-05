@@ -81,6 +81,7 @@ class TeacherMaterialScreen extends StatefulWidget {
   final int chapterId;
   final String chapterName;
   final String subjectName;
+  final int classRecNo;
 
   const TeacherMaterialScreen({
     super.key,
@@ -88,6 +89,7 @@ class TeacherMaterialScreen extends StatefulWidget {
     required this.chapterId,
     required this.chapterName,
     required this.subjectName,
+    required this.classRecNo,
   });
 
   @override
@@ -778,6 +780,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                             materialRecNo: materialRecNo ?? 0,
                             materialTitle: title,
                             totalMarks: material['TotalMarks'] ?? 0,
+                            classRecNo: widget.classRecNo,
                           ),
                         ),
                       );

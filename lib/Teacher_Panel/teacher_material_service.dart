@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class TeacherMaterialService {
   static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/teacher_material.php';
-  static const String assignmentBaseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/assignment_api.php';
+  static const String assignmentBaseUrl = 'http://localhost/AquareLMS/assignment_api.php';
 
   // Get materials for a chapter (publisher + teacher materials)
   static Future<Map<String, dynamic>> getChapterMaterials({
@@ -344,20 +344,26 @@ class TeacherMaterialService {
     }
   }
 
-  // Get submissions for an assignment (from assignment API)
+// Get submissions for an assignment - FIXED
   static Future<Map<String, dynamic>> getSubmissions({
     required String teacherCode,
     required int materialRecNo,
+    required int classRecNo,
     String filterStatus = 'All',
   }) async {
     print('🟠 [GET_SUBMISSIONS] Starting API call...');
-    print('🟠 TeacherCode: $teacherCode, MaterialRecNo: $materialRecNo');
+    print('🟠 TeacherCode: $teacherCode');
+    print('🟠 MaterialRecNo: $materialRecNo (type: int)');
+    print('🟠 ClassRecNo: $classRecNo (type: int)');
+    print('🟠 FilterStatus: $filterStatus');
 
     try {
+      // ✅ Ensure integers are actually integers before sending
       final requestBody = {
         "action": "GET_SUBMISSIONS",
         "TeacherCode": teacherCode,
-        "MaterialRecNo": materialRecNo,
+        "MaterialRecNo": materialRecNo is int ? materialRecNo : int.parse(materialRecNo.toString()),
+        "ClassRecNo": classRecNo is int ? classRecNo : int.parse(classRecNo.toString()),
         "FilterStatus": filterStatus,
       };
 
@@ -376,6 +382,8 @@ class TeacherMaterialService {
 
       if (decoded['status'] == 'success') {
         print('✅ [GET_SUBMISSIONS] Success!');
+        print('✅ Submitted Count: ${decoded['submitted_count']}');
+        print('✅ Not Submitted Count: ${decoded['not_submitted_count']}');
         return decoded;
       } else {
         print('❌ [GET_SUBMISSIONS] API returned error');
@@ -386,6 +394,8 @@ class TeacherMaterialService {
       rethrow;
     }
   }
+
+
 
   // Grade a submission
   static Future<Map<String, dynamic>> gradeSubmission({

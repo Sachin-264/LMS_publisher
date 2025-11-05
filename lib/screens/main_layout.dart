@@ -1,5 +1,7 @@
 // main_layout.dart
 
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart'; // Still needed
@@ -227,8 +229,6 @@ class _MainLayoutState extends State<MainLayout> {
                             // ✅ UPDATED: Pass title and icon to header
                             _Header(
                               isMobile: isMobile,
-                              title: title,
-                              icon: icon,
                             ),
                             SizedBox(
                                 height: isMobile
@@ -340,168 +340,73 @@ class _MobileMenuItem extends StatelessWidget {
   }
 }
 
-// ✅ UPDATED: Header with Enhanced Title and Mobile Title
 class _Header extends StatelessWidget {
   final bool isMobile;
-  final String title;
-  final IconData icon; // ✅ ADDED
+  // final String title; // REMOVED
 
   const _Header({
     required this.isMobile,
-    required this.title,
-    required this.icon, // ✅ ADDED
+    // required this.title, // REMOVED
   });
 
   @override
   Widget build(BuildContext context) {
     return Consumer<UserProvider>(
-      builder: (context, userProvider, child) {
+      builder: (context, userProvider, _) {
+        String userName = userProvider.userName ?? 'Admin User';
+        String userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : 'A';
+
         return LayoutBuilder(
           builder: (context, constraints) {
-            bool isCompact = constraints.maxWidth < 650;
-            String userName = userProvider.userName ?? 'Admin User';
+            bool isCompact = constraints.maxWidth < 750;
 
-            return Row(
-              children: [
-                // ✅ Hamburger Menu Button (Mobile Only)
-                if (isMobile)
-                  Container(
-                    margin: const EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.background,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.shadowColor,
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                      border: Border.all(color: AppTheme.borderGrey),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Iconsax.menu_1,
-                          color: AppTheme.primaryGreen),
-                      onPressed: () {
-                        Scaffold.of(context).openDrawer();
-                      },
-                      tooltip: 'Menu',
-                    ),
+            return Container(
+              // ✅ 1. THE "TOP-MOST LAYER" (FROSTED GLASS)
+              decoration: BoxDecoration(
+                color: AppTheme.background.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  // Soft green glow from your theme
+                  BoxShadow(
+                    color: AppTheme.shadowColor,
+                    blurRadius: 40,
+                    offset: const Offset(0, 10),
+                    spreadRadius: -10,
                   ),
-
-                // ✅ ADDED: Mobile Title
-                if (isMobile)
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: AppTheme.headline1.copyWith(fontSize: 18),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  // Tighter shadow for edge definition
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+                border: Border.all(
+                  color: AppTheme.background.withOpacity(0.9),
+                  width: 1.5,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 12 : 28,
+                      vertical: isMobile ? 12 : 18,
                     ),
-                  ),
-
-                // ✅ UPDATED: Enhanced Desktop Title
-                if (!isMobile)
-                  Row(
-                    children: [
-                      Icon(
-                        icon,
-                        color: AppTheme.primaryGreen,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        title,
-                        style: AppTheme.headline1.copyWith(fontSize: 22),
-                      ),
-                    ],
-                  ),
-
-                // ✅ REMOVED: Search Bar
-                const Spacer(), // Pushes icons to the right
-
-                // Notification Icon
-                if (!isCompact)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.background,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.shadowColor,
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                      border: Border.all(color: AppTheme.borderGrey),
+                    child: isMobile
+                        ? _MobileHeaderContent(
+                      userName: userName,
+                      userInitial: userInitial,
+                    )
+                        : _DesktopHeaderContent(
+                      userName: userName,
+                      userInitial: userInitial,
+                      isCompact: isCompact,
                     ),
-                    child: Stack(
-                      children: [
-                        const Icon(
-                          Iconsax.notification,
-                          size: 20,
-                          color: AppTheme.bodyText,
-                        ),
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                const SizedBox(width: 12),
-
-                // User Profile
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.background,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.shadowColor,
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                    border: Border.all(color: AppTheme.borderGrey),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          image: const DecorationImage(
-                            image: NetworkImage(
-                                'https://picsum.photos/id/237/200/200'),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      if (!isCompact && !isMobile) ...[
-                        const SizedBox(width: 12),
-                        Text(
-                          userName,
-                          style: AppTheme.labelText.copyWith(fontSize: 14),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                    ],
                   ),
                 ),
-              ],
+              ),
             );
           },
         );
@@ -509,6 +414,1052 @@ class _Header extends StatelessWidget {
     );
   }
 }
+
+// =======================================================================
+// ✅ NEW MOBILE HEADER (Replaces old _MobileHeaderContent)
+// =======================================================================
+class _MobileHeaderContent extends StatelessWidget {
+  final String userName;
+  final String userInitial;
+
+  const _MobileHeaderContent({
+    required this.userName,
+    required this.userInitial,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Menu Button
+        _HeaderMenuButton(
+          onPressed: () => Scaffold.of(context).openDrawer(),
+        ),
+        // App Logo (Replaces Title)
+        const Expanded(
+          child: _AppLogo(size: 18),
+        ),
+        // Notification Button
+        _HeaderNotificationButton(
+          onPressed: () {},
+          hasBadge: true,
+        ),
+      ],
+    );
+  }
+}
+
+// =======================================================================
+// ✅ NEW DESKTOP HEADER (Replaces old _DesktopHeaderContent)
+// =======================================================================
+class _DesktopHeaderContent extends StatelessWidget {
+  final String userName;
+  final String userInitial;
+  final bool isCompact;
+
+  const _DesktopHeaderContent({
+    required this.userName,
+    required this.userInitial,
+    required this.isCompact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // ✅ NEW TEXT LAYOUT (Logo + Welcome)
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 1. App Logo (Replaces Title)
+              const _AppLogo(size: 28),
+              const SizedBox(height: 4),
+              // 2. Welcome is secondary
+              Text(
+                'Welcome back, $userName',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.bodyText.withOpacity(0.9),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        if (!isCompact) const SizedBox(width: 28),
+
+        // ✅ RIGHT SECTION: "IMPROVED" SOLID ACTIONS
+        if (!isCompact)
+          Row(
+            children: [
+              // Improved Notification Button
+              _HeaderNotificationButton(
+                onPressed: () {},
+                hasBadge: true,
+              ),
+              const SizedBox(width: 16),
+
+              // Improved User Profile Card
+              _HeaderUserCard(
+                userName: userName,
+                userInitial: userInitial,
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+// =======================================================================
+// ✅ NEW: App Logo Widget
+// =======================================================================
+class _AppLogo extends StatelessWidget {
+  final double size;
+  const _AppLogo({this.size = 24});
+
+  @override
+  Widget build(BuildContext context) {
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        style: AppTheme.logoStyle.copyWith(
+          fontSize: size,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.5,
+        ),
+        children: const [
+          TextSpan(
+            text: 'MACK',
+            style: TextStyle(color: AppTheme.mackColor),
+          ),
+          TextSpan(
+            text: 'CLEO',
+            style: TextStyle(color: AppTheme.cleoColor),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =======================================================================
+// ✅ NEW "IMPROVED" HELPER WIDGETS
+// (These sit *on top* of the glass, using solid AppTheme.background)
+// =======================================================================
+
+// --- Base Button for solid components ---
+class _HeaderSolidButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onPressed;
+  final EdgeInsetsGeometry padding;
+  final BoxShape shape;
+
+  const _HeaderSolidButton({
+    required this.child,
+    required this.onPressed,
+    this.padding = const EdgeInsets.all(10),
+    this.shape = BoxShape.circle,
+  });
+
+  @override
+  State<_HeaderSolidButton> createState() => _HeaderSolidButtonState();
+}
+
+class _HeaderSolidButtonState extends State<_HeaderSolidButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: widget.padding,
+          decoration: BoxDecoration(
+            // Solid, elevated feel
+            color: _isHovered ? AppTheme.lightGrey : AppTheme.background,
+            shape: widget.shape,
+            borderRadius: widget.shape == BoxShape.circle
+                ? null
+                : BorderRadius.circular(50), // for pill shape
+            border: Border.all(
+              color: _isHovered ? AppTheme.borderGrey : AppTheme.borderGrey.withOpacity(0.7),
+              width: 1.5,
+            ),
+            // Shadow makes it pop off the glass
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.shadowColor.withOpacity(
+                  _isHovered ? 0.3 : 0.2,
+                ),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              )
+            ],
+          ),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+// --- Mobile Menu Button ---
+class _HeaderMenuButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _HeaderMenuButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return _HeaderSolidButton(
+      onPressed: onPressed,
+      child: Icon(
+        Iconsax.menu_1,
+        color: AppTheme.bodyText,
+        size: 18,
+      ),
+    );
+  }
+}
+
+// --- "IMPROVED" Notification Button ---
+class _HeaderNotificationButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  final bool hasBadge;
+
+  const _HeaderNotificationButton({
+    required this.onPressed,
+    this.hasBadge = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _HeaderSolidButton(
+      onPressed: onPressed,
+      child: Stack(
+        children: [
+          Icon(
+            Iconsax.notification,
+            size: 19,
+            color: AppTheme.bodyText,
+          ),
+          if (hasBadge)
+            Positioned(
+              right: 0,
+              top: 0,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.red.shade400, Colors.red.shade600],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withOpacity(0.5),
+                      blurRadius: 5,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- "IMPROVED" User Card (now a pill shape) ---
+class _HeaderUserCard extends StatelessWidget {
+  final String userName;
+  final String userInitial;
+
+  const _HeaderUserCard({
+    required this.userName,
+    required this.userInitial,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _HeaderSolidButton(
+      onPressed: () {
+        // TODO: Add profile navigation
+      },
+      shape: BoxShape.rectangle, // will be rounded by decoration
+      padding: const EdgeInsets.fromLTRB(6, 6, 16, 6), // Asymmetrical padding
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(50), // circular avatar
+              gradient: AppTheme.primaryGradient,
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primaryGreen.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                userInitial,
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                userName,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.darkText,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentGreen,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Online',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.accentGreen,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+
+// --- Base Button for Header ---
+class _HeaderBaseButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onPressed;
+
+  const _HeaderBaseButton({
+    required this.child,
+    required this.onPressed,
+  });
+
+  @override
+  State<_HeaderBaseButton> createState() => _HeaderBaseButtonState();
+}
+
+class _HeaderBaseButtonState extends State<_HeaderBaseButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            // Use lightGrey for hover, matching the page background
+            color: _isHovered
+                ? AppTheme.lightGrey
+                : AppTheme.background.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: _isHovered
+                  ? AppTheme.borderGrey
+                  : AppTheme.borderGrey.withOpacity(0.4),
+              width: 1.5,
+            ),
+          ),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+
+
+
+class _HeaderActionButton extends StatefulWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool hasBadge;
+
+  const _HeaderActionButton({
+    required this.icon,
+    required this.onPressed,
+    this.hasBadge = false,
+  });
+
+  @override
+  State<_HeaderActionButton> createState() => _HeaderActionButtonState();
+}
+
+class _HeaderActionButtonState extends State<_HeaderActionButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(
+            color: _isHovered
+                ? AppTheme.lightGrey
+                : AppTheme.background,
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: _isHovered
+                  ? AppTheme.borderGrey
+                  : AppTheme.borderGrey.withOpacity(0.7),
+              width: 1.5,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Icon(
+                widget.icon,
+                size: 19,
+                color: _isHovered
+                    ? AppTheme.primaryGreen
+                    : AppTheme.bodyText.withOpacity(0.7),
+              ),
+              if (widget.hasBadge)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.red.shade400, Colors.red.shade600],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.5),
+                          blurRadius: 5,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+// ✅ MOBILE NOTIFICATION BUTTON - THEMED GLASSY
+class _MobileNotificationButton extends StatefulWidget {
+  const _MobileNotificationButton();
+
+  @override
+  State<_MobileNotificationButton> createState() =>
+      _MobileNotificationButtonState();
+}
+
+class _MobileNotificationButtonState extends State<_MobileNotificationButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: () {},
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            // Use AppTheme.background
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: _isHovered
+                  ? [
+                AppTheme.background.withOpacity(0.4),
+                AppTheme.background.withOpacity(0.3),
+              ]
+                  : [
+                AppTheme.background.withOpacity(0.25),
+                AppTheme.background.withOpacity(0.15),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            // Use AppTheme.borderGrey
+            border: Border.all(
+              color: AppTheme.borderGrey.withOpacity(_isHovered ? 0.5 : 0.35),
+              width: 1.5,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Icon(
+                Iconsax.notification,
+                size: 18,
+                color: _isHovered
+                    ? AppTheme.primaryGreen // Use theme color
+                    : AppTheme.bodyText.withOpacity(0.7), // Use theme color
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.red.shade400,
+                        Colors.red.shade600,
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.5),
+                        blurRadius: 4,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+// ✅ GLASSY ACTION BUTTON - THEMED
+class _GlassyActionButton extends StatefulWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool hasBadge;
+
+  const _GlassyActionButton({
+    required this.icon,
+    required this.onPressed,
+    this.hasBadge = false,
+  });
+
+  @override
+  State<_GlassyActionButton> createState() => _GlassyActionButtonState();
+}
+
+class _GlassyActionButtonState extends State<_GlassyActionButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(
+            // Use AppTheme.background
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: _isHovered
+                  ? [
+                AppTheme.background.withOpacity(0.4),
+                AppTheme.background.withOpacity(0.3),
+              ]
+                  : [
+                AppTheme.background.withOpacity(0.2),
+                AppTheme.background.withOpacity(0.15),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(13),
+            // Use AppTheme.borderGrey
+            border: Border.all(
+              color: AppTheme.borderGrey.withOpacity(_isHovered ? 0.45 : 0.3),
+              width: 1.5,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Icon(
+                widget.icon,
+                size: 19,
+                color: _isHovered
+                    ? AppTheme.primaryGreen // Use theme color
+                    : AppTheme.bodyText.withOpacity(0.7), // Use theme color
+              ),
+              if (widget.hasBadge)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.red.shade400,
+                          Colors.red.shade600,
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.5),
+                          blurRadius: 5,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ✅ GLASSY USER CARD - THEMED
+class _GlassyUserCard extends StatefulWidget {
+  final String userName;
+  final String userInitial;
+
+  const _GlassyUserCard({
+    required this.userName,
+    required this.userInitial,
+  });
+
+  @override
+  State<_GlassyUserCard> createState() => _GlassyUserCardState();
+}
+
+class _GlassyUserCardState extends State<_GlassyUserCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          // Use AppTheme.background
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: _isHovered
+                ? [
+              AppTheme.background.withOpacity(0.35),
+              AppTheme.background.withOpacity(0.25),
+            ]
+                : [
+              AppTheme.background.withOpacity(0.2),
+              AppTheme.background.withOpacity(0.15),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          // Use AppTheme.borderGrey
+          border: Border.all(
+            color: AppTheme.borderGrey.withOpacity(_isHovered ? 0.45 : 0.3),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                // Use AppTheme.primaryGradient
+                gradient: AppTheme.primaryGradient,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryGreen.withOpacity(0.3), // Use theme color
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  widget.userInitial,
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.userName,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.darkText, // Use theme color
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentGreen, // Use theme color
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Online',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.accentGreen, // Use theme color
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+// ✅ DESKTOP HEADER
+class _DesktopHeader extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final String userName;
+  final String userInitial;
+  final bool isCompact;
+
+  const _DesktopHeader({
+    required this.title,
+    required this.icon,
+    required this.userName,
+    required this.userInitial,
+    required this.isCompact,
+  });
+
+  @override
+  State<_DesktopHeader> createState() => _DesktopHeaderState();
+}
+
+class _DesktopHeaderState extends State<_DesktopHeader> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // ✅ LEFT SECTION: Title with Icon
+        Expanded(
+          child: MouseRegion(
+            onEnter: (_) => setState(() => _isHovered = true),
+            onExit: (_) => setState(() => _isHovered = false),
+            child: Row(
+              children: [
+                // Icon Container with Gradient - DESKTOP
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: _isHovered
+                          ? [
+                        AppTheme.primaryGreen,
+                        AppTheme.accentGreen,
+                      ]
+                          : [
+                        AppTheme.primaryGreen.withOpacity(0.9),
+                        AppTheme.accentGreen.withOpacity(0.85),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryGreen.withOpacity(
+                          _isHovered ? 0.4 : 0.25,
+                        ),
+                        blurRadius: _isHovered ? 16 : 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: AnimatedScale(
+                    duration: const Duration(milliseconds: 300),
+                    scale: _isHovered ? 1.08 : 1.0,
+                    child: Icon(
+                      widget.icon,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 18),
+
+                // Title Section
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Breadcrumb
+                      Text(
+                        'Welcome Back',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.bodyText.withOpacity(0.5),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Main Title
+                      Text(
+                        widget.title,
+                        style: GoogleFonts.inter(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.darkText,
+                          letterSpacing: -0.5,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      // Subtitle
+                      Text(
+                        'Manage your ${widget.title.toLowerCase()}',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                          color: AppTheme.bodyText.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        if (!widget.isCompact) const SizedBox(width: 24),
+
+        // ✅ RIGHT SECTION: Actions
+        if (!widget.isCompact)
+          Row(
+            children: [
+              // Notification Button
+              _HeaderActionButton(
+                icon: Iconsax.notification,
+                onPressed: () {},
+                hasBadge: true,
+              ),
+              const SizedBox(width: 12),
+
+              // Settings Button
+              _HeaderActionButton(
+                icon: Iconsax.setting_2,
+                onPressed: () {},
+              ),
+              const SizedBox(width: 16),
+
+              // User Profile Card
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.background,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppTheme.borderGrey.withOpacity(0.5),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.shadowColor.withOpacity(0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // User Avatar
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppTheme.primaryGreen,
+                            AppTheme.accentGreen,
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryGreen.withOpacity(0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          widget.userInitial,
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // User Info
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.userName,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.darkText,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 5,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                color: AppTheme.accentGreen,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Online',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: AppTheme.accentGreen,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+
+
 
 // ==================== MODERN COLLAPSIBLE SIDEBAR ====================
 // (This widget is unchanged)

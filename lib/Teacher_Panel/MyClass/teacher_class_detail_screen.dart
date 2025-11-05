@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
-import 'package:lms_publisher/Teacher_Panel/MyClass/subject_chapter_screen.dart';
+import 'package:lms_publisher/Teacher_Panel/MyClass/teacher_subject_chapter_screen.dart';
 import 'package:lms_publisher/Teacher_Panel/MyClass/student_detail_screen.dart';
 import 'package:lms_publisher/Teacher_Panel/teacher_panel_service.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
@@ -372,6 +372,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
               subjectId: subjectId,
               subjectName: subjectName,
               subjectColor: color, // Pass the dynamic color
+              classRecNo: widget.classRecNo,
             ),
           ),
         );
