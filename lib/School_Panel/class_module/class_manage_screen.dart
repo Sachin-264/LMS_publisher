@@ -212,58 +212,66 @@ class _ClassManageScreenContentState extends State<ClassManageScreenContent> {
         final canEdit = Provider.of<UserProvider>(context).hasPermission('M012', 'edit');
         final canDelete = Provider.of<UserProvider>(context).hasPermission('M012', 'delete');
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildPageHeader(context, canAdd),
-            const SizedBox(height: AppTheme.defaultPadding * 1.5),
-            StyledContainer(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  _buildSearchFilterHeader(context), // Passed context for responsive checks
-                  const SizedBox(height: AppTheme.defaultPadding),
-                  if (isLoading)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: CircularProgressIndicator(color: AppTheme.primaryGreen),
-                      ),
-                    )
-                  else if (_filteredClasses.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32.0),
-                        child: Text(
-                          _searchController.text.isNotEmpty
-                              ? 'No classes match your search.'
-                              : 'No classes found for academic year $selectedAcademicYear. Try adding one!',
-                          style: GoogleFonts.inter(color: AppTheme.bodyText),
+        // --- ADDED THIS WRAPPER ---
+        return SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            // --- ADDED THIS LINE ---
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildPageHeader(context, canAdd),
+              const SizedBox(height: AppTheme.defaultPadding * 1.5),
+              StyledContainer(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  // --- ADDED THIS LINE (Good practice for nested columns) ---
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildSearchFilterHeader(context), // Passed context for responsive checks
+                    const SizedBox(height: AppTheme.defaultPadding),
+                    if (isLoading)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: CircularProgressIndicator(color: AppTheme.primaryGreen),
                         ),
+                      )
+                    else if (_filteredClasses.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Text(
+                            _searchController.text.isNotEmpty
+                                ? 'No classes match your search.'
+                                : 'No classes found for academic year $selectedAcademicYear. Try adding one!',
+                            style: GoogleFonts.inter(color: AppTheme.bodyText),
+                          ),
+                        ),
+                      )
+                    else
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isMobile = constraints.maxWidth < 700;
+                          return _buildClassTable(
+                            context,
+                            paginatedClasses,
+                            isMobile,
+                            canEdit,
+                            canDelete,
+                            operationBy,
+                          );
+                        },
                       ),
-                    )
-                  else
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isMobile = constraints.maxWidth < 700;
-                        return _buildClassTable(
-                          context,
-                          paginatedClasses,
-                          isMobile,
-                          canEdit,
-                          canDelete,
-                          operationBy,
-                        );
-                      },
-                    ),
-                  const SizedBox(height: AppTheme.defaultPadding),
-                  if (_filteredClasses.isNotEmpty && totalPages > 1)
-                    _buildPaginationControls(totalPages),
-                ],
+                    const SizedBox(height: AppTheme.defaultPadding),
+                    if (_filteredClasses.isNotEmpty && totalPages > 1)
+                      _buildPaginationControls(totalPages),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
+        // --- END OF CHANGES ---
       },
     );
   }

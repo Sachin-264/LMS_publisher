@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/screens/LoginScreen/responsive_login_screen.dart';
 
 
@@ -15,18 +16,30 @@ class _LogoutTransitionScreenState extends State<LogoutTransitionScreen>
     with SingleTickerProviderStateMixin {
   bool showAction = false;
   late final AnimationController _controller;
+  late final Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    // Simulate contacting Mackleo
-    Future.delayed(const Duration(milliseconds: 1800), () {
-      if (mounted) setState(() => showAction = true);
-    });
+
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    )..repeat();
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeIn,
+      ),
+    );
+
+    _controller.forward();
+
+    // Show button after 2 seconds
+    Future.delayed(const Duration(milliseconds: 2000), () {
+      if (mounted) setState(() => showAction = true);
+    });
   }
 
   @override
@@ -44,161 +57,211 @@ class _LogoutTransitionScreenState extends State<LogoutTransitionScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: Stack(
-        children: [
-          // Optional: replicate your login background (gradients/illustrations)
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    theme.colorScheme.primary.withOpacity(0.06),
-                    theme.colorScheme.secondary.withOpacity(0.06),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-            ),
-          ),
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // App brand/logo area similar to login
-                    Icon(Iconsax.logout, // Replace with your brand asset if used in login
-                        size: 64, color: theme.colorScheme.primary),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Signing you out',
-                      style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onSurface,
+      backgroundColor: AppTheme.background,
+      body: SafeArea(
+        child: Center(
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Simple logout image
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppTheme.borderGrey.withOpacity(0.3),
+                        width: 2,
                       ),
-                      textAlign: TextAlign.center,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Contacting Mackleo and securely closing your session…',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: theme.colorScheme.onSurface.withOpacity(0.7),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 28),
-
-                    // Loader animation aligned with your login aesthetics
-                    SizedBox(
-                      height: 56,
-                      width: 56,
-                      child: AnimatedBuilder(
-                        animation: _controller,
-                        builder: (_, __) {
-                          return CustomPaint(
-                            painter: _RingSpinnerPainter(
-                              progress: _controller.value,
-                              color: theme.colorScheme.primary,
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/logout.png',
+                        height: 140,
+                        width: 140,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 140,
+                            width: 140,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen.withOpacity(0.1),
+                            ),
+                            child: Icon(
+                              Iconsax.logout,
+                              size: 70,
+                              color: AppTheme.primaryGreen,
                             ),
                           );
                         },
                       ),
                     ),
+                  ),
 
-                    const SizedBox(height: 28),
-                    AnimatedOpacity(
-                      duration: const Duration(milliseconds: 400),
-                      opacity: showAction ? 1.0 : 0.0,
-                      child: IgnorePointer(
-                        ignoring: !showAction,
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: goToLogin,
-                            icon: const Icon(Icons.login_rounded),
-                            label: const Text('Back to Login'),
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 14, horizontal: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
+                  const SizedBox(height: 40),
+
+                  // MACK CLEO branding
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _StyledText(
+                        text: 'MACK',
+                        color: AppTheme.mackColor,
+                        borderColor: AppTheme.mackBorder,
+                        shadowColor: AppTheme.mackColor.withOpacity(0.3),
+                      ),
+                      const SizedBox(width: 12),
+                      _StyledText(
+                        text: 'CLEO',
+                        color: AppTheme.cleoColor,
+                        borderColor: AppTheme.cleoBorder,
+                        shadowColor: AppTheme.cleoColor.withOpacity(0.3),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Simple text
+                  Text(
+                    'See You Soon!',
+                    style: GoogleFonts.poppins(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.darkText,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Text(
+                    'You have been successfully logged out',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: AppTheme.bodyText,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  // Simple progress indicator
+                  if (!showAction)
+                    SizedBox(
+                      height: 4,
+                      width: 200,
+                      child: LinearProgressIndicator(
+                        backgroundColor: AppTheme.borderGrey.withOpacity(0.2),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppTheme.primaryGreen,
                         ),
                       ),
                     ),
 
-                    // Extra hint
-                    if (!showAction) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        'Please wait a moment…',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  // Button with fixed width
+                  if (showAction)
+                    ElevatedButton(
+                      onPressed: goToLogin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 24,
                         ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppTheme.defaultBorderRadius,
+                        ),
+                        elevation: 2,
+                        fixedSize: const Size(250, 50), // Fixed width and height
                       ),
-                    ],
-                  ],
-                ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.login_rounded, size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Back to Login',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-// Simple ring spinner painter to keep dependencies light
-class _RingSpinnerPainter extends CustomPainter {
-  final double progress;
+// Simple _StyledText Widget
+class _StyledText extends StatelessWidget {
+  final String text;
   final Color color;
-  _RingSpinnerPainter({required this.progress, required this.color});
+  final Color borderColor;
+  final Color shadowColor;
+
+  const _StyledText({
+    required this.text,
+    required this.color,
+    required this.borderColor,
+    required this.shadowColor,
+  });
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final stroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round
-      ..color = color;
-
-    final rect = Offset.zero & size;
-    final start = progress * 360.0;
-    const sweep = 270.0;
-
-    // background arc (subtle)
-    final bg = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..color = color.withOpacity(0.15);
-    canvas.drawArc(rect.deflate(4), 0, 2 * 3.14159, false, bg);
-
-    // foreground rotating arc
-    final startRad = start * 3.14159 / 180.0;
-    final sweepRad = sweep * 3.14159 / 180.0;
-    canvas.drawArc(rect.deflate(4), startRad, sweepRad, false, stroke);
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Border stroke
+        Text(
+          text,
+          style: GoogleFonts.poppins(
+            fontSize: 32,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 4
+              ..color = borderColor,
+          ),
+        ),
+        // Fill
+        Text(
+          text,
+          style: GoogleFonts.poppins(
+            fontSize: 32,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1,
+            color: color,
+            shadows: [
+              Shadow(
+                offset: const Offset(0, 3),
+                blurRadius: 8,
+                color: shadowColor,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant _RingSpinnerPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.color != color;
-  }
-}
-
-// TEMP icon reference if you use iconsax
-class IconsaxLogoutCurveBold {
-  static const IconData data = Icons.logout_rounded;
 }

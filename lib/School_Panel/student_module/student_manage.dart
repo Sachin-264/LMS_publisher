@@ -261,230 +261,244 @@ class _StudentsScreenContentState extends State<StudentsScreenContent> {
         final totalPages = (students.length / rowsPerPage).ceil();
 
         // Check for primary loading or secondary loading (for the list view itself)
-        final bool isLoading = state is StudentLoadingState || (state is StudentLoadedState && state.isSecondaryLoading && students.isEmpty);
+        final bool isLoading = state is StudentLoadingState ||
+            (state is StudentLoadedState &&
+                state.isSecondaryLoading &&
+                students.isEmpty);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final bool isMobile = constraints.maxWidth < 600;
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    if (!isMobile)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Student Directory',
-                            style: GoogleFonts.poppins(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.darkText,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Add, view, and manage all student records effortlessly.',
-                            style: GoogleFonts.inter(
-                              color: AppTheme.bodyText,
-                            ),
-                          ),
-                        ],
-                      ),
-                    if (isMobile)
-                      Text(
-                        'Students',
-                        style: GoogleFonts.poppins(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.darkText,
-                        ),
-                      ),
-                    ElevatedButton.icon(
-                      onPressed: () => navigateToAddEditStudent(null),
-                      icon: const Icon(Iconsax.add_square, size: 20),
-                      label: isMobile
-                          ? const SizedBox.shrink()
-                          : Text(
-                        'Add New Student',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryGreen,
-                        foregroundColor: Colors.white,
-                        shape: isMobile
-                            ? const CircleBorder()
-                            : RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 4,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isMobile ? 16 : 24,
-                          vertical: 20,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: AppTheme.defaultPadding * 1.5),
-
-            // Students Table Container
-            // IMPORTANT: The StyledContainer provides all necessary horizontal padding (24)
-            // for the table content on all screen sizes, solving the "table coming under layout" issue
-            // by ensuring the content is restricted within the container's bounds.
-            StyledContainer(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  // Search and Filter Header
-                  StudentsHeader(
-                    selectedCount: selectedStudents.length,
-                    onBulkDelete: () {
-                      if (selectedStudents.isNotEmpty) {
-                        showBulkDeleteDialog(
-                          context,
-                          selectedStudents.toList(),
-                        );
-                      }
-                    },
-                    onFilterPressed: () => showFilterDialog(context),
-                  ),
-                  const SizedBox(height: AppTheme.defaultPadding),
-
-                  // Loading / Empty / Table
-                  if (isLoading)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: CircularProgressIndicator(
-                          color: AppTheme.primaryGreen,
-                        ),
-                      ),
-                    )
-                  else if (students.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32.0),
-                        child: Column(
+        // --- ADDED THIS WRAPPER ---
+        return SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            // --- ADDED THIS LINE ---
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final bool isMobile = constraints.maxWidth < 600;
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (!isMobile)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Iconsax.document_cloud,
-                                size: 50, color: AppTheme.bodyText),
-                            const SizedBox(height: 10),
                             Text(
-                              state is StudentLoadedState &&
-                                  state.searchQuery != null &&
-                                  state.searchQuery!.isNotEmpty
-                                  ? 'No students match your search.'
-                                  : 'No student records found.',
-                              style: GoogleFonts.inter(color: AppTheme.bodyText),
+                              'Student Directory',
+                              style: GoogleFonts.poppins(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.darkText,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Add, view, and manage all student records effortlessly.',
+                              style: GoogleFonts.inter(
+                                color: AppTheme.bodyText,
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    )
-                  else
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        bool isMobile = constraints.maxWidth < 700;
-                        return ModernStudentsTable(
-                          students: paginatedStudents,
-                          isMobile: isMobile,
-                          selectedStudents: selectedStudents,
-                          onSelectionChanged: (recNo, isSelected) {
-                            setState(() {
-                              if (isSelected) {
-                                selectedStudents.add(recNo);
-                              } else {
-                                selectedStudents.remove(recNo);
-                              }
-                            });
-                          },
-                          onTapRow: (student) => showDetailsDialog(context, student),
-                          onEdit: (student) =>
-                              navigateToAddEditStudent(student),
-                          onDelete: (student) =>
-                              showDeleteConfirmationDialog(context, student),
-                          onViewHistory: (student) =>
-                              showHistoryDialog(context, student),
-                          onUpdateCredentials: _showUpdateCredentialsDialog,
-                        );
-                      },
-                    ),
-
-                  const SizedBox(height: AppTheme.defaultPadding),
-
-                  // Pagination
-                  if (students.isNotEmpty && totalPages > 1)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text('Rows:', style: GoogleFonts.inter()),
-                        const SizedBox(width: 8),
-                        // Professional Dropdown
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white, // Made white
-                            border: Border.all(color: AppTheme.borderGrey),
-                            borderRadius: BorderRadius.circular(12), // Smooth corners
+                      if (isMobile)
+                        Text(
+                          'Students',
+                          style: GoogleFonts.poppins(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.darkText,
                           ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<int>(
-                              value: rowsPerPage,
-                              isDense: true,
-                              icon: const Icon(Iconsax.arrow_down_1, size: 20),
-                              items: [5, 8, 10, 15]
-                                  .map((e) => DropdownMenuItem(
-                                value: e,
-                                child: Text(e.toString(), style: GoogleFonts.inter()),
-                              ))
-                                  .toList(),
-                              onChanged: (value) {
-                                if (value != null) {
-                                  setState(() {
-                                    rowsPerPage = value;
-                                    currentPage = 0;
-                                  });
+                        ),
+                      ElevatedButton.icon(
+                        onPressed: () => navigateToAddEditStudent(null),
+                        icon: const Icon(Iconsax.add_square, size: 20),
+                        label: isMobile
+                            ? const SizedBox.shrink()
+                            : Text(
+                          'Add New Student',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryGreen,
+                          foregroundColor: Colors.white,
+                          shape: isMobile
+                              ? const CircleBorder()
+                              : RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 4,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isMobile ? 16 : 24,
+                            vertical: 20,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: AppTheme.defaultPadding * 1.5),
+
+              // Students Table Container
+              StyledContainer(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  // --- ADDED THIS LINE (Good practice for nested column) ---
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Search and Filter Header
+                    StudentsHeader(
+                      selectedCount: selectedStudents.length,
+                      onBulkDelete: () {
+                        if (selectedStudents.isNotEmpty) {
+                          showBulkDeleteDialog(
+                            context,
+                            selectedStudents.toList(),
+                          );
+                        }
+                      },
+                      onFilterPressed: () => showFilterDialog(context),
+                    ),
+                    const SizedBox(height: AppTheme.defaultPadding),
+
+                    // Loading / Empty / Table
+                    if (isLoading)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: CircularProgressIndicator(
+                            color: AppTheme.primaryGreen,
+                          ),
+                        ),
+                      )
+                    else if (students.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            children: [
+                              const Icon(Iconsax.document_cloud,
+                                  size: 50, color: AppTheme.bodyText),
+                              const SizedBox(height: 10),
+                              Text(
+                                state is StudentLoadedState &&
+                                    state.searchQuery != null &&
+                                    state.searchQuery!.isNotEmpty
+                                    ? 'No students match your search.'
+                                    : 'No student records found.',
+                                style:
+                                GoogleFonts.inter(color: AppTheme.bodyText),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          bool isMobile = constraints.maxWidth < 700;
+                          return ModernStudentsTable(
+                            students: paginatedStudents,
+                            isMobile: isMobile,
+                            selectedStudents: selectedStudents,
+                            onSelectionChanged: (recNo, isSelected) {
+                              setState(() {
+                                if (isSelected) {
+                                  selectedStudents.add(recNo);
+                                } else {
+                                  selectedStudents.remove(recNo);
                                 }
-                              },
-                              dropdownColor: Colors.white,
-                              style: GoogleFonts.inter(color: AppTheme.darkText, fontSize: 14),
+                              });
+                            },
+                            onTapRow: (student) =>
+                                showDetailsDialog(context, student),
+                            onEdit: (student) =>
+                                navigateToAddEditStudent(student),
+                            onDelete: (student) =>
+                                showDeleteConfirmationDialog(context, student),
+                            onViewHistory: (student) =>
+                                showHistoryDialog(context, student),
+                            onUpdateCredentials: _showUpdateCredentialsDialog,
+                          );
+                        },
+                      ),
+
+                    const SizedBox(height: AppTheme.defaultPadding),
+
+                    // Pagination
+                    if (students.isNotEmpty && totalPages > 1)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text('Rows:', style: GoogleFonts.inter()),
+                          const SizedBox(width: 8),
+                          // Professional Dropdown
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white, // Made white
+                              border: Border.all(color: AppTheme.borderGrey),
+                              borderRadius:
+                              BorderRadius.circular(12), // Smooth corners
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<int>(
+                                value: rowsPerPage,
+                                isDense: true,
+                                icon:
+                                const Icon(Iconsax.arrow_down_1, size: 20),
+                                items: [5, 8, 10, 15]
+                                    .map((e) => DropdownMenuItem(
+                                  value: e,
+                                  child: Text(e.toString(),
+                                      style: GoogleFonts.inter()),
+                                ))
+                                    .toList(),
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() {
+                                      rowsPerPage = value;
+                                      currentPage = 0;
+                                    });
+                                  }
+                                },
+                                dropdownColor: Colors.white,
+                                style: GoogleFonts.inter(
+                                    color: AppTheme.darkText, fontSize: 14),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Text(
-                          'Page ${currentPage + 1} of $totalPages',
-                          style: GoogleFonts.inter(),
-                        ),
-                        const SizedBox(width: 16),
-                        IconButton(
-                          icon: const Icon(Iconsax.arrow_left_2, size: 20),
-                          onPressed: currentPage > 0
-                              ? () => goToPage(currentPage - 1)
-                              : null,
-                        ),
-                        IconButton(
-                          icon: const Icon(Iconsax.arrow_right_3, size: 20),
-                          onPressed: currentPage < totalPages - 1
-                              ? () => goToPage(currentPage + 1)
-                              : null,
-                        ),
-                      ],
-                    ),
-                ],
+                          const SizedBox(width: 16),
+                          Text(
+                            'Page ${currentPage + 1} of $totalPages',
+                            style: GoogleFonts.inter(),
+                          ),
+                          const SizedBox(width: 16),
+                          IconButton(
+                            icon: const Icon(Iconsax.arrow_left_2, size: 20),
+                            onPressed: currentPage > 0
+                                ? () => goToPage(currentPage - 1)
+                                : null,
+                          ),
+                          IconButton(
+                            icon: const Icon(Iconsax.arrow_right_3, size: 20),
+                            onPressed: currentPage < totalPages - 1
+                                ? () => goToPage(currentPage + 1)
+                                : null,
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
+        // --- END OF CHANGES ---
       },
     );
   }

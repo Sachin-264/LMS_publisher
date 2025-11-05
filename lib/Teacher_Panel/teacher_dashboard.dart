@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/Teacher_Panel/MyClass/teacher_classes_screen.dart';
@@ -9,7 +8,6 @@ import 'package:lms_publisher/Util/beautiful_loader.dart';
 import 'package:lms_publisher/Util/custom_snackbar.dart';
 import 'package:lms_publisher/screens/main_layout.dart';
 import 'package:provider/provider.dart';
-import 'dart:ui';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -18,12 +16,14 @@ class TeacherDashboard extends StatefulWidget {
   State<TeacherDashboard> createState() => _TeacherDashboardState();
 }
 
-class _TeacherDashboardState extends State<TeacherDashboard> with TickerProviderStateMixin {
+class _TeacherDashboardState extends State<TeacherDashboard>
+    with TickerProviderStateMixin {
   bool _isLoading = true;
   String? _errorMessage;
   Map<String, dynamic>? _dashboardData;
 
-  static const String _imageBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
+  static const String _imageBaseUrl =
+      "https://storage.googleapis.com/upload-images-34/images/LMS/";
 
   String _selectedAcademicYear = '2025-26';
   final List<String> _academicYears = ['2024-25', '2025-26', '2026-27'];
@@ -124,7 +124,13 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
     return MainLayout(
       activeScreen: AppScreen.teacherDashboard,
       child: _isLoading
-          ? const Center(child: BeautifulLoader())
+          ? Center(
+          child: BeautifulLoader(
+            type: LoaderType.pulse,
+            color: AppTheme.primaryGreen,
+            size: 80,
+            message: 'Loading dashboard...',
+          ))
           : _errorMessage != null
           ? _buildErrorView()
           : _buildDashboardContent(),
@@ -136,33 +142,38 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Iconsax.info_circle, size: 64, color: Colors.red.shade300),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppTheme.mackColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Iconsax.danger,
+                size: 64, color: AppTheme.mackColor),
+          ),
           const SizedBox(height: 16),
           Text(
             'Error Loading Dashboard',
-            style: GoogleFonts.inter(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
+            style: AppTheme.headline1.copyWith(fontSize: 20),
           ),
           const SizedBox(height: 8),
           Text(
             _errorMessage ?? 'Unknown error',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: AppTheme.bodyText,
-            ),
+            style: AppTheme.bodyText1,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: _loadDashboard,
             icon: const Icon(Iconsax.refresh),
-            label: const Text('Retry'),
+            label: Text('Retry', style: AppTheme.buttonText),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryGreen,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppTheme.defaultBorderRadius,
+              ),
             ),
           ),
         ],
@@ -182,6 +193,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
           final isMobile = constraints.maxWidth < 768;
 
           return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: EdgeInsets.all(isMobile ? 16 : 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,15 +243,16 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
     );
   }
 
-  Widget _buildMobileHeader(Map<String, dynamic>? teacherInfo, String teacherPhotoUrl, String schoolLogoUrl) {
+  Widget _buildMobileHeader(Map<String, dynamic>? teacherInfo,
+      String teacherPhotoUrl, String schoolLogoUrl) {
     return Row(
       children: [
         Container(
           width: 60,
           height: 60,
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            color: AppTheme.background,
+            borderRadius: AppTheme.defaultBorderRadius, // 16
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.15),
@@ -249,12 +262,13 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: AppTheme.defaultBorderRadius, // 16
             child: teacherPhotoUrl.isNotEmpty
                 ? Image.network(
               teacherPhotoUrl,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => _buildDefaultAvatar(),
+              errorBuilder: (context, error, stackTrace) =>
+                  _buildDefaultAvatar(),
             )
                 : _buildDefaultAvatar(),
           ),
@@ -266,7 +280,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
             children: [
               Text(
                 'Welcome Back! 👋',
-                style: GoogleFonts.inter(
+                style: AppTheme.bodyText1.copyWith(
                   fontSize: 11,
                   color: Colors.white.withOpacity(0.9),
                   fontWeight: FontWeight.w500,
@@ -275,11 +289,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
               const SizedBox(height: 4),
               Text(
                 teacherInfo?['Teacher_Name'] ?? 'Teacher',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
+                style: AppTheme.headline2.copyWith(fontSize: 18),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -290,7 +300,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: AppTheme.defaultBorderRadius * 0.75, // 8
             border: Border.all(color: Colors.white.withOpacity(0.3)),
           ),
           child: Row(
@@ -302,12 +312,9 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
                 child: DropdownButton<String>(
                   value: _selectedAcademicYear,
                   dropdownColor: AppTheme.primaryGreen,
-                  icon: const Icon(Iconsax.arrow_down_1, color: Colors.white, size: 14),
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
+                  icon: const Icon(Iconsax.arrow_down_1,
+                      color: Colors.white, size: 14),
+                  style: AppTheme.buttonText.copyWith(fontSize: 12),
                   items: _academicYears.map((year) {
                     return DropdownMenuItem(
                       value: year,
@@ -339,12 +346,12 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade100),
+        color: AppTheme.background,
+        borderRadius: AppTheme.defaultBorderRadius, // 12
+        border: Border.all(color: AppTheme.borderGrey),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AppTheme.shadowColor,
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -357,12 +364,12 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade200),
+                color: AppTheme.lightGrey,
+                borderRadius: AppTheme.defaultBorderRadius * 0.75, // 10
+                border: Border.all(color: AppTheme.borderGrey),
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: AppTheme.defaultBorderRadius * 0.75, // 10
                 child: Image.network(
                   schoolLogoUrl,
                   fit: BoxFit.cover,
@@ -382,9 +389,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
               children: [
                 Text(
                   teacherInfo?['School_Name'] ?? '',
-                  style: GoogleFonts.inter(
+                  style: AppTheme.labelText.copyWith(
                     fontSize: 14,
-                    fontWeight: FontWeight.w600,
                     color: AppTheme.darkText,
                   ),
                   maxLines: 1,
@@ -401,7 +407,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
                     const SizedBox(width: 4),
                     Text(
                       'Your Institution',
-                      style: GoogleFonts.inter(
+                      style: AppTheme.bodyText1.copyWith(
                         fontSize: 11,
                         color: AppTheme.bodyText.withOpacity(0.6),
                       ),
@@ -415,9 +421,9 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AppTheme.primaryGreen.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppTheme.defaultBorderRadius * 0.75, // 8
             ),
-            child: Icon(
+            child: const Icon(
               Iconsax.building,
               size: 16,
               color: AppTheme.primaryGreen,
@@ -428,19 +434,15 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
     );
   }
 
-
   Widget _buildHeader(Map<String, dynamic>? teacherInfo, bool isMobile) {
     final teacherPhotoUrl = _getImageUrl(teacherInfo?['Teacher_Photo_Path']);
     final schoolLogoUrl = _getImageUrl(teacherInfo?['School_Logo_Path']);
 
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppTheme.primaryGreen, AppTheme.accentGreen],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
+        gradient: AppTheme.primaryGradient,
+        borderRadius:
+        AppTheme.defaultBorderRadius * (isMobile ? 1.5 : 2), // 18 or 24
         boxShadow: [
           BoxShadow(
             color: AppTheme.primaryGreen.withOpacity(0.3),
@@ -458,17 +460,16 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
     );
   }
 
-
-
-  Widget _buildWebHeader(Map<String, dynamic>? teacherInfo, String teacherPhotoUrl, String schoolLogoUrl) {
+  Widget _buildWebHeader(Map<String, dynamic>? teacherInfo,
+      String teacherPhotoUrl, String schoolLogoUrl) {
     return Row(
       children: [
         Container(
           width: 90,
           height: 90,
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            color: AppTheme.background,
+            borderRadius: AppTheme.defaultBorderRadius * 1.75, // 20
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.15),
@@ -478,25 +479,25 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: AppTheme.defaultBorderRadius * 1.75, // 20
             child: teacherPhotoUrl.isNotEmpty
                 ? Image.network(
               teacherPhotoUrl,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => _buildDefaultAvatar(),
+              errorBuilder: (context, error, stackTrace) =>
+                  _buildDefaultAvatar(),
             )
                 : _buildDefaultAvatar(),
           ),
         ),
         const SizedBox(width: 24),
-
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Welcome Back! 👋',
-                style: GoogleFonts.inter(
+                style: AppTheme.bodyText1.copyWith(
                   fontSize: 13,
                   color: Colors.white.withOpacity(0.9),
                   fontWeight: FontWeight.w500,
@@ -505,11 +506,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
               const SizedBox(height: 8),
               Text(
                 teacherInfo?['Teacher_Name'] ?? 'Teacher',
-                style: GoogleFonts.inter(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
+                style: AppTheme.headline2.copyWith(fontSize: 26),
               ),
               const SizedBox(height: 6),
               Row(
@@ -519,7 +516,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
                       width: 20,
                       height: 20,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppTheme.background,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: ClipRRect(
@@ -537,7 +534,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
                   Expanded(
                     child: Text(
                       teacherInfo?['School_Name'] ?? '',
-                      style: GoogleFonts.inter(
+                      style: AppTheme.bodyText1.copyWith(
                         fontSize: 14,
                         color: Colors.white.withOpacity(0.9),
                         fontWeight: FontWeight.w500,
@@ -551,14 +548,12 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
             ],
           ),
         ),
-
         const SizedBox(width: 24),
-
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: AppTheme.defaultBorderRadius, // 12
             border: Border.all(color: Colors.white.withOpacity(0.3)),
           ),
           child: Row(
@@ -570,12 +565,9 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
                 child: DropdownButton<String>(
                   value: _selectedAcademicYear,
                   dropdownColor: AppTheme.primaryGreen,
-                  icon: const Icon(Iconsax.arrow_down_1, color: Colors.white, size: 16),
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
+                  icon: const Icon(Iconsax.arrow_down_1,
+                      color: Colors.white, size: 16),
+                  style: AppTheme.buttonText.copyWith(fontSize: 14),
                   items: _academicYears.map((year) {
                     return DropdownMenuItem(
                       value: year,
@@ -684,12 +676,13 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
     return Container(
       padding: EdgeInsets.all(isMobile ? 14 : 20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
-        border: Border.all(color: Colors.grey.shade100),
+        color: AppTheme.background,
+        borderRadius:
+        AppTheme.defaultBorderRadius * (isMobile ? 1 : 1.5), // 12 or 18
+        border: Border.all(color: AppTheme.borderGrey),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AppTheme.shadowColor,
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -702,26 +695,24 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
             padding: EdgeInsets.all(isMobile ? 8 : 10),
             decoration: BoxDecoration(
               color: AppTheme.primaryGreen.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: AppTheme.defaultBorderRadius * 0.75, // 10
             ),
-            child: Icon(icon, color: AppTheme.primaryGreen, size: isMobile ? 18 : 22),
+            child: Icon(icon,
+                color: AppTheme.primaryGreen, size: isMobile ? 18 : 22),
           ),
           const Spacer(),
           Text(
             value,
-            style: GoogleFonts.inter(
+            style: AppTheme.headline1.copyWith(
               fontSize: isMobile ? 22 : 28,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.darkText,
             ),
           ),
           SizedBox(height: isMobile ? 2 : 4),
           Text(
             title,
-            style: GoogleFonts.inter(
+            style: AppTheme.labelText.copyWith(
               fontSize: isMobile ? 11 : 13,
               color: AppTheme.bodyText,
-              fontWeight: FontWeight.w600,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -729,7 +720,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
           SizedBox(height: isMobile ? 1 : 2),
           Text(
             subtitle,
-            style: GoogleFonts.inter(
+            style: AppTheme.bodyText1.copyWith(
               fontSize: isMobile ? 9 : 11,
               color: AppTheme.bodyText.withOpacity(0.6),
             ),
@@ -744,12 +735,13 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
   Widget _buildTodaysSchedule(List<dynamic> schedule, bool isMobile) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
-        border: Border.all(color: Colors.grey.shade100),
+        color: AppTheme.background,
+        borderRadius:
+        AppTheme.defaultBorderRadius * (isMobile ? 1 : 1.5), // 12 or 18
+        border: Border.all(color: AppTheme.borderGrey),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AppTheme.shadowColor,
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -762,13 +754,13 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
             padding: EdgeInsets.all(isMobile ? 16 : 20),
             child: Row(
               children: [
-                Icon(Iconsax.calendar, color: AppTheme.primaryGreen, size: isMobile ? 18 : 22),
+                Icon(Iconsax.calendar,
+                    color: AppTheme.primaryGreen, size: isMobile ? 18 : 22),
                 SizedBox(width: isMobile ? 8 : 12),
                 Text(
                   "Today's Schedule",
-                  style: GoogleFonts.inter(
+                  style: AppTheme.headline1.copyWith(
                     fontSize: isMobile ? 16 : 18,
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const Spacer(),
@@ -783,9 +775,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
                   ),
                   child: Text(
                     '${schedule.length} ${schedule.length == 1 ? 'Class' : 'Classes'}',
-                    style: GoogleFonts.inter(
+                    style: AppTheme.labelText.copyWith(
                       fontSize: isMobile ? 10 : 12,
-                      fontWeight: FontWeight.w600,
                       color: AppTheme.primaryGreen,
                     ),
                   ),
@@ -793,9 +784,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
               ],
             ),
           ),
-
-          const Divider(height: 1),
-
+          Divider(height: 1, color: AppTheme.borderGrey),
           schedule.isEmpty
               ? Padding(
             padding: EdgeInsets.all(isMobile ? 24 : 40),
@@ -805,15 +794,13 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
                   Icon(
                     Iconsax.calendar_tick,
                     size: isMobile ? 40 : 56,
-                    color: Colors.grey.shade300,
+                    color: AppTheme.borderGrey.withOpacity(0.7),
                   ),
                   SizedBox(height: isMobile ? 8 : 16),
                   Text(
                     'No classes scheduled for today',
-                    style: GoogleFonts.inter(
+                    style: AppTheme.bodyText1.copyWith(
                       fontSize: isMobile ? 12 : 14,
-                      color: AppTheme.bodyText,
-                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -842,7 +829,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
       padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
         color: AppTheme.primaryGreen.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(isMobile ? 10 : 12),
+        borderRadius:
+        AppTheme.defaultBorderRadius * (isMobile ? 0.75 : 1), // 10 or 12
         border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.2)),
       ),
       child: Row(
@@ -862,17 +850,15 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
               children: [
                 Text(
                   classItem['Class_Name'] ?? '',
-                  style: GoogleFonts.inter(
+                  style: AppTheme.labelText.copyWith(
                     fontSize: isMobile ? 13 : 15,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 SizedBox(height: isMobile ? 2 : 4),
                 Text(
                   classItem['Subject_Name'] ?? '',
-                  style: GoogleFonts.inter(
+                  style: AppTheme.bodyText1.copyWith(
                     fontSize: isMobile ? 11 : 13,
-                    color: AppTheme.bodyText,
                   ),
                 ),
               ],
@@ -885,14 +871,12 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
             ),
             decoration: BoxDecoration(
               color: AppTheme.primaryGreen,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppTheme.defaultBorderRadius * 0.75, // 8
             ),
             child: Text(
               classItem['Start_Time'] ?? '',
-              style: GoogleFonts.inter(
+              style: AppTheme.buttonText.copyWith(
                 fontSize: isMobile ? 11 : 13,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
               ),
             ),
           ),
@@ -908,6 +892,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
         'title': 'My Classes',
         'subtitle': 'View all classes',
         'onTap': () {
+          // Navigate to classes screen. Using pushReplacement to avoid
+          // stacking dashboards if 'My Classes' is part of the MainLayout nav
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const TeacherClassesScreen()),
@@ -919,7 +905,6 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
         'title': 'Students',
         'subtitle': 'Manage students',
         'onTap': () {
-          // TODO: Navigate to students screen
           CustomSnackbar.showInfo(context, 'Students screen coming soon!');
         }
       },
@@ -928,7 +913,6 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
         'title': 'Analytics',
         'subtitle': 'View performance',
         'onTap': () {
-          // TODO: Navigate to analytics screen
           CustomSnackbar.showInfo(context, 'Analytics screen coming soon!');
         }
       },
@@ -937,7 +921,6 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
         'title': 'Materials',
         'subtitle': 'Study resources',
         'onTap': () {
-          // TODO: Navigate to materials screen
           CustomSnackbar.showInfo(context, 'Materials screen coming soon!');
         }
       },
@@ -945,12 +928,13 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
-        border: Border.all(color: Colors.grey.shade100),
+        color: AppTheme.background,
+        borderRadius:
+        AppTheme.defaultBorderRadius * (isMobile ? 1 : 1.5), // 12 or 18
+        border: Border.all(color: AppTheme.borderGrey),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AppTheme.shadowColor,
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -963,29 +947,29 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
             padding: EdgeInsets.all(isMobile ? 16 : 20),
             child: Text(
               "Quick Actions",
-              style: GoogleFonts.inter(
+              style: AppTheme.headline1.copyWith(
                 fontSize: isMobile ? 16 : 18,
-                fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: AppTheme.borderGrey),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             padding: EdgeInsets.all(isMobile ? 12 : 16),
             itemCount: actions.length,
-            separatorBuilder: (context, index) => SizedBox(height: isMobile ? 6 : 8),
+            separatorBuilder: (context, index) =>
+                SizedBox(height: isMobile ? 6 : 8),
             itemBuilder: (context, index) {
               final action = actions[index];
               return InkWell(
                 onTap: action['onTap'] as VoidCallback,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: AppTheme.defaultBorderRadius * 0.75, // 10
                 child: Container(
                   padding: EdgeInsets.all(isMobile ? 10 : 14),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppTheme.lightGrey,
+                    borderRadius: AppTheme.defaultBorderRadius * 0.75, // 10
                   ),
                   child: Row(
                     children: [
@@ -993,7 +977,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
                         padding: EdgeInsets.all(isMobile ? 6 : 8),
                         decoration: BoxDecoration(
                           color: AppTheme.primaryGreen.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: AppTheme.defaultBorderRadius * 0.75, // 8
                         ),
                         child: Icon(
                           action['icon'] as IconData,
@@ -1008,16 +992,14 @@ class _TeacherDashboardState extends State<TeacherDashboard> with TickerProvider
                           children: [
                             Text(
                               action['title'] as String,
-                              style: GoogleFonts.inter(
+                              style: AppTheme.labelText.copyWith(
                                 fontSize: isMobile ? 12 : 14,
-                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             Text(
                               action['subtitle'] as String,
-                              style: GoogleFonts.inter(
+                              style: AppTheme.bodyText1.copyWith(
                                 fontSize: isMobile ? 10 : 11,
-                                color: AppTheme.bodyText,
                               ),
                             ),
                           ],

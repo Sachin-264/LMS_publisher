@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
@@ -31,6 +30,10 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   final TextEditingController _searchController = TextEditingController();
+
+  // Using a distinct "Favorites" color for this screen's branding
+  static const Color _favoriteColor = Color(0xFFFF6B9D);
+  static const Color _favoriteColorDark = Color(0xFFC06C84);
 
   @override
   void initState() {
@@ -114,7 +117,6 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
   void _applyFilters() {
     List<FavoriteChapter> filtered = List.from(_favorites);
 
-    // Search filter
     if (_searchController.text.isNotEmpty) {
       filtered = filtered
           .where((f) => f.chapterName
@@ -123,7 +125,6 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
           .toList();
     }
 
-    // Sort
     switch (_sortBy) {
       case 'recent':
         filtered.sort((a, b) {
@@ -136,7 +137,8 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
         filtered.sort((a, b) => a.chapterName.compareTo(b.chapterName));
         break;
       case 'progress':
-        filtered.sort((a, b) => b.progressPercentage.compareTo(a.progressPercentage));
+        filtered
+            .sort((a, b) => b.progressPercentage.compareTo(a.progressPercentage));
         break;
     }
 
@@ -190,18 +192,7 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
     }
   }
 
-  String buildFullName(String? first, String? middle, String? last) {
-    final parts = <String>[];
-    if (first != null && first.trim().isNotEmpty) parts.add(first.trim());
-    if (middle != null && middle.trim().isNotEmpty) parts.add(middle.trim());
-    if (last != null && last.trim().isNotEmpty) parts.add(last.trim());
-    return parts.join(' ');
-  }
-
-
-
   void openChapterDetails(FavoriteChapter favorite) {
-    // 1) Map FavoriteChapter to ChapterModel (unchanged)
     final chapterModel = ChapterModel(
       chapterId: favorite.chapterId,
       chapterName: favorite.chapterName,
@@ -218,12 +209,15 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
       lastAccessedDisplay: favorite.lastAccessedDisplay,
     );
 
-    // 2) Build TeacherNavigationData list from teachersRaw
     TeacherNavigationData mapTeacher(Map<String, dynamic> t) {
       DateTime? doj;
       final dojStr = (t['DateOfJoining'] ?? '').toString();
       if (dojStr.isNotEmpty) {
-        try { doj = DateTime.parse(dojStr); } catch (_) { doj = null; }
+        try {
+          doj = DateTime.parse(dojStr);
+        } catch (_) {
+          doj = null;
+        }
       }
       final String computedFullName = [
         (t['FirstName'] ?? '').toString().trim(),
@@ -231,21 +225,26 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
         (t['LastName'] ?? '').toString().trim(),
       ].where((e) => e.isNotEmpty).join(' ').trim();
 
-      final String displayFullName = (t['TeacherFullName'] ?? '').toString().trim().isNotEmpty
+      final String displayFullName =
+      (t['TeacherFullName'] ?? '').toString().trim().isNotEmpty
           ? (t['TeacherFullName'] as String).trim()
           : (computedFullName.isNotEmpty ? computedFullName : 'Teacher');
 
-      final bool isCurrent = (t['Is_Current_Teacher'] == true) || (t['Is_Current_Teacher'] == 1);
+      final bool isCurrent =
+          (t['Is_Current_Teacher'] == true) || (t['Is_Current_Teacher'] == 1);
 
       return TeacherNavigationData(
         teacherCode: (t['TeacherCode'] ?? '').toString(),
         teacherFullName: displayFullName,
-        teacherPhoto: (t['TeacherPhoto']?.toString().isNotEmpty ?? false) ? t['TeacherPhoto'].toString() : null,
+        teacherPhoto: (t['TeacherPhoto']?.toString().isNotEmpty ?? false)
+            ? t['TeacherPhoto'].toString()
+            : null,
         designation: (t['Designation'] ?? 'Teacher').toString(),
         department: (t['Department'] ?? 'Not Assigned').toString(),
         mobileNumber: (t['MobileNumber'] ?? '').toString(),
         institutionalEmail: (t['InstitutionalEmail'] ?? '').toString(),
-        experienceYears: int.tryParse((t['ExperienceYears'] ?? '').toString()) ?? 0,
+        experienceYears:
+        int.tryParse((t['ExperienceYears'] ?? '').toString()) ?? 0,
         employeeCode: (t['EmployeeCode'] ?? '').toString(),
         isCurrentTeacher: isCurrent, // bool
         dateOfJoining: doj,
@@ -256,7 +255,6 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
     final List<TeacherNavigationData> allTeachers =
     favorite.teachersRaw.map(mapTeacher).toList();
 
-    // 3) Choose selectedTeacher (current if any, else first, else fallback)
     TeacherNavigationData? selectedTeacher;
     if (allTeachers.isNotEmpty) {
       selectedTeacher = allTeachers.firstWhere(
@@ -271,7 +269,10 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
           favorite.firstName?.trim() ?? '',
           favorite.middleName?.trim() ?? '',
           favorite.lastName?.trim() ?? ''
-        ].where((e) => e.isNotEmpty).join(' ').isNotEmpty
+        ]
+            .where((e) => e.isNotEmpty)
+            .join(' ')
+            .isNotEmpty
             ? [
           favorite.firstName?.trim() ?? '',
           favorite.middleName?.trim() ?? '',
@@ -286,23 +287,21 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
         experienceYears: favorite.experienceYears ?? 0,
         employeeCode: favorite.employeeCode,
         isCurrentTeacher: (favorite.isCurrentTeacher ?? 0) == 1, // bool
-        dateOfJoining: (favorite.dateOfJoining != null && favorite.dateOfJoining!.isNotEmpty)
+        dateOfJoining: (favorite.dateOfJoining != null &&
+            favorite.dateOfJoining!.isNotEmpty)
             ? DateTime.tryParse(favorite.dateOfJoining!)
             : null,
         employeeStatus: favorite.employeeStatus ?? 'Active',
       );
     }
 
-    final List<TeacherNavigationData> otherTeachers = allTeachers
-        .where((t) => t.teacherCode != selectedTeacher!.teacherCode)
-        .toList();
+    final List<TeacherNavigationData> otherTeachers =
+    allTeachers.where((t) => t.teacherCode != selectedTeacher!.teacherCode).toList();
 
-    // 4) Subject color + academic year
     final Color subjectColor = _getSubjectColor(favorite.subjectId);
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final String academicYear = userProvider.academicYear ?? '';
 
-    // 5) Navigate
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -312,17 +311,14 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
           subjectName: favorite.subjectName,
           subjectId: favorite.subjectId,
           selectedTeacher: selectedTeacher!,
-          allTeachers: allTeachers.isNotEmpty ? allTeachers : [selectedTeacher!],
+          allTeachers:
+          allTeachers.isNotEmpty ? allTeachers : [selectedTeacher!],
           otherTeachers: otherTeachers,
           academicYear: academicYear,
         ),
       ),
     ).then((_) => _loadFavorites());
   }
-
-
-
-
 
   Color _getSubjectColor(int subjectId) {
     final colors = [
@@ -333,7 +329,7 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
       const Color(0xFF8B5CF6),
       const Color(0xFF06B6D4),
       const Color(0xFFEF4444),
-      const Color(0xFF14B8A6),
+      const Color(0xFF14B6A6),
     ];
     return colors[subjectId % colors.length];
   }
@@ -344,13 +340,12 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
       activeScreen: AppScreen.myFavourites,
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppTheme.defaultPadding * 1.5), // 24.0
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildPageHeader(),
             const SizedBox(height: 32),
-
             if (_isLoading)
               _buildLoadingState()
             else if (_errorMessage != null)
@@ -368,41 +363,38 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
     );
   }
 
-  // ========== PAGE HEADER ==========
+  // ========== PAGE HEADER (Refined) ==========
   Widget _buildPageHeader() {
     return Row(
       children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFF6B9D), Color(0xFFC06C84)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFF6B9D).withOpacity(0.4),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: const Icon(Iconsax.heart, color: Colors.white, size: 32),
-        ),
-        const SizedBox(width: 24),
-
+        // Container(
+        //   padding: const EdgeInsets.all(18),
+        //   decoration: BoxDecoration(
+        //     gradient: const LinearGradient(
+        //       colors: [_favoriteColor, _favoriteColorDark],
+        //       begin: Alignment.topLeft,
+        //       end: Alignment.bottomRight,
+        //     ),
+        //     borderRadius: BorderRadius.circular(18),
+        //     boxShadow: [
+        //       BoxShadow(
+        //         color: _favoriteColor.withOpacity(0.4),
+        //         blurRadius: 16,
+        //         offset: const Offset(0, 6),
+        //       ),
+        //     ],
+        //   ),
+        //   child: const Icon(Iconsax.heart, color: Colors.white, size: 32),
+        // ),
+        // const SizedBox(width: 24),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'My Favourites',
-                style: GoogleFonts.inter(
+                style: AppTheme.headline1.copyWith(
                   fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.darkText,
                   letterSpacing: -0.5,
                 ),
               ),
@@ -411,10 +403,9 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
                 children: [
                   Text(
                     'Your Chapter',
-                    style: GoogleFonts.inter(
+                    style: AppTheme.bodyText1.copyWith(
                       fontSize: 15,
                       color: AppTheme.bodyText.withOpacity(0.7),
-                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   if (!_isLoading && _favorites.isNotEmpty) ...[
@@ -426,17 +417,13 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
                       ),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFFF6B9D), Color(0xFFC06C84)],
+                          colors: [_favoriteColor, _favoriteColorDark],
                         ),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         '${_favorites.length} ${_favorites.length == 1 ? "Chapter" : "Chapters"}',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
+                        style: AppTheme.buttonText.copyWith(fontSize: 13),
                       ),
                     ),
                   ],
@@ -445,7 +432,6 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
             ],
           ),
         ),
-
         _buildActionButton(
           icon: Iconsax.refresh,
           onTap: () {
@@ -465,38 +451,34 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
     required String tooltip,
     bool isPrimary = false,
   }) {
+    final color = isPrimary ? _favoriteColor : AppTheme.bodyText;
+    final bgColor =
+    isPrimary ? _favoriteColor.withOpacity(0.1) : AppTheme.background;
+    final borderColor =
+    isPrimary ? _favoriteColor.withOpacity(0.3) : AppTheme.borderGrey;
+
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: isPrimary
-            ? const Color(0xFFFF6B9D).withOpacity(0.1)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        color: bgColor,
+        borderRadius: AppTheme.defaultBorderRadius,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppTheme.defaultBorderRadius,
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(
-                color: isPrimary
-                    ? const Color(0xFFFF6B9D).withOpacity(0.3)
-                    : AppTheme.borderGrey.withOpacity(0.2),
-              ),
-              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: borderColor),
+              borderRadius: AppTheme.defaultBorderRadius,
             ),
-            child: Icon(
-              icon,
-              color: isPrimary ? const Color(0xFFFF6B9D) : AppTheme.bodyText,
-              size: 20,
-            ),
+            child: Icon(icon, color: color, size: 20),
           ),
         ),
       ),
     );
   }
 
-  // ========== SEARCH AND SORT ==========
+  // ========== SEARCH AND SORT (Refined) ==========
   Widget _buildSearchAndSort() {
     return Row(
       children: [
@@ -504,14 +486,12 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
         Expanded(
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppTheme.borderGrey.withOpacity(0.2),
-              ),
+              color: AppTheme.background,
+              borderRadius: AppTheme.defaultBorderRadius,
+              border: Border.all(color: AppTheme.borderGrey),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: AppTheme.shadowColor,
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -522,7 +502,7 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
               onChanged: (value) => _applyFilters(),
               decoration: InputDecoration(
                 hintText: 'Search favorites...',
-                hintStyle: GoogleFonts.inter(
+                hintStyle: AppTheme.bodyText1.copyWith(
                   color: AppTheme.bodyText.withOpacity(0.5),
                   fontSize: 14,
                 ),
@@ -557,16 +537,14 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
 
         // Sort dropdown
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppTheme.borderGrey.withOpacity(0.2),
-            ),
+            color: AppTheme.background,
+            borderRadius: AppTheme.defaultBorderRadius,
+            border: Border.all(color: AppTheme.borderGrey),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: AppTheme.shadowColor,
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -583,13 +561,10 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
               DropdownButton<String>(
                 value: _sortBy,
                 underline: const SizedBox(),
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.darkText,
-                ),
+                style: AppTheme.labelText.copyWith(fontSize: 14),
                 items: const [
-                  DropdownMenuItem(value: 'recent', child: Text('Recently Accessed')),
+                  DropdownMenuItem(
+                      value: 'recent', child: Text('Recently Accessed')),
                   DropdownMenuItem(value: 'name', child: Text('Chapter Name')),
                   DropdownMenuItem(value: 'progress', child: Text('Progress')),
                 ],
@@ -607,7 +582,7 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
     );
   }
 
-  // ========== FAVORITES GRID ==========
+  // ========== FAVORITES GRID (Refined) ==========
   Widget _buildFavoritesGrid() {
     if (_filteredFavorites.isEmpty) {
       return Center(
@@ -623,9 +598,8 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
               const SizedBox(height: 16),
               Text(
                 'No favorites match your search',
-                style: GoogleFonts.inter(
+                style: AppTheme.bodyText1.copyWith(
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
                   color: AppTheme.bodyText.withOpacity(0.6),
                 ),
               ),
@@ -671,140 +645,122 @@ class _MyFavouritesScreenState extends State<MyFavouritesScreen>
     );
   }
 
-  // ========== LOADING STATE ==========
+  // ========== LOADING STATE (Refined) ==========
   Widget _buildLoadingState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 120),
-          BeautifulLoader(
-            type: LoaderType.pulse,
-            size: 80,
-            color: const Color(0xFFFF6B9D),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Loading your favorites...',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.bodyText,
-            ),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 120),
+        child: BeautifulLoader(
+          type: LoaderType.pulse,
+          size: 80,
+          color: _favoriteColor,
+          message: 'Loading your favorites...',
+        ),
       ),
     );
   }
 
-  // ========== ERROR STATE ==========
+  // ========== ERROR STATE (Refined) ==========
   Widget _buildErrorState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 120),
-          Container(
-            padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.red.withOpacity(0.3), width: 2),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 120),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+                border:
+                Border.all(color: Colors.red.withOpacity(0.3), width: 2),
+              ),
+              child: const Icon(Iconsax.danger, size: 72, color: Colors.red),
             ),
-            child: const Icon(Iconsax.danger, size: 72, color: Colors.red),
-          ),
-          const SizedBox(height: 28),
-          Text(
-            'Oops! Something Went Wrong',
-            style: GoogleFonts.inter(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.darkText,
+            const SizedBox(height: 28),
+            Text(
+              'Oops! Something Went Wrong',
+              style: AppTheme.headline1.copyWith(fontSize: 22),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _errorMessage ?? 'Unknown error occurred',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: AppTheme.bodyText.withOpacity(0.7),
+            const SizedBox(height: 12),
+            Text(
+              _errorMessage ?? 'Unknown error occurred',
+              style: AppTheme.bodyText1.copyWith(
+                color: AppTheme.bodyText.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: _loadFavorites,
-            icon: const Icon(Iconsax.refresh, size: 20),
-            label: Text(
-              'Try Again',
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: _loadFavorites,
+              icon: const Icon(Iconsax.refresh, size: 20),
+              label: Text(
+                'Try Again',
+                style: AppTheme.buttonText.copyWith(fontSize: 15),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _favoriteColor,
+                foregroundColor: Colors.white,
+                padding:
+                const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppTheme.defaultBorderRadius,
+                ),
               ),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF6B9D),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // ========== EMPTY STATE ==========
+  // ========== EMPTY STATE (Refined) ==========
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 120),
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF6B9D).withOpacity(0.08),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFFF6B9D).withOpacity(0.2),
-                width: 2,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 120),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: _favoriteColor.withOpacity(0.08),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _favoriteColor.withOpacity(0.2),
+                  width: 2,
+                ),
+              ),
+              child: Icon(
+                Iconsax.heart,
+                size: 80,
+                color: _favoriteColor.withOpacity(0.5),
               ),
             ),
-            child: Icon(
-              Iconsax.heart,
-              size: 80,
-              color: const Color(0xFFFF6B9D).withOpacity(0.5),
+            const SizedBox(height: 28),
+            Text(
+              'No Favorites Yet',
+              style: AppTheme.headline1.copyWith(fontSize: 22),
             ),
-          ),
-          const SizedBox(height: 28),
-          Text(
-            'No Favorites Yet',
-            style: GoogleFonts.inter(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.darkText,
+            const SizedBox(height: 12),
+            Text(
+              'Start adding chapters to your favorites\nto access them quickly',
+              style: AppTheme.bodyText1.copyWith(
+                color: AppTheme.bodyText.withOpacity(0.7),
+                height: 1.6,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Start adding chapters to your favorites\nto access them quickly',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: AppTheme.bodyText.withOpacity(0.7),
-              height: 1.6,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-// ========== ENHANCED FAVORITE CARD ==========
+// ========== ENHANCED FAVORITE CARD (Refined) ==========
 class _EnhancedFavoriteCard extends StatefulWidget {
   final FavoriteChapter favorite;
   final int index;
@@ -862,9 +818,9 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
   Color _getStatusColor() {
     switch (widget.favorite.completionStatus) {
       case 'Completed':
-        return const Color(0xFF10B981);
+        return AppTheme.accentGreen;
       case 'In Progress':
-        return const Color(0xFF6366F1);
+        return const Color(0xFF6366F1); // Keep custom "in progress" color
       default:
         return AppTheme.bodyText.withOpacity(0.5);
     }
@@ -890,19 +846,19 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
             curve: Curves.easeOutCubic,
             width: 420,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppTheme.background,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
                 color: _isHovered
                     ? widget.subjectColor.withOpacity(0.5)
-                    : AppTheme.borderGrey.withOpacity(0.12),
+                    : AppTheme.borderGrey,
                 width: _isHovered ? 2.5 : 1.5,
               ),
               boxShadow: [
                 BoxShadow(
                   color: _isHovered
                       ? widget.subjectColor.withOpacity(0.25)
-                      : Colors.black.withOpacity(0.04),
+                      : AppTheme.shadowColor,
                   blurRadius: _isHovered ? 32 : 12,
                   offset: Offset(0, _isHovered ? 16 : 8),
                 ),
@@ -940,7 +896,7 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                                   widget.subjectColor.withOpacity(0.75),
                                 ],
                               ),
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: AppTheme.defaultBorderRadius,
                               boxShadow: [
                                 BoxShadow(
                                   color: widget.subjectColor.withOpacity(0.35),
@@ -962,16 +918,15 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                               children: [
                                 Text(
                                   widget.favorite.subjectName,
-                                  style: GoogleFonts.inter(
+                                  style: AppTheme.labelText.copyWith(
                                     fontSize: 13,
                                     color: widget.subjectColor,
-                                    fontWeight: FontWeight.w700,
                                     letterSpacing: 0.5,
                                   ),
                                 ),
                                 Text(
                                   'Chapter ${widget.favorite.chapterOrder}',
-                                  style: GoogleFonts.inter(
+                                  style: AppTheme.bodyText1.copyWith(
                                     fontSize: 11,
                                     color: AppTheme.bodyText.withOpacity(0.6),
                                     fontWeight: FontWeight.w600,
@@ -984,7 +939,7 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                             onPressed: widget.onRemove,
                             icon: const Icon(
                               Iconsax.heart,
-                              color: Color(0xFFFF6B9D),
+                              color: _MyFavouritesScreenState._favoriteColor,
                               size: 22,
                             ),
                             tooltip: 'Remove from favorites',
@@ -994,10 +949,8 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                       const SizedBox(height: 16),
                       Text(
                         widget.favorite.chapterName,
-                        style: GoogleFonts.inter(
+                        style: AppTheme.headline1.copyWith(
                           fontSize: 19,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.darkText,
                           letterSpacing: -0.5,
                           height: 1.3,
                         ),
@@ -1042,9 +995,8 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                                 const SizedBox(width: 6),
                                 Text(
                                   widget.favorite.completionStatus,
-                                  style: GoogleFonts.inter(
+                                  style: AppTheme.labelText.copyWith(
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w700,
                                     color: _getStatusColor(),
                                   ),
                                 ),
@@ -1072,9 +1024,8 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                                 const SizedBox(width: 6),
                                 Text(
                                   '${widget.favorite.progressPercentage.toStringAsFixed(0)}%',
-                                  style: GoogleFonts.inter(
+                                  style: AppTheme.labelText.copyWith(
                                     fontSize: 14,
-                                    fontWeight: FontWeight.w900,
                                     color: widget.subjectColor,
                                   ),
                                 ),
@@ -1095,17 +1046,15 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                             children: [
                               Text(
                                 'Progress',
-                                style: GoogleFonts.inter(
+                                style: AppTheme.labelText.copyWith(
                                   fontSize: 12,
-                                  fontWeight: FontWeight.w700,
                                   color: AppTheme.bodyText.withOpacity(0.75),
                                 ),
                               ),
                               Text(
                                 '${widget.favorite.progressPercentage.toStringAsFixed(1)}% Complete',
-                                style: GoogleFonts.inter(
+                                style: AppTheme.bodyText1.copyWith(
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w600,
                                   color: AppTheme.bodyText.withOpacity(0.5),
                                 ),
                               ),
@@ -1138,8 +1087,8 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                                     borderRadius: BorderRadius.circular(10),
                                     boxShadow: [
                                       BoxShadow(
-                                        color:
-                                        widget.subjectColor.withOpacity(0.4),
+                                        color: widget.subjectColor
+                                            .withOpacity(0.4),
                                         blurRadius: 8,
                                         offset: const Offset(0, 2),
                                       ),
@@ -1158,10 +1107,10 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: AppTheme.bodyText.withOpacity(0.03),
-                          borderRadius: BorderRadius.circular(14),
+                          color: AppTheme.lightGrey,
+                          borderRadius: AppTheme.defaultBorderRadius,
                           border: Border.all(
-                            color: AppTheme.borderGrey.withOpacity(0.1),
+                            color: AppTheme.borderGrey,
                           ),
                         ),
                         child: Row(
@@ -1178,19 +1127,17 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                                 children: [
                                   Text(
                                     'Last Accessed',
-                                    style: GoogleFonts.inter(
+                                    style: AppTheme.bodyText1.copyWith(
                                       fontSize: 11,
                                       color: AppTheme.bodyText.withOpacity(0.5),
-                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     widget.favorite.lastAccessedDisplay,
-                                    style: GoogleFonts.inter(
+                                    style: AppTheme.labelText.copyWith(
                                       fontSize: 13,
                                       color: AppTheme.darkText,
-                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ],
@@ -1201,7 +1148,8 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                               Icon(
                                 Iconsax.heart,
                                 size: 16,
-                                color: const Color(0xFFFF6B9D).withOpacity(0.7),
+                                color: _MyFavouritesScreenState._favoriteColor
+                                    .withOpacity(0.7),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -1210,19 +1158,19 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                                   children: [
                                     Text(
                                       'Added to Favorites',
-                                      style: GoogleFonts.inter(
+                                      style: AppTheme.bodyText1.copyWith(
                                         fontSize: 11,
-                                        color: AppTheme.bodyText.withOpacity(0.5),
-                                        fontWeight: FontWeight.w600,
+                                        color:
+                                        AppTheme.bodyText.withOpacity(0.5),
                                       ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      _formatDate(widget.favorite.favoritedDate!),
-                                      style: GoogleFonts.inter(
+                                      _formatDate(
+                                          widget.favorite.favoritedDate!),
+                                      style: AppTheme.labelText.copyWith(
                                         fontSize: 13,
                                         color: AppTheme.darkText,
-                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                   ],
@@ -1244,20 +1192,18 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
                           label: Text(
                             widget.favorite.completionStatus == 'Completed'
                                 ? 'Review Chapter'
-                                : widget.favorite.completionStatus == 'In Progress'
+                                : widget.favorite.completionStatus ==
+                                'In Progress'
                                 ? 'Continue Learning'
                                 : 'Start Chapter',
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: AppTheme.buttonText.copyWith(fontSize: 15),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: widget.subjectColor,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: AppTheme.defaultBorderRadius,
                             ),
                             elevation: 0,
                           ),
@@ -1295,7 +1241,9 @@ class _EnhancedFavoriteCardState extends State<_EnhancedFavoriteCard>
   }
 }
 
-
+// ============================================
+// CORE DATA MODEL (Essential - Not a Mock)
+// ============================================
 class FavoriteChapter {
   final int recNo;
   final int chapterId;
@@ -1306,12 +1254,12 @@ class FavoriteChapter {
 
   // Progress
   final double progressPercentage; // from Progress_Percentage
-  final String completionStatus;   // 0 -> Not Started, 100 -> Completed, else In Progress
+  final String completionStatus; // 0 -> Not Started, 100 -> Completed, else In Progress
 
   // Dates
-  final String? lastAccessedDate;   // from Last_Accessed_Date (yyyy-MM-dd HH:mm:ss)
+  final String? lastAccessedDate; // from Last_Accessed_Date (yyyy-MM-dd HH:mm:ss)
   final String lastAccessedDisplay; // from Last_Studied_Display
-  final String? favoritedDate;      // from Favorited_Date
+  final String? favoritedDate; // from Favorited_Date
 
   // Single selected teacher snapshot (for quick card display/fallbacks)
   final int? allotmentRecNo;
@@ -1410,9 +1358,8 @@ class FavoriteChapter {
     }
 
     final double prog = parseDouble(json['Progress_Percentage']);
-    final String status = prog >= 100
-        ? 'Completed'
-        : (prog > 0 ? 'In Progress' : 'Not Started');
+    final String status =
+    prog >= 100 ? 'Completed' : (prog > 0 ? 'In Progress' : 'Not Started');
 
     return FavoriteChapter(
       recNo: parseIntOrNull(json['RecNo']) ?? 0,
@@ -1423,21 +1370,26 @@ class FavoriteChapter {
       subjectName: (json['SubjectName'] ?? '').toString(),
       progressPercentage: prog,
       completionStatus: status,
-
       lastAccessedDate: (json['Last_Accessed_Date'] ?? '').toString().isNotEmpty
           ? json['Last_Accessed_Date'].toString()
           : null,
-      lastAccessedDisplay: (json['Last_Studied_Display'] ?? 'Never').toString(),
+      lastAccessedDisplay:
+      (json['Last_Studied_Display'] ?? 'Never').toString(),
       favoritedDate: (json['Favorited_Date'] ?? '').toString().isNotEmpty
           ? json['Favorited_Date'].toString()
           : null,
-
-      // Selected teacher snapshot (optional)
-      allotmentRecNo: chosenTeacher != null ? parseIntOrNull(chosenTeacher['Allotment_RecNo']) : null,
-      isCurrentTeacher: chosenTeacher != null
-          ? ((chosenTeacher['Is_Current_Teacher'] == true || chosenTeacher['Is_Current_Teacher'] == 1) ? 1 : 0)
+      allotmentRecNo: chosenTeacher != null
+          ? parseIntOrNull(chosenTeacher['Allotment_RecNo'])
           : null,
-      teacherRecNo: chosenTeacher != null ? parseIntOrNull(chosenTeacher['TeacherRecNo']) : null,
+      isCurrentTeacher: chosenTeacher != null
+          ? ((chosenTeacher['Is_Current_Teacher'] == true ||
+          chosenTeacher['Is_Current_Teacher'] == 1)
+          ? 1
+          : 0)
+          : null,
+      teacherRecNo: chosenTeacher != null
+          ? parseIntOrNull(chosenTeacher['TeacherRecNo'])
+          : null,
       teacherCode: chosenTeacher?['TeacherCode']?.toString(),
       employeeCode: chosenTeacher?['EmployeeCode']?.toString(),
       firstName: chosenTeacher?['FirstName']?.toString(),
@@ -1452,12 +1404,7 @@ class FavoriteChapter {
       experienceYears: parseIntOrNull(chosenTeacher?['ExperienceYears']),
       dateOfJoining: chosenTeacher?['DateOfJoining']?.toString(),
       employeeStatus: chosenTeacher?['EmployeeStatus']?.toString(),
-
-      // Full list preserved
       teachersRaw: teachersList,
     );
   }
 }
-
-
-

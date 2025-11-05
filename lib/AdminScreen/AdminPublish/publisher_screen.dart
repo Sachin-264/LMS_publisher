@@ -9,6 +9,7 @@ import 'package:lms_publisher/Service/publisher_api_service.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/screens/AcademicsScreen/academics_content.dart';
 import 'package:lms_publisher/screens/main_layout.dart';
+import 'package:lms_publisher/Util/beautiful_loader.dart'; // ✅ Import BeautifulLoader
 import 'publisher_bloc.dart';
 
 class PublisherScreen extends StatelessWidget {
@@ -50,105 +51,107 @@ class _PublisherViewState extends State<PublisherView> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    // FIXED: Removed mainAxisSize.min and Expanded, using Column directly
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header Section
-        Padding(
-          padding: const EdgeInsets.only(bottom: AppTheme.defaultPadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Publisher Management',
-                style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Oversee all publishers and their content contributions.',
-                style: GoogleFonts.inter(color: AppTheme.bodyText),
-              ),
-            ],
+    // ✅ Added SingleChildScrollView for scrollability
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Section
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppTheme.defaultPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Publisher Management',
+                  style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Oversee all publishers and their content contributions.',
+                  style: GoogleFonts.inter(color: AppTheme.bodyText),
+                ),
+              ],
+            ),
           ),
-        ),
 
-        // KPI Cards
-        BlocBuilder<PublisherBloc, PublisherState>(
-          builder: (context, state) {
-            bool isLoading = state is! PublisherLoaded;
-            AdminKPIs? kpis = (state is PublisherLoaded) ? state.kpis : null;
-            int activeCount = (state is PublisherLoaded) ? state.activePublishers.length : 0;
-            int inactiveCount = (state is PublisherLoaded) ? state.inactivePublishers.length : 0;
+          // KPI Cards
+          BlocBuilder<PublisherBloc, PublisherState>(
+            builder: (context, state) {
+              bool isLoading = state is! PublisherLoaded;
+              AdminKPIs? kpis = (state is PublisherLoaded) ? state.kpis : null;
+              int activeCount = (state is PublisherLoaded) ? state.activePublishers.length : 0;
+              int inactiveCount = (state is PublisherLoaded) ? state.inactivePublishers.length : 0;
 
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final isMobile = constraints.maxWidth < 700;
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobile = constraints.maxWidth < 700;
 
-                final kpiCards = [
-                  AnimatedKPICard(
-                    icon: Iconsax.user_square,
-                    color: AppTheme.primaryGreen,
-                    value: kpis?.publisherCount.toString() ?? '0',
-                    label: 'Total Publishers',
-                    isLoading: isLoading,
-                  ),
-                  AnimatedKPICard(
-                    icon: Iconsax.tick_circle,
-                    color: Colors.green,
-                    value: activeCount.toString(),
-                    label: 'Active Publishers',
-                    isLoading: isLoading,
-                  ),
-                  AnimatedKPICard(
-                    icon: Iconsax.close_circle,
-                    color: Colors.red,
-                    value: inactiveCount.toString(),
-                    label: 'Inactive Publishers',
-                    isLoading: isLoading,
-                  ),
-                  AnimatedKPICard(
-                    icon: Iconsax.book_1,
-                    color: Colors.blue,
-                    value: kpis?.subjectCount.toString() ?? '0',
-                    label: 'Total Subjects',
-                    isLoading: isLoading,
-                  ),
-                ];
+                  final kpiCards = [
+                    AnimatedKPICard(
+                      icon: Iconsax.user_square,
+                      color: AppTheme.primaryGreen,
+                      value: kpis?.publisherCount.toString() ?? '0',
+                      label: 'Total Publishers',
+                      isLoading: isLoading,
+                    ),
+                    AnimatedKPICard(
+                      icon: Iconsax.tick_circle,
+                      color: Colors.green,
+                      value: activeCount.toString(),
+                      label: 'Active Publishers',
+                      isLoading: isLoading,
+                    ),
+                    AnimatedKPICard(
+                      icon: Iconsax.close_circle,
+                      color: Colors.red,
+                      value: inactiveCount.toString(),
+                      label: 'Inactive Publishers',
+                      isLoading: isLoading,
+                    ),
+                    AnimatedKPICard(
+                      icon: Iconsax.book_1,
+                      color: Colors.blue,
+                      value: kpis?.subjectCount.toString() ?? '0',
+                      label: 'Total Subjects',
+                      isLoading: isLoading,
+                    ),
+                  ];
 
-                if (isMobile) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
+                  if (isMobile) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: kpiCards
+                          .map((card) => Padding(
+                        padding: const EdgeInsets.only(bottom: AppTheme.defaultPadding),
+                        child: card,
+                      ))
+                          .toList(),
+                    );
+                  }
+
+                  return Row(
                     children: kpiCards
-                        .map((card) => Padding(
-                      padding: const EdgeInsets.only(bottom: AppTheme.defaultPadding),
-                      child: card,
+                        .map((card) => Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppTheme.defaultPadding / 2),
+                        child: card,
+                      ),
                     ))
                         .toList(),
                   );
-                }
+                },
+              );
+            },
+          ),
 
-                return Row(
-                  children: kpiCards
-                      .map((card) => Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppTheme.defaultPadding / 2),
-                      child: card,
-                    ),
-                  ))
-                      .toList(),
-                );
-              },
-            );
-          },
-        ),
+          const SizedBox(height: AppTheme.defaultPadding * 1.5),
 
-        const SizedBox(height: AppTheme.defaultPadding * 1.5),
-
-        // FIXED: No Expanded here - let ScrollView in MainLayout handle scrolling
-        _buildPublisherListWithTabs(),
-      ],
+          // Publisher List with Tabs
+          _buildPublisherListWithTabs(),
+        ],
+      ),
     );
   }
 
@@ -156,7 +159,18 @@ class _PublisherViewState extends State<PublisherView> with SingleTickerProvider
     return BlocBuilder<PublisherBloc, PublisherState>(
       builder: (context, state) {
         if (state is PublisherLoading || state is PublisherInitial) {
-          return const Center(child: CircularProgressIndicator());
+          // ✅ Use BeautifulLoader instead of CircularProgressIndicator
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(40.0),
+              child: BeautifulLoader(
+                type: LoaderType.spinner,
+                color: AppTheme.primaryGreen,
+                size: 50,
+                message: 'Loading publishers...',
+              ),
+            ),
+          );
         }
 
         if (state is PublisherError) {
@@ -191,9 +205,9 @@ class _PublisherViewState extends State<PublisherView> with SingleTickerProvider
             builder: (context, constraints) {
               final isMobile = constraints.maxWidth < 700;
 
-              // FIXED: Using fixed height container for TabBarView
               return SizedBox(
-                height: 600, // Adjust this value based on your needs
+                // ✅ Increased height for better scrollability
+                height: 700,
                 child: Column(
                   children: [
                     Container(
@@ -341,7 +355,9 @@ class _PublisherViewState extends State<PublisherView> with SingleTickerProvider
                   Icon(Iconsax.folder_open, size: 48, color: Colors.grey.shade400),
                   const SizedBox(height: 16),
                   Text(
-                    isActive ? "No active publishers found." : "No inactive publishers found.",
+                    isActive
+                        ? "No active publishers found."
+                        : "No inactive publishers found.",
                     style: GoogleFonts.inter(color: AppTheme.bodyText),
                   ),
                 ],
@@ -416,7 +432,9 @@ class _PublisherViewState extends State<PublisherView> with SingleTickerProvider
                   Icon(Iconsax.folder_open, size: 48, color: Colors.grey.shade400),
                   const SizedBox(height: 16),
                   Text(
-                    isActive ? "No active publishers found." : "No inactive publishers found.",
+                    isActive
+                        ? "No active publishers found."
+                        : "No inactive publishers found.",
                     style: GoogleFonts.inter(color: AppTheme.bodyText),
                   ),
                 ],
@@ -442,6 +460,7 @@ class _PublisherViewState extends State<PublisherView> with SingleTickerProvider
       barrierDismissible: false,
       builder: (_) => const AddEditPublisherDialog(),
     );
+
     if (result == true && context.mounted) {
       context.read<PublisherBloc>().add(LoadPublisherData());
     }
@@ -486,12 +505,16 @@ class _AnimatedKPICardState extends State<AnimatedKPICard> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _isHovered ? widget.color.withOpacity(0.3) : AppTheme.borderGrey.withOpacity(0.3),
+              color: _isHovered
+                  ? widget.color.withOpacity(0.3)
+                  : AppTheme.borderGrey.withOpacity(0.3),
               width: _isHovered ? 2 : 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: _isHovered ? widget.color.withOpacity(0.1) : Colors.black.withOpacity(0.02),
+                color: _isHovered
+                    ? widget.color.withOpacity(0.1)
+                    : Colors.black.withOpacity(0.02),
                 blurRadius: _isHovered ? 12 : 4,
                 offset: Offset(0, _isHovered ? 6 : 2),
               ),
@@ -518,13 +541,10 @@ class _AnimatedKPICardState extends State<AnimatedKPICard> {
               ),
               const SizedBox(height: 12),
               widget.isLoading
-                  ? Container(
-                height: 24,
-                width: 50,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(4),
-                ),
+                  ? const BeautifulLoader(
+                type: LoaderType.dots,
+                color: AppTheme.primaryGreen,
+                size: 24,
               )
                   : Text(
                 widget.value,
@@ -550,6 +570,9 @@ class _AnimatedKPICardState extends State<AnimatedKPICard> {
     );
   }
 }
+
+
+
 
 // PublisherListItem Widget
 class PublisherListItem extends StatefulWidget {

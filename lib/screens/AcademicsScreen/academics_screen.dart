@@ -127,29 +127,33 @@ class _AcademicsViewState extends State<AcademicsView> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: AppTheme.defaultPadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Academics Module', style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700, color: AppTheme.darkText)),
-              const SizedBox(height: 4),
-              Text('Manage all your educational content from classes to materials.', style: GoogleFonts.inter(color: AppTheme.bodyText)),
-            ],
+    // --- ADDED THIS ---
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppTheme.defaultPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Academics Module', style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700, color: AppTheme.darkText)),
+                const SizedBox(height: 4),
+                Text('Manage all your educational content from classes to materials.', style: GoogleFonts.inter(color: AppTheme.bodyText)),
+              ],
+            ),
           ),
-        ),
-        const AcademicsDashboard(),
-        const SizedBox(height: AppTheme.defaultPadding * 1.5),
-        _buildViewSwitcher(),
-        const SizedBox(height: AppTheme.defaultPadding),
-        _buildCurrentView(),
-      ],
+          const AcademicsDashboard(),
+          const SizedBox(height: AppTheme.defaultPadding * 1.5),
+          _buildViewSwitcher(),
+          const SizedBox(height: AppTheme.defaultPadding),
+          _buildCurrentView(),
+        ],
+      ),
     );
+    // --- AND CLOSED IT HERE ---
   }
 
   Widget _buildViewSwitcher() {

@@ -1,5 +1,5 @@
+import 'dart:math' as math; // Added for the new animation
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 
 /// A beautiful custom loader widget with various styles
@@ -24,7 +24,7 @@ class BeautifulLoader extends StatefulWidget {
 class _BeautifulLoaderState extends State<BeautifulLoader>
     with TickerProviderStateMixin {
   late AnimationController _controller;
-  late AnimationController _pulseController;
+  // Removed the unused _pulseController
 
   @override
   void initState() {
@@ -34,16 +34,13 @@ class _BeautifulLoaderState extends State<BeautifulLoader>
       duration: const Duration(milliseconds: 1500),
     )..repeat();
 
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    )..repeat(reverse: true);
+    // _pulseController no longer needed for the new animation
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _pulseController.dispose();
+    // _pulseController no longer needed
     super.dispose();
   }
 
@@ -66,10 +63,11 @@ class _BeautifulLoaderState extends State<BeautifulLoader>
         loader = _buildSpinnerLoader(loaderColor);
         break;
       case LoaderType.pulse:
+      // This function name is the same, but the inside is all new
         loader = _buildPulseLoader(loaderColor);
         break;
       case LoaderType.cube:
-        // TODO: Handle this case.
+      // TODO: Handle this case.
         throw UnimplementedError();
     }
 
@@ -81,7 +79,8 @@ class _BeautifulLoaderState extends State<BeautifulLoader>
           const SizedBox(height: 16),
           Text(
             widget.message!,
-            style: GoogleFonts.inter(
+            // Use AppTheme style
+            style: AppTheme.bodyText1.copyWith(
               fontSize: 14,
               color: AppTheme.bodyText,
               fontWeight: FontWeight.w500,
@@ -172,13 +171,13 @@ class _BeautifulLoaderState extends State<BeautifulLoader>
       animation: _controller,
       builder: (context, child) {
         return Transform.rotate(
-          angle: _controller.value * 2 * 3.14159,
+          angle: _controller.value * 2 * math.pi,
           child: SizedBox(
             width: widget.size,
             height: widget.size,
             child: Stack(
               children: List.generate(8, (index) {
-                final angle = (index * 3.14159 / 4);
+                final angle = (index * math.pi / 4);
                 final opacity = 1.0 - (index * 0.12);
                 return Transform.rotate(
                   angle: angle,
@@ -202,41 +201,71 @@ class _BeautifulLoaderState extends State<BeautifulLoader>
     );
   }
 
+  // ==================================================================
+  // == THIS IS THE MODIFIED LOADER ==
+  // The name is the same, but the implementation is now "Spinning Arcs"
+  // ==================================================================
   Widget _buildPulseLoader(Color color) {
     return AnimatedBuilder(
-      animation: _pulseController,
+      animation: _controller,
       builder: (context, child) {
-        final scale = 0.7 + (_pulseController.value * 0.3);
-        final opacity = 1.0 - (_pulseController.value * 0.5);
-
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            // Outer pulse
-            Transform.scale(
-              scale: scale,
-              child: Container(
-                width: widget.size,
-                height: widget.size,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: color.withOpacity(opacity * 0.3),
-                ),
-              ),
+        return SizedBox(
+          width: widget.size,
+          height: widget.size,
+          child: CustomPaint(
+            painter: _PulseArcPainter(
+              color: color,
+              animationValue: _controller.value,
             ),
-            // Inner circle
-            Container(
-              width: widget.size * 0.6,
-              height: widget.size * 0.6,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color,
-              ),
-            ),
-          ],
+          ),
         );
       },
     );
+  }
+}
+
+// ==================================================================
+// == NEW CUSTOM PAINTER FOR THE SPINNING ARCS ANIMATION ==
+// ==================================================================
+class _PulseArcPainter extends CustomPainter {
+  final Color color;
+  final double animationValue;
+
+  _PulseArcPainter({required this.color, required this.animationValue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = color
+      ..strokeWidth = 4.0 // You can adjust stroke width
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final double center = size.width / 2;
+    final Rect rect =
+    Rect.fromCircle(center: Offset(center, center), radius: center - 4);
+
+    // Arc 1: Main spinning arc
+    double startAngle1 = animationValue * 2 * math.pi;
+    double sweepAngle1 = math.pi * 0.8; // 80% of a semi-circle
+
+    // Arc 2: Opposing, faster arc with different opacity
+    final Paint paint2 = Paint()
+      ..color = color.withOpacity(0.5)
+      ..strokeWidth = 4.0 // You can adjust stroke width
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    double startAngle2 = (animationValue * -1.5) * 2 * math.pi;
+    double sweepAngle2 = math.pi * 0.5; // 50% of a semi-circle
+
+    canvas.drawArc(rect, startAngle1, sweepAngle1, false, paint);
+    canvas.drawArc(rect, startAngle2, sweepAngle2, false, paint2);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PulseArcPainter oldDelegate) {
+    return oldDelegate.animationValue != animationValue;
   }
 }
 
@@ -245,7 +274,8 @@ enum LoaderType {
   dots,
   bars,
   spinner,
-  pulse, cube,
+  pulse,
+  cube,
 }
 
 /// Overlay loader that covers the entire screen
@@ -268,11 +298,13 @@ class OverlayLoader {
           child: Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              color: AppTheme.background, // Use AppTheme.background
+              borderRadius:
+              AppTheme.defaultBorderRadius * 1.5, // Use themed radius (18.0)
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  // Use a softer, more modern shadow
+                  color: Colors.black.withOpacity(0.1),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -315,6 +347,7 @@ class ButtonLoader extends StatelessWidget {
       height: size,
       child: CircularProgressIndicator(
         strokeWidth: 2,
+        // Default to white, which matches AppTheme.buttonText
         valueColor: AlwaysStoppedAnimation(color ?? Colors.white),
       ),
     );

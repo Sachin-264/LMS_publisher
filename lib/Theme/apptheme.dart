@@ -13,15 +13,19 @@ class AppTheme {
   static const Color bodyText = Color(0xFF6B7280);
   static const Color lightGrey = Color(0xFFF9FAFB);
   static const Color borderGrey = Color(0xFFE5E7EB);
-  static const Color background = Color(0xFFFFFFFF); // Changed to pure white for a cleaner look
-  static Color shadowColor = const Color(0xFF1E8E3E).withOpacity(0.1); // NEW: For focused shadow
+  static const Color background = Color(0xFFFFFFFF);
+  static Color shadowColor = const Color(0xFF1E8E3E).withOpacity(0.1);
 
   // --- BRAND COLORS ---
   static const Color mackColor = Color(0xFFBF6449);
   static const Color mackBorder = Color(0xFF733C2B);
   static const Color cleoColor = Color(0xFFDFAA3A);
   static const Color cleoBorder = Color(0xFF856622);
+  // NEW COLOR UPDATED HERE
+  static const Color assignmentColor = Color(0xFF0D9488); // NEW: Replaced Indigo with Teal
   static const Color particleColor = Color(0xFFE0E0E0);
+  static const Color dashboardBlue = Color(0xFF00529B);
+  static const Color dashboardBlueLight = Color(0xFF007BFF);
 
   // --- GRADIENTS ---
   static const LinearGradient primaryGradient = LinearGradient(
@@ -30,6 +34,22 @@ class AppTheme {
     colors: [accentGreen, primaryGreen],
     stops: [0.0, 1.0],
   );
+
+  static const LinearGradient dashboardGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [dashboardBlueLight, dashboardBlue],
+    stops: [0.0, 1.0],
+  );
+
+  // NEW: Assignment Gradient
+  static LinearGradient assignmentGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [assignmentColor.withOpacity(0.9), assignmentColor],
+    stops: const [0.0, 1.0],
+  );
+
 
   // --- TEXT STYLES ---
   static TextStyle get _baseTextStyle => GoogleFonts.plusJakartaSans();

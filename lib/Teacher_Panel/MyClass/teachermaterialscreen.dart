@@ -1,18 +1,20 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:lms_publisher/Teacher_Panel/MyClass/assignment_submission_screen.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/Teacher_Panel/teacher_material_service.dart';
 import 'package:lms_publisher/Service/academics_service.dart';
+import 'package:lms_publisher/Util/beautiful_loader.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:lms_publisher/Util/custom_snackbar.dart'; // Assuming CustomSnackbar is here
 
-const String _documentBaseUrl = "https://storage.googleapis.com/upload-images-34/documents/LMS/";
+const String _documentBaseUrl =
+    "https://storage.googleapis.com/upload-images-34/documents/LMS/";
 
 String getFullDocumentUrl(String filename) {
   if (filename.isEmpty) return '';
@@ -35,7 +37,8 @@ String? extractYoutubeVideoId(String url) {
       .replaceAll('>', '>')
       .replaceAll('"', '"');
   final patterns = [
-    RegExp(r'(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})'),
+    RegExp(
+        r'(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})'),
     RegExp(r'youtube\.com\/watch\?.*[?&]v=([a-zA-Z0-9_-]{11})'),
   ];
   for (final pattern in patterns) {
@@ -48,25 +51,18 @@ String? extractYoutubeVideoId(String url) {
 }
 
 // Helper to parse XML files
-// Helper to parse XML files - FIXED VERSION
 List<Map<String, String>> parseXmlFiles(String? xmlString) {
   if (xmlString == null || xmlString.isEmpty) return [];
 
   final files = <Map<String, String>>[];
-
-  // Decode HTML entities first
   String decoded = xmlString
       .replaceAll('&amp;', '&')
       .replaceAll('&lt;', '<')
       .replaceAll('&gt;', '>')
       .replaceAll('&quot;', '"');
 
-  print('📄 [PARSE_XML] Input XML: $decoded');
-
-  // Correct regex pattern for XML File tags
   final fileRegex = RegExp(
-      r'<File\s+Sno="([^"]*)"\s+Path="([^"]*)"\s+Type="([^"]*)"\s+Name="([^"]*)"\s*/?>'
-  );
+      r'<File\s+Sno="([^"]*)"\s+Path="([^"]*)"\s+Type="([^"]*)"\s+Name="([^"]*)"\s*/?>');
 
   for (final match in fileRegex.allMatches(decoded)) {
     final file = {
@@ -75,14 +71,10 @@ List<Map<String, String>> parseXmlFiles(String? xmlString) {
       'type': match.group(3) ?? 'pdf',
       'name': match.group(4) ?? 'Unnamed File',
     };
-    print('📄 [PARSE_XML] Parsed file: ${file['name']}');
     files.add(file);
   }
-
-  print('📄 [PARSE_XML] Total files parsed: ${files.length}');
   return files;
 }
-
 
 class TeacherMaterialScreen extends StatefulWidget {
   final String teacherCode;
@@ -122,21 +114,17 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
         chapterId: widget.chapterId,
       );
       setState(() {
-        _publisherMaterials = List<Map<String, dynamic>>.from(response['publisher_materials'] ?? []);
-        _teacherMaterials = List<Map<String, dynamic>>.from(response['teacher_materials'] ?? []);
+        _publisherMaterials =
+        List<Map<String, dynamic>>.from(response['publisher_materials'] ?? []);
+        _teacherMaterials =
+        List<Map<String, dynamic>>.from(response['teacher_materials'] ?? []);
         _isLoading = false;
       });
-      print('✅ [SCREEN] Materials loaded successfully');
     } catch (e) {
-      print('❌ [SCREEN] Error loading materials: $e');
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading materials: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        CustomSnackbar.showError(context, 'Error loading materials: $e',
+            title: 'Error');
       }
     }
   }
@@ -158,7 +146,6 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
       if (result['isFile'] == true && result['file'] != null) {
         XFile file = result['file'];
         uploadedPath = await ApiService.uploadDocument(file, context: context);
-        print('📤 Uploaded file: $uploadedPath');
       } else if (result['link'] != null) {
         uploadedLink = result['link'];
       }
@@ -182,23 +169,14 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
       if (response['status'] == 'success') {
         await _loadMaterials();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Material uploaded successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          CustomSnackbar.showSuccess(
+              context, 'Material uploaded successfully!',
+              title: 'Success');
         }
       }
     } catch (e) {
-      print('❌ Upload error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        CustomSnackbar.showError(context, 'Upload failed: $e', title: 'Error');
       }
     } finally {
       setState(() => _isUploading = false);
@@ -209,25 +187,27 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+            borderRadius: AppTheme.defaultBorderRadius * 1.5),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: AppTheme.mackColor.withOpacity(0.1),
+                borderRadius: AppTheme.defaultBorderRadius,
               ),
-              child: const Icon(Iconsax.warning_2, color: Colors.red, size: 24),
+              child: const Icon(Iconsax.warning_2,
+                  color: AppTheme.mackColor, size: 24),
             ),
             const SizedBox(width: 12),
             Text('Delete Material?',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 18)),
+                style: AppTheme.headline1.copyWith(fontSize: 18)),
           ],
         ),
         content: Text(
           'This action cannot be undone. Are you sure you want to delete this material?',
-          style: GoogleFonts.inter(fontSize: 14, color: AppTheme.bodyText),
+          style: AppTheme.bodyText1,
         ),
         actions: [
           TextButton(
@@ -235,16 +215,19 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
-            child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+            child: Text('Cancel',
+                style: AppTheme.labelText.copyWith(color: AppTheme.bodyText)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppTheme.mackColor,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: AppTheme.defaultBorderRadius),
             ),
-            child: Text('Delete', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+            child: Text('Delete', style: AppTheme.buttonText),
           ),
         ],
       ),
@@ -261,23 +244,14 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
       if (response['status'] == 'success') {
         await _loadMaterials();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Material deleted successfully'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          CustomSnackbar.showSuccess(
+              context, 'Material deleted successfully',
+              title: 'Deleted');
         }
       }
     } catch (e) {
-      print('❌ Delete error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Delete failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        CustomSnackbar.showError(context, 'Delete failed: $e', title: 'Error');
       }
     }
   }
@@ -285,10 +259,10 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppTheme.lightGrey,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: AppTheme.background,
         leading: IconButton(
           icon: const Icon(Iconsax.arrow_left, color: AppTheme.darkText),
           onPressed: () => Navigator.pop(context),
@@ -298,29 +272,26 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
           children: [
             Text(
               widget.chapterName,
-              style: GoogleFonts.poppins(
+              style: AppTheme.labelText.copyWith(
                 color: AppTheme.darkText,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
                 fontSize: 16,
               ),
             ),
             Text(
               widget.subjectName,
-              style: GoogleFonts.inter(
-                color: AppTheme.bodyText,
-                fontSize: 12,
-              ),
+              style: AppTheme.bodyText1.copyWith(fontSize: 12),
             ),
           ],
         ),
         actions: [
           if (_isUploading)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: BeautifulLoader(
+                type: LoaderType.circular,
+                size: 20,
+                color: AppTheme.primaryGreen,
               ),
             ),
           IconButton(
@@ -331,9 +302,18 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _buildContent(),
+      body: _isLoading ? _buildLoadingState() : _buildContent(),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: BeautifulLoader(
+        type: LoaderType.pulse,
+        size: 80,
+        color: AppTheme.primaryGreen,
+        message: 'Loading materials...',
+      ),
     );
   }
 
@@ -343,9 +323,11 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
 
     if (isMobile) {
       return SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            _buildPublisherSection(),
+            Container(
+                color: AppTheme.background, child: _buildPublisherSection()),
             const SizedBox(height: 16),
             _buildTeacherSection(),
           ],
@@ -359,15 +341,16 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
         Expanded(
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(right: BorderSide(color: Colors.grey.shade200, width: 1)),
+              color: AppTheme.background,
+              border:
+              Border(right: BorderSide(color: AppTheme.borderGrey, width: 1)),
             ),
             child: _buildPublisherSection(),
           ),
         ),
         Expanded(
           child: Container(
-            color: Colors.grey[50],
+            color: AppTheme.lightGrey,
             child: _buildTeacherSection(),
           ),
         ),
@@ -377,6 +360,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
 
   Widget _buildPublisherSection() {
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,10 +370,10 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppTheme.cleoColor.withOpacity(0.1),
+                  borderRadius: AppTheme.defaultBorderRadius,
                 ),
-                child: const Icon(Iconsax.book, color: Colors.blue, size: 24),
+                child: const Icon(Iconsax.book, color: AppTheme.cleoColor, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -398,18 +382,11 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                   children: [
                     Text(
                       'Publisher Materials',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.darkText,
-                      ),
+                      style: AppTheme.headline1.copyWith(fontSize: 20),
                     ),
                     Text(
                       'Official curriculum resources',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: AppTheme.bodyText,
-                      ),
+                      style: AppTheme.bodyText1.copyWith(fontSize: 12),
                     ),
                   ],
                 ),
@@ -423,14 +400,13 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                 padding: const EdgeInsets.all(40),
                 child: Column(
                   children: [
-                    Icon(Iconsax.document, size: 64, color: Colors.grey.shade300),
+                    Icon(Iconsax.document,
+                        size: 64, color: AppTheme.bodyText.withOpacity(0.2)),
                     const SizedBox(height: 16),
                     Text(
                       'No publisher materials available',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.bodyText,
-                        fontStyle: FontStyle.italic,
-                      ),
+                      style: AppTheme.bodyText1
+                          .copyWith(fontStyle: FontStyle.italic),
                     ),
                   ],
                 ),
@@ -445,9 +421,15 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                       isVideo: true),
                   _buildMaterialCategory('Worksheets', Iconsax.document, Colors.blue,
                       parseXmlFiles(material['Worksheet_Path'])),
-                  _buildMaterialCategory('Extra Questions', Iconsax.document_text, Colors.orange,
+                  _buildMaterialCategory(
+                      'Extra Questions',
+                      Iconsax.document_text,
+                      AppTheme.cleoColor,
                       parseXmlFiles(material['Extra_Questions_Path'])),
-                  _buildMaterialCategory('Solved Questions', Iconsax.tick_circle, Colors.green,
+                  _buildMaterialCategory(
+                      'Solved Questions',
+                      Iconsax.tick_circle,
+                      AppTheme.accentGreen,
                       parseXmlFiles(material['Solved_Questions_Path'])),
                   _buildMaterialCategory('Revision Notes', Iconsax.note, Colors.purple,
                       parseXmlFiles(material['Revision_Notes_Path'])),
@@ -455,9 +437,11 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                       parseXmlFiles(material['Lesson_Plans_Path'])),
                   _buildMaterialCategory('Teaching Aids', Iconsax.teacher, Colors.indigo,
                       parseXmlFiles(material['Teaching_Aids_Path'])),
-                  _buildMaterialCategory('Assessment Tools', Iconsax.task_square, Colors.pink,
+                  _buildMaterialCategory('Assessment Tools', Iconsax.task_square,
+                      AppTheme.mackColor,
                       parseXmlFiles(material['Assessment_Tools_Path'])),
-                  _buildMaterialCategory('Homework Tools', Iconsax.clipboard_text, Colors.amber,
+                  _buildMaterialCategory('Homework Tools', Iconsax.clipboard_text,
+                      Colors.amber,
                       parseXmlFiles(material['Homework_Tools_Path'])),
                   _buildMaterialCategory('Practice Zone', Iconsax.activity, Colors.cyan,
                       parseXmlFiles(material['Practice_Zone_Path'])),
@@ -473,6 +457,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
 
   Widget _buildTeacherSection() {
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,9 +468,10 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppTheme.defaultBorderRadius,
                 ),
-                child: const Icon(Iconsax.teacher, color: AppTheme.primaryGreen, size: 24),
+                child: const Icon(Iconsax.teacher,
+                    color: AppTheme.primaryGreen, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -494,18 +480,11 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                   children: [
                     Text(
                       'My Materials',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.darkText,
-                      ),
+                      style: AppTheme.headline1.copyWith(fontSize: 20),
                     ),
                     Text(
                       'Your uploaded resources',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: AppTheme.bodyText,
-                      ),
+                      style: AppTheme.bodyText1.copyWith(fontSize: 12),
                     ),
                   ],
                 ),
@@ -517,14 +496,16 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
             spacing: 12,
             runSpacing: 12,
             children: [
-              _buildUploadButton('Assignment', Iconsax.task_square, Colors.orange),
+              _buildUploadButton(
+                  'Assignment', Iconsax.task_square, AppTheme.mackColor),
               _buildUploadButton('Worksheet', Iconsax.document, Colors.blue),
               _buildUploadButton('Video', Iconsax.video, Colors.red),
-              _buildUploadButton('Document', Iconsax.document_download, Colors.green),
+              _buildUploadButton(
+                  'Document', Iconsax.document_download, AppTheme.accentGreen),
             ],
           ),
           const SizedBox(height: 24),
-          const Divider(),
+          Divider(color: AppTheme.borderGrey),
           const SizedBox(height: 24),
           if (_teacherMaterials.isEmpty)
             Center(
@@ -532,22 +513,18 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                 padding: const EdgeInsets.all(40),
                 child: Column(
                   children: [
-                    Icon(Iconsax.document_upload, size: 64, color: Colors.grey.shade300),
+                    Icon(Iconsax.document_upload,
+                        size: 64, color: AppTheme.bodyText.withOpacity(0.2)),
                     const SizedBox(height: 16),
                     Text(
                       'No materials uploaded yet',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.bodyText,
-                        fontStyle: FontStyle.italic,
-                      ),
+                      style: AppTheme.bodyText1
+                          .copyWith(fontStyle: FontStyle.italic),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Click the buttons above to add materials',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.bodyText,
-                        fontSize: 12,
-                      ),
+                      style: AppTheme.bodyText1,
                     ),
                   ],
                 ),
@@ -566,12 +543,13 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
     return ElevatedButton.icon(
       onPressed: _isUploading ? null : () => _uploadMaterial(label),
       icon: Icon(icon, size: 18),
-      label: Text(label),
+      label: Text(label, style: AppTheme.buttonText.copyWith(fontSize: 14)),
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+            borderRadius: AppTheme.defaultBorderRadius),
         elevation: 0,
       ),
     );
@@ -591,7 +569,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppTheme.defaultBorderRadius,
         border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: Column(
@@ -603,25 +581,26 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
               const SizedBox(width: 10),
               Text(
                 title,
-                style: GoogleFonts.poppins(
+                style: AppTheme.labelText.copyWith(
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
                   color: AppTheme.darkText,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   '${files.length}',
-                  style: GoogleFonts.poppins(
+                  style: AppTheme.labelText.copyWith(
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
                     color: color,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -642,15 +621,15 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        color: AppTheme.background,
+        borderRadius: AppTheme.defaultBorderRadius,
         border: Border.all(color: color.withOpacity(0.1)),
       ),
       child: Row(
         children: [
           if (isVideo)
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: AppTheme.defaultBorderRadius * 0.75,
               child: CachedNetworkImage(
                 imageUrl: getYoutubeThumbnail(path),
                 width: 60,
@@ -659,7 +638,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                 placeholder: (context, url) => Container(
                   width: 60,
                   height: 45,
-                  color: Colors.grey[300],
+                  color: AppTheme.lightGrey,
                 ),
                 errorWidget: (context, url, error) => Container(
                   width: 60,
@@ -674,7 +653,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: AppTheme.defaultBorderRadius * 0.75,
               ),
               child: Icon(Iconsax.document, color: color, size: 20),
             ),
@@ -682,16 +661,14 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
           Expanded(
             child: Text(
               name,
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w500,
-                fontSize: 13,
-              ),
+              style: AppTheme.bodyText1.copyWith(fontWeight: FontWeight.w500),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),
           IconButton(
-            icon: Icon(isVideo ? Iconsax.play : Iconsax.document_download, color: color),
+            icon: Icon(isVideo ? Iconsax.play : Iconsax.document_download,
+                color: color),
             onPressed: () => _openFile(path, isVideo),
             tooltip: isVideo ? 'Play' : 'Open',
           ),
@@ -722,15 +699,15 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
         icon = Iconsax.document;
         break;
       case 'assignment':
-        color = Colors.orange;
+        color = AppTheme.mackColor;
         icon = Iconsax.task_square;
         break;
       case 'document':
-        color = Colors.green;
+        color = AppTheme.accentGreen;
         icon = Iconsax.document_download;
         break;
       default:
-        color = Colors.grey;
+        color = AppTheme.bodyText;
         icon = Iconsax.document_text;
     }
 
@@ -740,12 +717,12 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        color: AppTheme.background,
+        borderRadius: AppTheme.defaultBorderRadius,
+        border: Border.all(color: AppTheme.borderGrey),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AppTheme.shadowColor,
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -760,7 +737,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppTheme.defaultBorderRadius * 0.75,
                 ),
                 child: Icon(icon, color: color, size: 20),
               ),
@@ -771,7 +748,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.poppins(
+                      style: AppTheme.labelText.copyWith(
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                         color: AppTheme.darkText,
@@ -780,10 +757,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                     if (description != null && description.isNotEmpty)
                       Text(
                         description,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: AppTheme.bodyText,
-                        ),
+                        style: AppTheme.bodyText1.copyWith(fontSize: 12),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -794,7 +768,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                 Tooltip(
                   message: 'View Submissions',
                   child: IconButton(
-                    icon: Icon(Iconsax.eye, color: Colors.blue),
+                    icon: const Icon(Iconsax.eye, color: Colors.blue),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -804,7 +778,6 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                             materialRecNo: materialRecNo ?? 0,
                             materialTitle: title,
                             totalMarks: material['TotalMarks'] ?? 0,
-                            color: color,
                           ),
                         ),
                       );
@@ -812,12 +785,15 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                   ),
                 ),
               IconButton(
-                icon: Icon(isVideo ? Iconsax.play : Iconsax.document_download, color: color),
-                onPressed: () => _openFile(isVideo ? materialLink : materialPath, isVideo),
+                icon: Icon(
+                    isVideo ? Iconsax.play : Iconsax.document_download,
+                    color: color),
+                onPressed: () =>
+                    _openFile(isVideo ? materialLink : materialPath, isVideo),
                 tooltip: isVideo ? 'Play' : 'Open',
               ),
               IconButton(
-                icon: const Icon(Iconsax.trash, color: Colors.red),
+                icon: const Icon(Iconsax.trash, color: AppTheme.mackColor),
                 onPressed: () => _deleteMaterial(materialRecNo),
                 tooltip: 'Delete',
               ),
@@ -825,7 +801,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
           ),
           if (uploadedOn.isNotEmpty) ...[
             const SizedBox(height: 12),
-            const Divider(height: 1),
+            Divider(height: 1, color: AppTheme.borderGrey),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -833,10 +809,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                 const SizedBox(width: 6),
                 Text(
                   'Uploaded: $uploadedOn',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: AppTheme.bodyText,
-                  ),
+                  style: AppTheme.bodyText1.copyWith(fontSize: 11),
                 ),
               ],
             ),
@@ -848,9 +821,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
 
   void _openFile(String? path, bool isVideo) async {
     if (path == null || path.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('File path not available')),
-      );
+      CustomSnackbar.showError(context, 'File path not available');
       return;
     }
 
@@ -861,15 +832,13 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open file')),
-        );
+        CustomSnackbar.showError(context, 'Could not open file');
       }
     }
   }
 }
 
-// ======================== UPLOAD DIALOG WIDGET ========================
+// ======================== UPLOAD DIALOG WIDGET (Themed) ========================
 
 class _UploadMaterialDialog extends StatefulWidget {
   final String materialType;
@@ -903,17 +872,25 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(duration: const Duration(milliseconds: 500), vsync: this);
+    _fadeController =
+        AnimationController(duration: const Duration(milliseconds: 500), vsync: this);
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
     );
     _fadeController.forward();
+
+    // Worksheets are files by default, Videos are links by default
+    if (widget.materialType.toLowerCase() == 'video') {
+      _isFile = false;
+    } else {
+      _isFile = true;
+    }
   }
 
   Future<void> _pickFile() async {
     try {
-      print('📂 Opening file picker...');
-      FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+      FilePickerResult? result =
+      await FilePicker.platform.pickFiles(type: FileType.any);
 
       if (result == null || result.files.isEmpty) return;
 
@@ -950,9 +927,7 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        CustomSnackbar.showError(context, 'Error: $e');
       }
     }
   }
@@ -971,11 +946,11 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
             child: Container(
               constraints: const BoxConstraints(maxWidth: 500),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                color: Colors.white,
+                borderRadius: AppTheme.defaultBorderRadius * 2, // 24.0
+                color: AppTheme.background,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: AppTheme.shadowColor.withOpacity(0.5),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -988,17 +963,10 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.primaryGreen,
-                          AppTheme.primaryGreen.withOpacity(0.7),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(24),
-                        topRight: Radius.circular(24),
+                      gradient: AppTheme.primaryGradient,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(AppTheme.defaultBorderRadius.topLeft.x * 2),
+                        topRight: Radius.circular(AppTheme.defaultBorderRadius.topRight.x * 2),
                       ),
                     ),
                     child: Row(
@@ -1007,7 +975,7 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.25),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: AppTheme.defaultBorderRadius, // 14.0
                           ),
                           child: const Icon(
                             Iconsax.document,
@@ -1022,19 +990,14 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                             children: [
                               Text(
                                 'File Format',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                ),
+                                style: AppTheme.headline2.copyWith(fontSize: 18),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 'Select the correct file type',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: Colors.white.withOpacity(0.85),
-                                ),
+                                style: AppTheme.buttonText.copyWith(
+                                    fontSize: 12,
+                                    color: Colors.white.withOpacity(0.85)),
                               ),
                             ],
                           ),
@@ -1051,10 +1014,10 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(16),
+                            color: AppTheme.cleoColor.withOpacity(0.1),
+                            borderRadius: AppTheme.defaultBorderRadius, // 16.0
                             border: Border.all(
-                              color: Colors.blue.shade200,
+                              color: AppTheme.cleoColor.withOpacity(0.3),
                               width: 1.5,
                             ),
                           ),
@@ -1063,12 +1026,12 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                               Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: Colors.blue.shade100,
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: AppTheme.cleoColor.withOpacity(0.2),
+                                  borderRadius: AppTheme.defaultBorderRadius, // 10.0
                                 ),
                                 child: Icon(
                                   Iconsax.document_text,
-                                  color: Colors.blue.shade700,
+                                  color: AppTheme.cleoColor,
                                   size: 20,
                                 ),
                               ),
@@ -1079,19 +1042,18 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                                   children: [
                                     Text(
                                       'Current File',
-                                      style: GoogleFonts.inter(
+                                      style: AppTheme.bodyText1.copyWith(
                                         fontSize: 10,
-                                        color: Colors.blue.shade600,
+                                        color: AppTheme.cleoColor,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       fileName,
-                                      style: GoogleFonts.poppins(
+                                      style: AppTheme.labelText.copyWith(
                                         fontSize: 13,
-                                        color: Colors.blue.shade900,
-                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.cleoColor,
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -1106,18 +1068,14 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                         // Format Selection
                         Text(
                           'Choose Format',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.darkText,
-                          ),
+                          style: AppTheme.labelText,
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                           value: tempExtension,
                           isExpanded: true,
                           decoration: InputDecoration(
-                            prefixIcon: Icon(
+                            prefixIcon: const Icon(
                               Icons.file_present,
                               color: AppTheme.primaryGreen,
                               size: 22,
@@ -1127,40 +1085,48 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                               vertical: 16,
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: AppTheme.defaultBorderRadius, // 14.0
                               borderSide: BorderSide(
-                                color: Colors.grey.shade300,
+                                color: AppTheme.borderGrey,
                                 width: 1.5,
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: AppTheme.defaultBorderRadius, // 14.0
                               borderSide: BorderSide(
-                                color: Colors.grey.shade300,
+                                color: AppTheme.borderGrey,
                                 width: 1.5,
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: AppTheme.defaultBorderRadius, // 14.0
                               borderSide: const BorderSide(
                                 color: AppTheme.primaryGreen,
                                 width: 2,
                               ),
                             ),
                             filled: true,
-                            fillColor: Colors.grey.shade50,
+                            fillColor: AppTheme.lightGrey,
                           ),
                           items: [
-                            _buildDropdownItem('pdf', '📄 PDF Document', Icons.picture_as_pdf),
-                            _buildDropdownItem('docx', '📝 Word Document', Icons.description),
-                            _buildDropdownItem('pptx', '🎯 PowerPoint', Icons.slideshow),
-                            _buildDropdownItem('xlsx', '📊 Excel Sheet', Icons.table_chart),
-                            _buildDropdownItem('jpg', '🖼️ JPEG Image', Icons.image),
-                            _buildDropdownItem('png', '🖼️ PNG Image', Icons.image),
-                            _buildDropdownItem('txt', '📋 Text File', Icons.text_fields),
+                            _buildDropdownItem('pdf', '📄 PDF Document',
+                                Icons.picture_as_pdf),
+                            _buildDropdownItem('docx', '📝 Word Document',
+                                Icons.description),
+                            _buildDropdownItem('pptx', '🎯 PowerPoint',
+                                Icons.slideshow),
+                            _buildDropdownItem('xlsx', '📊 Excel Sheet',
+                                Icons.table_chart),
+                            _buildDropdownItem(
+                                'jpg', '🖼️ JPEG Image', Icons.image),
+                            _buildDropdownItem(
+                                'png', '🖼️ PNG Image', Icons.image),
+                            _buildDropdownItem(
+                                'txt', '📋 Text File', Icons.text_fields),
                           ],
                           onChanged: (value) {
-                            if (value != null) setDialogState(() => tempExtension = value);
+                            if (value != null)
+                              setDialogState(() => tempExtension = value);
                           },
                         ),
                         const SizedBox(height: 20),
@@ -1169,10 +1135,10 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.amber.shade50,
-                            borderRadius: BorderRadius.circular(14),
+                            color: AppTheme.cleoColor.withOpacity(0.1),
+                            borderRadius: AppTheme.defaultBorderRadius, // 14.0
                             border: Border.all(
-                              color: Colors.amber.shade300,
+                              color: AppTheme.cleoColor.withOpacity(0.3),
                               width: 1.5,
                             ),
                           ),
@@ -1182,12 +1148,12 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: Colors.amber.shade100,
-                                  borderRadius: BorderRadius.circular(8),
+                                  color: AppTheme.cleoColor.withOpacity(0.2),
+                                  borderRadius: AppTheme.defaultBorderRadius * 0.75, // 8.0
                                 ),
                                 child: Icon(
                                   Iconsax.info_circle,
-                                  color: Colors.amber.shade700,
+                                  color: AppTheme.cleoColor,
                                   size: 18,
                                 ),
                               ),
@@ -1195,9 +1161,9 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                               Expanded(
                                 child: Text(
                                   'Ensure file format matches your actual file',
-                                  style: GoogleFonts.inter(
+                                  style: AppTheme.bodyText1.copyWith(
                                     fontSize: 12,
-                                    color: Colors.amber.shade900,
+                                    color: AppTheme.cleoColor,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -1214,12 +1180,12 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                               child: TextButton(
                                 onPressed: () => Navigator.pop(ctx),
                                 style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
                                 ),
                                 child: Text(
                                   'Cancel',
-                                  style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w700,
+                                  style: AppTheme.buttonText.copyWith(
                                     fontSize: 14,
                                     color: AppTheme.bodyText,
                                   ),
@@ -1231,16 +1197,12 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                               flex: 2,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      AppTheme.primaryGreen,
-                                      AppTheme.primaryGreen.withOpacity(0.85),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
+                                  gradient: AppTheme.primaryGradient,
+                                  borderRadius: AppTheme.defaultBorderRadius, // 12.0
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppTheme.primaryGreen.withOpacity(0.3),
+                                      color:
+                                      AppTheme.primaryGreen.withOpacity(0.3),
                                       blurRadius: 12,
                                       offset: const Offset(0, 4),
                                     ),
@@ -1249,23 +1211,23 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                                 child: Material(
                                   color: Colors.transparent,
                                   child: InkWell(
-                                    onTap: () => Navigator.pop(ctx, tempExtension),
-                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: () =>
+                                        Navigator.pop(ctx, tempExtension),
+                                    borderRadius: AppTheme.defaultBorderRadius, // 12.0
                                     child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 14),
                                       child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                        MainAxisAlignment.center,
                                         children: [
                                           const Icon(Iconsax.arrow_right_3,
                                               color: Colors.white, size: 18),
                                           const SizedBox(width: 8),
                                           Text(
                                             'Continue',
-                                            style: GoogleFonts.poppins(
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 14,
-                                              color: Colors.white,
-                                            ),
+                                            style: AppTheme.buttonText.copyWith(
+                                                fontSize: 14),
                                           ),
                                         ],
                                       ),
@@ -1288,7 +1250,8 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
     );
   }
 
-  DropdownMenuItem<String> _buildDropdownItem(String value, String label, IconData icon) {
+  DropdownMenuItem<String> _buildDropdownItem(
+      String value, String label, IconData icon) {
     return DropdownMenuItem<String>(
       value: value,
       child: Row(
@@ -1297,10 +1260,10 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
           const SizedBox(width: 12),
           Text(
             label,
-            style: GoogleFonts.poppins(
+            style: AppTheme.labelText.copyWith(
               fontSize: 13,
-              fontWeight: FontWeight.w600,
               color: AppTheme.darkText,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -1309,6 +1272,7 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
   }
 
   String _getMimeTypeFromExtension(String extension) {
+    // (This function remains unchanged)
     switch (extension.toLowerCase()) {
       case 'jpg':
       case 'jpeg':
@@ -1348,9 +1312,10 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
             colorScheme: const ColorScheme.light(
               primary: AppTheme.primaryGreen,
               onPrimary: Colors.white,
-              surface: Colors.white,
+              surface: AppTheme.background,
               onSurface: AppTheme.darkText,
             ),
+            dialogBackgroundColor: AppTheme.background,
           ),
           child: child!,
         );
@@ -1377,11 +1342,11 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
           child: Container(
             constraints: const BoxConstraints(maxWidth: 620, maxHeight: 650),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              color: Colors.white,
+              borderRadius: AppTheme.defaultBorderRadius * 2.3, // 28.0
+              color: AppTheme.background,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
+                  color: AppTheme.shadowColor.withOpacity(0.5),
                   blurRadius: 28,
                   offset: const Offset(0, 12),
                 ),
@@ -1393,17 +1358,10 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                 Container(
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppTheme.primaryGreen,
-                        AppTheme.primaryGreen.withOpacity(0.75),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(28),
-                      topRight: Radius.circular(28),
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(AppTheme.defaultBorderRadius.topLeft.x * 2),
+                      topRight: Radius.circular(AppTheme.defaultBorderRadius.topRight.x * 2),
                     ),
                   ),
                   child: Row(
@@ -1412,7 +1370,7 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: AppTheme.defaultBorderRadius, // 14.0
                           border: Border.all(
                             color: Colors.white.withOpacity(0.3),
                             width: 1.5,
@@ -1431,11 +1389,7 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                           children: [
                             Text(
                               'Upload ${widget.materialType}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
+                              style: AppTheme.headline2.copyWith(fontSize: 22),
                             ),
                             const SizedBox(height: 6),
                             Container(
@@ -1449,10 +1403,9 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                               ),
                               child: Text(
                                 'Step ${_currentStep + 1} of ${_isAssignment ? 3 : 2}',
-                                style: GoogleFonts.inter(
+                                style: AppTheme.buttonText.copyWith(
                                   fontSize: 11,
                                   color: Colors.white.withOpacity(0.9),
-                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
@@ -1462,11 +1415,12 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: AppTheme.defaultBorderRadius, // 10.0
                         ),
                         child: IconButton(
                           onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close, color: Colors.white, size: 24),
+                          icon: const Icon(Icons.close,
+                              color: Colors.white, size: 24),
                           splashRadius: 24,
                         ),
                       ),
@@ -1481,11 +1435,11 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: AppTheme.defaultBorderRadius, // 12.0
                         child: LinearProgressIndicator(
                           value: (_currentStep + 1) / (_isAssignment ? 3 : 2),
                           minHeight: 8,
-                          backgroundColor: Colors.grey.shade200,
+                          backgroundColor: AppTheme.lightGrey,
                           valueColor: const AlwaysStoppedAnimation<Color>(
                             AppTheme.primaryGreen,
                           ),
@@ -1494,10 +1448,9 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                       const SizedBox(height: 8),
                       Text(
                         '${((_currentStep + 1) / (_isAssignment ? 3 : 2) * 100).toStringAsFixed(0)}% Complete',
-                        style: GoogleFonts.inter(
+                        style: AppTheme.bodyText1.copyWith(
                           fontSize: 11,
                           color: AppTheme.bodyText,
-                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -1519,7 +1472,8 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
+                    border:
+                    Border(top: BorderSide(color: AppTheme.borderGrey, width: 1)),
                   ),
                   child: Row(
                     children: [
@@ -1530,13 +1484,14 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                             icon: const Icon(Iconsax.arrow_left, size: 18),
                             label: Text(
                               'Back',
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w700,
+                              style: AppTheme.buttonText.copyWith(
                                 fontSize: 14,
+                                color: AppTheme.bodyText,
                               ),
                             ),
                             style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              padding:
+                              const EdgeInsets.symmetric(vertical: 14),
                               foregroundColor: AppTheme.bodyText,
                             ),
                           ),
@@ -1546,13 +1501,8 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                         flex: _currentStep > 0 ? 2 : 1,
                         child: Container(
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                AppTheme.primaryGreen,
-                                AppTheme.primaryGreen.withOpacity(0.85),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(14),
+                            gradient: AppTheme.primaryGradient,
+                            borderRadius: AppTheme.defaultBorderRadius, // 14.0
                             boxShadow: [
                               BoxShadow(
                                 color: AppTheme.primaryGreen.withOpacity(0.3),
@@ -1566,16 +1516,18 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                             child: InkWell(
                               onTap: _canProceedToNext()
                                   ? () {
-                                if (_currentStep == (_isAssignment ? 2 : 1)) {
+                                if (_currentStep ==
+                                    (_isAssignment ? 2 : 1)) {
                                   _submitUpload();
                                 } else {
                                   setState(() => _currentStep++);
                                 }
                               }
                                   : null,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: AppTheme.defaultBorderRadius, // 14.0
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding:
+                                const EdgeInsets.symmetric(vertical: 14),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -1591,11 +1543,8 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                                       _currentStep == (_isAssignment ? 2 : 1)
                                           ? 'Upload'
                                           : 'Next Step',
-                                      style: GoogleFonts.poppins(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 14,
-                                        color: Colors.white,
-                                      ),
+                                      style: AppTheme.buttonText.copyWith(
+                                          fontSize: 14),
                                     ),
                                   ],
                                 ),
@@ -1614,8 +1563,6 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
       ),
     );
   }
-
-  // ... [Rest of the methods remain the same - _buildStepContent, _buildStep1Material, etc.]
 
   Widget _buildStepContent() {
     if (_isAssignment) {
@@ -1647,10 +1594,15 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
   }
 
   List<Widget> _buildStep1Material() {
+    bool isVideo = widget.materialType.toLowerCase() == 'video';
+
     return [
-      _buildStepHeader('Upload Content', 'Select your ${widget.materialType.toLowerCase()} file or link'),
+      _buildStepHeader(
+          'Upload Content',
+          'Select your ${widget.materialType.toLowerCase()} '
+              '${isVideo ? "file or link" : "file"}'),
       const SizedBox(height: 28),
-      if (widget.materialType.toLowerCase() == 'video')
+      if (isVideo)
         Row(
           children: [
             Expanded(child: _buildChoiceChip('🔗 Video Link', !_isFile)),
@@ -1665,48 +1617,58 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
           children: [
             Text(
               'Video URL',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.darkText,
-              ),
+              style: AppTheme.labelText,
             ),
             const SizedBox(height: 10),
             TextField(
               controller: _linkController,
               decoration: InputDecoration(
                 hintText: 'https://youtube.com/watch?v=...',
-                prefixIcon: const Icon(Iconsax.link, size: 20),
+                hintStyle: AppTheme.bodyText1
+                    .copyWith(color: AppTheme.bodyText.withOpacity(0.5)),
+                prefixIcon:
+                const Icon(Iconsax.link, size: 20, color: AppTheme.primaryGreen),
                 filled: true,
-                fillColor: Colors.grey.shade50,
+                fillColor: AppTheme.lightGrey,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+                  borderRadius: AppTheme.defaultBorderRadius, // 14.0
+                  borderSide: BorderSide(color: AppTheme.borderGrey),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: AppTheme.defaultBorderRadius, // 14.0
+                  borderSide: BorderSide(color: AppTheme.borderGrey),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 2),
+                  borderRadius: AppTheme.defaultBorderRadius, // 14.0
+                  borderSide:
+                  const BorderSide(color: AppTheme.primaryGreen, width: 2),
                 ),
               ),
             ),
           ],
         ),
-      if (_isFile || widget.materialType.toLowerCase() == 'video')
+      if (_isFile)
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 16),
+            if (isVideo) const SizedBox(height: 16),
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    _selectedFile != null ? Colors.green.shade50 : Colors.grey.shade50,
-                    _selectedFile != null ? Colors.green.shade100 : Colors.grey.shade100,
+                    _selectedFile != null
+                        ? AppTheme.accentGreen.withOpacity(0.05)
+                        : AppTheme.lightGrey,
+                    _selectedFile != null
+                        ? AppTheme.accentGreen.withOpacity(0.1)
+                        : AppTheme.lightGrey,
                   ],
                 ),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: AppTheme.defaultBorderRadius, // 14.0
                 border: Border.all(
-                  color: _selectedFile != null ? Colors.green.shade300 : Colors.grey.shade300,
+                  color: _selectedFile != null
+                      ? AppTheme.accentGreen
+                      : AppTheme.borderGrey,
                   width: 2,
                 ),
               ),
@@ -1714,32 +1676,40 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: _pickFile,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: AppTheme.defaultBorderRadius, // 14.0
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 20, horizontal: 16),
                     child: Column(
                       children: [
                         Icon(
-                          _selectedFile != null ? Iconsax.verify : Iconsax.document_upload,
+                          _selectedFile != null
+                              ? Iconsax.verify
+                              : Iconsax.document_upload,
                           size: 32,
-                          color: _selectedFile != null ? Colors.green.shade700 : AppTheme.primaryGreen,
+                          color: _selectedFile != null
+                              ? AppTheme.accentGreen
+                              : AppTheme.primaryGreen,
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          _selectedFile == null ? 'Select File' : '✓ File Selected',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w800,
+                          _selectedFile == null
+                              ? 'Select File'
+                              : '✓ File Selected',
+                          style: AppTheme.labelText.copyWith(
                             fontSize: 15,
-                            color: _selectedFile != null ? Colors.green.shade700 : AppTheme.darkText,
+                            color: _selectedFile != null
+                                ? AppTheme.accentGreen
+                                : AppTheme.darkText,
                           ),
                         ),
                         if (_selectedFile != null) ...[
                           const SizedBox(height: 4),
                           Text(
                             _selectedFile!.name,
-                            style: GoogleFonts.inter(
+                            style: AppTheme.bodyText1.copyWith(
                               fontSize: 12,
-                              color: Colors.green.shade600,
+                              color: AppTheme.accentGreen,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -1771,7 +1741,9 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
       _buildFormField(
         'Description',
         _descriptionController,
-        isWorksheet ? 'Worksheet instructions...' : 'Add optional description...',
+        isWorksheet
+            ? 'Worksheet instructions...'
+            : 'Add optional description...',
         Iconsax.note_text,
         maxLines: isWorksheet ? 3 : 4,
       ),
@@ -1783,45 +1755,53 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
           children: [
             Text(
               'Due Date (Optional)',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.darkText,
-              ),
+              style: AppTheme.labelText,
             ),
             const SizedBox(height: 10),
             GestureDetector(
               onTap: _selectDate,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: _selectedDueDate != null ? AppTheme.primaryGreen : Colors.grey.shade300,
+                    color: _selectedDueDate != null
+                        ? AppTheme.primaryGreen
+                        : AppTheme.borderGrey,
                     width: 2,
                   ),
-                  borderRadius: BorderRadius.circular(14),
-                  color: _selectedDueDate != null ? AppTheme.primaryGreen.withOpacity(0.05) : Colors.white,
+                  borderRadius: AppTheme.defaultBorderRadius, // 14.0
+                  color: _selectedDueDate != null
+                      ? AppTheme.primaryGreen.withOpacity(0.05)
+                      : AppTheme.background,
                 ),
                 child: Row(
                   children: [
                     Icon(
                       Iconsax.calendar_1,
                       size: 22,
-                      color: _selectedDueDate != null ? AppTheme.primaryGreen : AppTheme.bodyText,
+                      color: _selectedDueDate != null
+                          ? AppTheme.primaryGreen
+                          : AppTheme.bodyText,
                     ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Text(
-                        _deadlineController.text.isEmpty ? 'Select deadline (optional)' : _deadlineController.text,
-                        style: GoogleFonts.inter(
+                        _deadlineController.text.isEmpty
+                            ? 'Select deadline (optional)'
+                            : _deadlineController.text,
+                        style: AppTheme.labelText.copyWith(
                           fontSize: 15,
-                          color: _deadlineController.text.isEmpty ? AppTheme.bodyText : AppTheme.darkText,
+                          color: _deadlineController.text.isEmpty
+                              ? AppTheme.bodyText
+                              : AppTheme.darkText,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                     if (_selectedDueDate != null)
-                      Icon(Iconsax.verify, color: Colors.green.shade600, size: 20),
+                      const Icon(Iconsax.verify,
+                          color: AppTheme.accentGreen, size: 20),
                   ],
                 ),
               ),
@@ -1866,7 +1846,6 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
     ];
   }
 
-
   List<Widget> _buildStep2Assignment() {
     return [
       _buildStepHeader('Assignment Details', 'Configure deadline and marking'),
@@ -1887,45 +1866,53 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
         children: [
           Text(
             'Due Date',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.darkText,
-            ),
+            style: AppTheme.labelText,
           ),
           const SizedBox(height: 10),
           GestureDetector(
             onTap: _selectDate,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: _selectedDueDate != null ? AppTheme.primaryGreen : Colors.grey.shade300,
+                  color: _selectedDueDate != null
+                      ? AppTheme.primaryGreen
+                      : AppTheme.borderGrey,
                   width: 2,
                 ),
-                borderRadius: BorderRadius.circular(14),
-                color: _selectedDueDate != null ? AppTheme.primaryGreen.withOpacity(0.05) : Colors.white,
+                borderRadius: AppTheme.defaultBorderRadius, // 14.0
+                color: _selectedDueDate != null
+                    ? AppTheme.primaryGreen.withOpacity(0.05)
+                    : AppTheme.background,
               ),
               child: Row(
                 children: [
                   Icon(
                     Iconsax.calendar_1,
                     size: 22,
-                    color: _selectedDueDate != null ? AppTheme.primaryGreen : AppTheme.bodyText,
+                    color: _selectedDueDate != null
+                        ? AppTheme.primaryGreen
+                        : AppTheme.bodyText,
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
-                      _deadlineController.text.isEmpty ? 'Select deadline' : _deadlineController.text,
-                      style: GoogleFonts.inter(
+                      _deadlineController.text.isEmpty
+                          ? 'Select deadline'
+                          : _deadlineController.text,
+                      style: AppTheme.labelText.copyWith(
                         fontSize: 15,
-                        color: _deadlineController.text.isEmpty ? AppTheme.bodyText : AppTheme.darkText,
+                        color: _deadlineController.text.isEmpty
+                            ? AppTheme.bodyText
+                            : AppTheme.darkText,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   if (_selectedDueDate != null)
-                    Icon(Iconsax.verify, color: Colors.green.shade600, size: 20),
+                    const Icon(Iconsax.verify,
+                        color: AppTheme.accentGreen, size: 20),
                 ],
               ),
             ),
@@ -1972,12 +1959,12 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
         decoration: BoxDecoration(
           color: _allowLateSubmission
               ? AppTheme.primaryGreen.withOpacity(0.1)
-              : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(14),
+              : AppTheme.lightGrey,
+          borderRadius: AppTheme.defaultBorderRadius, // 14.0
           border: Border.all(
             color: _allowLateSubmission
                 ? AppTheme.primaryGreen.withOpacity(0.4)
-                : Colors.grey.shade300,
+                : AppTheme.borderGrey,
             width: 1.5,
           ),
         ),
@@ -1988,13 +1975,15 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
               decoration: BoxDecoration(
                 color: _allowLateSubmission
                     ? AppTheme.primaryGreen.withOpacity(0.15)
-                    : Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(10),
+                    : AppTheme.lightGrey,
+                borderRadius: AppTheme.defaultBorderRadius, // 10.0
               ),
               child: Icon(
                 Iconsax.clock,
                 size: 22,
-                color: _allowLateSubmission ? AppTheme.primaryGreen : AppTheme.bodyText,
+                color: _allowLateSubmission
+                    ? AppTheme.primaryGreen
+                    : AppTheme.bodyText,
               ),
             ),
             const SizedBox(width: 14),
@@ -2004,20 +1993,15 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                 children: [
                   Text(
                     'Allow Late Submission',
-                    style: GoogleFonts.poppins(
+                    style: AppTheme.labelText.copyWith(
                       fontSize: 14,
-                      fontWeight: FontWeight.w800,
                       color: AppTheme.darkText,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Students can submit after deadline with penalty',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: AppTheme.bodyText,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    'Students can submit after deadline',
+                    style: AppTheme.bodyText1.copyWith(fontSize: 11),
                   ),
                 ],
               ),
@@ -2040,7 +2024,7 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
       ...[
         ('Title', _titleController.text, AppTheme.primaryGreen),
         ('Description', _descriptionController.text, Colors.blue),
-        ('Due Date', _deadlineController.text, Colors.orange),
+        ('Due Date', _deadlineController.text, AppTheme.cleoColor),
       ].map((item) {
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
@@ -2051,11 +2035,14 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
       Row(
         children: [
           Expanded(
-            child: _buildReviewCard('Total Marks', _totalMarksController.text, color: Colors.purple),
+            child: _buildReviewCard('Total Marks', _totalMarksController.text,
+                color: Colors.purple),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: _buildReviewCard('Pass Marks', _passingMarksController.text, color: Colors.pink),
+            child: _buildReviewCard(
+                'Pass Marks', _passingMarksController.text,
+                color: AppTheme.mackColor),
           ),
         ],
       ),
@@ -2068,24 +2055,17 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
       children: [
         Text(
           title,
-          style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: AppTheme.darkText,
-          ),
+          style: AppTheme.headline1.copyWith(fontSize: 20),
         ),
         const SizedBox(height: 6),
         Text(
           subtitle,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            color: AppTheme.bodyText,
-            fontWeight: FontWeight.w500,
-          ),
+          style: AppTheme.bodyText1,
         ),
       ],
     );
   }
+
   Widget _buildFormField(
       String label,
       TextEditingController controller,
@@ -2099,11 +2079,7 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
       children: [
         Text(
           label,
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            color: AppTheme.darkText,
-          ),
+          style: AppTheme.labelText.copyWith(fontSize: 14),
         ),
         const SizedBox(height: 10),
         TextField(
@@ -2112,24 +2088,21 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
           keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: GoogleFonts.inter(
-              fontSize: 14,
-              color: Colors.grey.shade400, // Shaded hint text
-              fontWeight: FontWeight.w500,
-            ),
+            hintStyle: AppTheme.bodyText1
+                .copyWith(color: AppTheme.bodyText.withOpacity(0.5)),
             prefixIcon: Icon(icon, size: 20, color: AppTheme.primaryGreen),
             filled: true,
-            fillColor: Colors.grey.shade50,
+            fillColor: AppTheme.lightGrey,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderRadius: AppTheme.defaultBorderRadius, // 14.0
+              borderSide: BorderSide(color: AppTheme.borderGrey),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderRadius: AppTheme.defaultBorderRadius, // 14.0
+              borderSide: BorderSide(color: AppTheme.borderGrey),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: AppTheme.defaultBorderRadius, // 14.0
               borderSide: const BorderSide(
                 color: AppTheme.primaryGreen,
                 width: 2,
@@ -2141,7 +2114,7 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
             ),
             alignLabelWithHint: true,
           ),
-          style: GoogleFonts.inter(
+          style: AppTheme.labelText.copyWith(
             fontSize: 14,
             color: AppTheme.darkText,
             fontWeight: FontWeight.w600,
@@ -2151,18 +2124,17 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
     );
   }
 
-
   Widget _buildChoiceChip(String label, bool selected) {
     return Container(
       decoration: BoxDecoration(
         color: selected
             ? AppTheme.primaryGreen.withOpacity(0.15)
-            : Colors.grey.shade100,
+            : AppTheme.lightGrey,
         border: Border.all(
-          color: selected ? AppTheme.primaryGreen : Colors.grey.shade300,
+          color: selected ? AppTheme.primaryGreen : AppTheme.borderGrey,
           width: selected ? 2.5 : 1.5,
         ),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppTheme.defaultBorderRadius, // 14.0
       ),
       child: Material(
         color: Colors.transparent,
@@ -2170,23 +2142,22 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
           onTap: () {
             setState(() => _isFile = label.contains('Upload'));
           },
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppTheme.defaultBorderRadius, // 14.0
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 14),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  selected ? Iconsax.tick_circle : Iconsax.civic_cvc,
+                  selected ? Iconsax.tick_circle : Iconsax.info_circle,
                   size: 20,
-                  color: selected ? AppTheme.primaryGreen : Colors.grey.shade400,
+                  color: selected ? AppTheme.primaryGreen : AppTheme.bodyText,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   label,
-                  style: GoogleFonts.poppins(
+                  style: AppTheme.labelText.copyWith(
                     fontSize: 14,
-                    fontWeight: FontWeight.w700,
                     color: selected ? AppTheme.primaryGreen : AppTheme.bodyText,
                   ),
                 ),
@@ -2203,7 +2174,7 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: (color ?? AppTheme.primaryGreen).withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppTheme.defaultBorderRadius, // 12.0
         border: Border.all(
           color: (color ?? AppTheme.primaryGreen).withOpacity(0.25),
           width: 1.5,
@@ -2214,19 +2185,18 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
         children: [
           Text(
             label,
-            style: GoogleFonts.inter(
+            style: AppTheme.bodyText1.copyWith(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: AppTheme.bodyText,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             value.isEmpty ? '—' : value,
-            style: GoogleFonts.poppins(
+            style: AppTheme.labelText.copyWith(
               fontSize: 15,
-              fontWeight: FontWeight.w800,
               color: color ?? AppTheme.primaryGreen,
+              fontWeight: FontWeight.w800,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -2244,29 +2214,23 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
         return _linkController.text.isNotEmpty;
       }
       return _selectedFile != null;
-    }
-    else if (_currentStep == 1 && _isAssignment) {
+    } else if (_currentStep == 1 && _isAssignment) {
       return _titleController.text.isNotEmpty &&
           _deadlineController.text.isNotEmpty &&
           _totalMarksController.text.isNotEmpty;
-    }
-    else if (_currentStep == 1 && isWorksheet) {
+    } else if (_currentStep == 1 && isWorksheet) {
       // Worksheet: only title required, others optional
       return _titleController.text.isNotEmpty;
-    }
-    else if (_currentStep == 1) {
+    } else if (_currentStep == 1) {
       // Other materials: only title required
       return _titleController.text.isNotEmpty;
     }
     return true;
   }
 
-
   void _submitUpload() {
     if (_titleController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a title')),
-      );
+      CustomSnackbar.showError(context, 'Please enter a title');
       return;
     }
 
@@ -2274,7 +2238,8 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
 
     Navigator.pop(context, {
       'title': _titleController.text,
-      'description': _descriptionController.text.isEmpty ? null : _descriptionController.text,
+      'description':
+      _descriptionController.text.isEmpty ? null : _descriptionController.text,
       'isFile': _isFile,
       'file': _selectedFile,
       'link': _isFile ? null : _linkController.text,
@@ -2293,12 +2258,12 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
           'totalMarks': int.tryParse(_totalMarksController.text),
         if (_passingMarksController.text.isNotEmpty)
           'passingMarks': int.tryParse(_passingMarksController.text),
-        if (_maxAttemptsController.text.isNotEmpty && _maxAttemptsController.text != '1')
+        if (_maxAttemptsController.text.isNotEmpty &&
+            _maxAttemptsController.text != '1')
           'maxAttempts': int.tryParse(_maxAttemptsController.text),
       },
     });
   }
-
 
   @override
   void dispose() {
@@ -2313,4 +2278,3 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
     super.dispose();
   }
 }
-

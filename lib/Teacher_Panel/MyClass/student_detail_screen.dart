@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/Teacher_Panel/teacher_panel_service.dart';
+import 'package:lms_publisher/Util/beautiful_loader.dart';
 import 'package:lms_publisher/Util/custom_snackbar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-const String _imageBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
+const String _imageBaseUrl =
+    "https://storage.googleapis.com/upload-images-34/images/LMS/";
 
 class StudentDetailScreen extends StatefulWidget {
   final Map studentData;
@@ -23,25 +24,18 @@ class StudentDetailScreen extends StatefulWidget {
   State<StudentDetailScreen> createState() => _StudentDetailScreenState();
 }
 
-class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTickerProviderStateMixin {
+class _StudentDetailScreenState extends State<StudentDetailScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _noteController = TextEditingController();
   bool _isAddingNote = false;
-  bool _isLoadingProfile = false;
+  bool _isLoadingProfile = true; // Start as true
   Map? _fullProfileData;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    if (kDebugMode) {
-      print('\n========================================');
-      print('📄 STUDENT DETAIL SCREEN OPENED');
-      print('========================================');
-      print('👤 Full Student Data: ${widget.studentData}');
-      print('🔑 Available Keys: ${widget.studentData.keys.toList()}');
-      print('👨‍🏫 Teacher Code: ${widget.teacherCode}');
-    }
     _loadFullProfile();
   }
 
@@ -56,7 +50,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
     setState(() => _isLoadingProfile = true);
 
     try {
-      int? studentRecNo = int.tryParse(widget.studentData['StudentRecNo']?.toString() ?? '');
+      int? studentRecNo =
+      int.tryParse(widget.studentData['StudentRecNo']?.toString() ?? '');
 
       if (studentRecNo != null) {
         final response = await TeacherPanelService.getStudentProfile(
@@ -64,19 +59,21 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
           studentRecNo: studentRecNo,
         );
 
-        if (kDebugMode) {
-          print('📦 Full Profile Response: $response');
-        }
-
         setState(() {
-          // API returns student_info, not student
           _fullProfileData = response['student_info'] as Map?;
           _isLoadingProfile = false;
         });
+      } else {
+        throw Exception('Invalid StudentRecNo');
       }
     } catch (e) {
       if (kDebugMode) {
         print('❌ Error loading full profile: $e');
+      }
+      if (mounted) {
+        CustomSnackbar.showError(
+            context, 'Failed to load full profile: $e',
+            title: 'Error');
       }
       setState(() => _isLoadingProfile = false);
     }
@@ -88,15 +85,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
       return;
     }
 
-    int? studentRecNo = int.tryParse(widget.studentData['StudentRecNo']?.toString() ?? '');
+    int? studentRecNo =
+    int.tryParse(widget.studentData['StudentRecNo']?.toString() ?? '');
 
     if (studentRecNo == null) {
       CustomSnackbar.showError(context, 'Student ID not found');
       return;
-    }
-
-    if (kDebugMode) {
-      print('\n📝 Adding note for student $studentRecNo');
     }
 
     setState(() => _isAddingNote = true);
@@ -123,7 +117,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
         CustomSnackbar.showError(context, 'Failed to add note: $e');
       }
     } finally {
-      setState(() => _isAddingNote = false);
+      if (mounted) {
+        setState(() => _isAddingNote = false);
+      }
     }
   }
 
@@ -132,7 +128,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
     final photoPath = widget.studentData['Student_Photo_Path'] ?? '';
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.lightGrey,
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
@@ -142,20 +138,13 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
               pinned: true,
               backgroundColor: AppTheme.primaryGreen,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                icon: const Icon(Iconsax.arrow_left, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               ),
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppTheme.primaryGreen,
-                        AppTheme.primaryGreen.withOpacity(0.8),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    gradient: AppTheme.primaryGradient,
                   ),
                   child: Stack(
                     children: [
@@ -184,7 +173,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                               height: 120,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 4),
+                                border: Border.all(
+                                    color: Colors.white.withOpacity(0.5),
+                                    width: 4),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withOpacity(0.3),
@@ -199,72 +190,47 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                                   imageUrl: '$_imageBaseUrl$photoPath',
                                   fit: BoxFit.cover,
                                   placeholder: (context, url) => Container(
-                                    color: Colors.white,
-                                    child: const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  ),
-                                  errorWidget: (context, url, error) => Container(
-                                    color: Colors.white,
+                                    color: AppTheme.background,
                                     child: Center(
-                                      child: Text(
-                                        _getInitials(widget.studentData['StudentName'] ?? ''),
-                                        style: GoogleFonts.inter(
-                                          fontSize: 40,
-                                          fontWeight: FontWeight.w800,
-                                          color: AppTheme.primaryGreen,
-                                        ),
-                                      ),
+                                      child: BeautifulLoader(
+                                          type: LoaderType.circular,
+                                          size: 30),
                                     ),
                                   ),
+                                  errorWidget: (context, url, error) =>
+                                      _buildInitialsFallback(),
                                 )
-                                    : Container(
-                                  color: Colors.white,
-                                  child: Center(
-                                    child: Text(
-                                      _getInitials(widget.studentData['StudentName'] ?? ''),
-                                      style: GoogleFonts.inter(
-                                        fontSize: 40,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppTheme.primaryGreen,
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                                    : _buildInitialsFallback(),
                               ),
                             ),
                             const SizedBox(height: 16),
                             // Name
                             Text(
                               widget.studentData['StudentName'] ?? 'Unknown',
-                              style: GoogleFonts.inter(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
+                              style: AppTheme.headline2.copyWith(fontSize: 24),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 8),
                             // Roll Number Badge
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 6),
                               decoration: BoxDecoration(
                                 color: Colors.white.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.white.withOpacity(0.3)),
+                                border: Border.all(
+                                    color: Colors.white.withOpacity(0.3)),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Iconsax.user, color: Colors.white, size: 14),
+                                  const Icon(Iconsax.user,
+                                      color: Colors.white, size: 14),
                                   const SizedBox(width: 6),
                                   Text(
                                     'Roll: ${widget.studentData['Roll_Number'] ?? 'N/A'}',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
+                                    style: AppTheme.buttonText.copyWith(
+                                        fontSize: 13),
                                   ),
                                 ],
                               ),
@@ -285,7 +251,13 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
             _buildPillTabBar(),
             Expanded(
               child: _isLoadingProfile
-                  ? const Center(child: CircularProgressIndicator())
+                  ? Center(
+                  child: BeautifulLoader(
+                    type: LoaderType.pulse,
+                    size: 80,
+                    color: AppTheme.primaryGreen,
+                    message: 'Loading profile...',
+                  ))
                   : TabBarView(
                 controller: _tabController,
                 children: [
@@ -302,16 +274,32 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
     );
   }
 
+  Widget _buildInitialsFallback() {
+    return Container(
+      color: AppTheme.background,
+      child: Center(
+        child: Text(
+          _getInitials(widget.studentData['StudentName'] ?? ''),
+          style: AppTheme.headline2.copyWith(
+            fontSize: 40,
+            color: AppTheme.primaryGreen,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildQuickStats() {
     return Container(
-      margin: const EdgeInsets.all(20),
+      margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: AppTheme.background,
+        borderRadius: AppTheme.defaultBorderRadius * 1.5, // 18.0
+        border: Border.all(color: AppTheme.borderGrey),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: AppTheme.shadowColor,
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -324,46 +312,42 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
             Iconsax.award,
             'Attendance',
             '${_fullProfileData?['AttendancePercentage'] ?? 'N/A'}%',
-            Colors.blue,
+            AppTheme.cleoColor, // Brand color
           ),
-          Container(width: 1, height: 40, color: Colors.grey.shade200),
+          Container(width: 1, height: 40, color: AppTheme.borderGrey),
           _buildQuickStat(
             Iconsax.chart_21,
             'Performance',
             '${_fullProfileData?['OverallPercentage'] ?? 'N/A'}%',
-            Colors.green,
+            AppTheme.accentGreen, // Brand color
           ),
-          Container(width: 1, height: 40, color: Colors.grey.shade200),
+          Container(width: 1, height: 40, color: AppTheme.borderGrey),
           _buildQuickStat(
             Iconsax.book,
             'Chapters',
             '${_fullProfileData?['CompletedChapters'] ?? 0}',
-            Colors.orange,
+            AppTheme.mackColor, // Brand color
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickStat(IconData icon, String label, String value, Color color) {
+  Widget _buildQuickStat(
+      IconData icon, String label, String value, Color color) {
     return Column(
       children: [
         Icon(icon, color: color, size: 28),
         const SizedBox(height: 8),
         Text(
           value,
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: AppTheme.darkText,
-          ),
+          style: AppTheme.headline1.copyWith(fontSize: 18),
         ),
         Text(
           label,
-          style: GoogleFonts.inter(
+          style: AppTheme.bodyText1.copyWith(
             fontSize: 11,
             color: AppTheme.bodyText,
-            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -372,27 +356,21 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
 
   Widget _buildPillTabBar() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
+      margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: AppTheme.lightGrey,
         borderRadius: BorderRadius.circular(50),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: AppTheme.borderGrey),
       ),
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
-          color: Colors.white,
+          color: AppTheme.background,
           borderRadius: BorderRadius.circular(50),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primaryGreen.withOpacity(0.15),
+              color: AppTheme.shadowColor.withOpacity(0.7),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -402,14 +380,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
         dividerColor: Colors.transparent,
         labelColor: AppTheme.primaryGreen,
         unselectedLabelColor: AppTheme.bodyText,
-        labelStyle: GoogleFonts.inter(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
-        unselectedLabelStyle: GoogleFonts.inter(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
+        labelStyle: AppTheme.labelText.copyWith(fontSize: 12),
+        unselectedLabelStyle: AppTheme.labelText.copyWith(
+            fontSize: 12, fontWeight: FontWeight.w600),
         tabs: const [
           Tab(icon: Icon(Iconsax.user, size: 16), text: 'Overview'),
           Tab(icon: Icon(Iconsax.book, size: 16), text: 'Academics'),
@@ -422,48 +395,61 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
 
   Widget _buildOverviewTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      physics: const BouncingScrollPhysics(),
       child: Column(
         children: [
           _buildInfoSection(
             'Personal Information',
             Iconsax.user,
-            Colors.blue,
             [
-              _buildInfoRow('Full Name', widget.studentData['StudentName'] ?? 'N/A'),
-              _buildInfoRow('First Name', widget.studentData['First_Name'] ?? 'N/A'),
-              _buildInfoRow('Middle Name', widget.studentData['Middle_Name'] ?? 'N/A'),
-              _buildInfoRow('Last Name', widget.studentData['Last_Name'] ?? 'N/A'),
+              _buildInfoRow(
+                  'Full Name', widget.studentData['StudentName'] ?? 'N/A'),
+              _buildInfoRow(
+                  'First Name', widget.studentData['First_Name'] ?? 'N/A'),
+              _buildInfoRow(
+                  'Middle Name', widget.studentData['Middle_Name'] ?? 'N/A'),
+              _buildInfoRow(
+                  'Last Name', widget.studentData['Last_Name'] ?? 'N/A'),
               _buildInfoRow('Gender', widget.studentData['Gender'] ?? 'N/A'),
-              _buildInfoRow('Date of Birth', widget.studentData['Date_of_Birth'] ?? 'N/A'),
+              _buildInfoRow(
+                  'Date of Birth', widget.studentData['Date_of_Birth'] ?? 'N/A'),
               _buildInfoRow('Age', '${widget.studentData['Age'] ?? 'N/A'} years'),
-              _buildInfoRow('Blood Group', _fullProfileData?['Blood_Group'] ?? 'N/A'),
+              _buildInfoRow(
+                  'Blood Group', _fullProfileData?['Blood_Group'] ?? 'N/A'),
             ],
           ),
           const SizedBox(height: 16),
           _buildInfoSection(
             'Contact Details',
             Iconsax.call,
-            Colors.green,
             [
-              _buildInfoRow('Mobile', widget.studentData['Mobile_Number'] ?? 'N/A'),
+              _buildInfoRow(
+                  'Mobile', widget.studentData['Mobile_Number'] ?? 'N/A'),
               _buildInfoRow('Email', widget.studentData['Email_ID'] ?? 'N/A'),
-              _buildInfoRow('Current Address', _fullProfileData?['Current_Address'] ?? 'N/A'),
-              _buildInfoRow('Permanent Address', _fullProfileData?['Permanent_Address'] ?? 'N/A'),
+              _buildInfoRow('Current Address',
+                  _fullProfileData?['Current_Address'] ?? 'N/A'),
+              _buildInfoRow('Permanent Address',
+                  _fullProfileData?['Permanent_Address'] ?? 'N/A'),
             ],
           ),
           const SizedBox(height: 16),
           _buildInfoSection(
             'Family Information',
             Iconsax.profile_2user,
-            Colors.purple,
             [
-              _buildInfoRow('Father Name', widget.studentData['Father_Name'] ?? 'N/A'),
-              _buildInfoRow('Father Mobile', widget.studentData['Father_Mobile_Number'] ?? 'N/A'),
-              _buildInfoRow('Mother Name', _fullProfileData?['Mother_Name'] ?? 'N/A'),
-              _buildInfoRow('Mother Mobile', _fullProfileData?['MotherMobile'] ?? 'N/A'),
-              _buildInfoRow('Guardian Name', _fullProfileData?['Guardian_Name'] ?? 'N/A'),
-              _buildInfoRow('Guardian Contact', _fullProfileData?['GuardianContact'] ?? 'N/A'),
+              _buildInfoRow(
+                  'Father Name', widget.studentData['Father_Name'] ?? 'N/A'),
+              _buildInfoRow('Father Mobile',
+                  widget.studentData['Father_Mobile_Number'] ?? 'N/A'),
+              _buildInfoRow(
+                  'Mother Name', _fullProfileData?['Mother_Name'] ?? 'N/A'),
+              _buildInfoRow(
+                  'Mother Mobile', _fullProfileData?['MotherMobile'] ?? 'N/A'),
+              _buildInfoRow('Guardian Name',
+                  _fullProfileData?['Guardian_Name'] ?? 'N/A'),
+              _buildInfoRow('Guardian Contact',
+                  _fullProfileData?['GuardianContact'] ?? 'N/A'),
             ],
           ),
         ],
@@ -473,33 +459,43 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
 
   Widget _buildAcademicsTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      physics: const BouncingScrollPhysics(),
       child: Column(
         children: [
           _buildInfoSection(
             'Academic Details',
             Iconsax.book_square,
-            Colors.orange,
             [
-              _buildInfoRow('Admission Number', widget.studentData['Admission_Number'] ?? 'N/A'),
-              _buildInfoRow('Class', widget.studentData['Class_Name'] ?? 'N/A'),
-              _buildInfoRow('Section', widget.studentData['Section_Name'] ?? 'N/A'),
-              _buildInfoRow('Roll Number', widget.studentData['Roll_Number']?.toString() ?? 'N/A'),
-              _buildInfoRow('Academic Year', _fullProfileData?['Academic_Year'] ?? 'N/A'),
+              _buildInfoRow('Admission Number',
+                  widget.studentData['Admission_Number'] ?? 'N/A'),
+              _buildInfoRow(
+                  'Class', widget.studentData['Class_Name'] ?? 'N/A'),
+              _buildInfoRow(
+                  'Section', widget.studentData['Section_Name'] ?? 'N/A'),
+              _buildInfoRow('Roll Number',
+                  widget.studentData['Roll_Number']?.toString() ?? 'N/A'),
+              _buildInfoRow('Academic Year',
+                  _fullProfileData?['Academic_Year'] ?? 'N/A'),
             ],
           ),
           const SizedBox(height: 16),
           _buildInfoSection(
             'Performance Metrics',
             Iconsax.chart_21,
-            Colors.teal,
             [
-              _buildInfoRow('Overall Percentage', '${_fullProfileData?['OverallPercentage'] ?? 'N/A'}%'),
-              _buildInfoRow('Total Assessments', '${_fullProfileData?['TotalAssessments'] ?? 0}'),
-              _buildInfoRow('Completed Chapters', '${_fullProfileData?['CompletedChapters'] ?? 0}'),
-              _buildInfoRow('In Progress Chapters', '${_fullProfileData?['InProgressChapters'] ?? 0}'),
-              _buildInfoRow('Study Minutes', '${_fullProfileData?['TotalStudyMinutes'] ?? 0} mins'),
-              _buildInfoRow('Last Active', _fullProfileData?['LastActive'] ?? 'N/A'),
+              _buildInfoRow('Overall Percentage',
+                  '${_fullProfileData?['OverallPercentage'] ?? 'N/A'}%'),
+              _buildInfoRow('Total Assessments',
+                  '${_fullProfileData?['TotalAssessments'] ?? 0}'),
+              _buildInfoRow('Completed Chapters',
+                  '${_fullProfileData?['CompletedChapters'] ?? 0}'),
+              _buildInfoRow('In Progress Chapters',
+                  '${_fullProfileData?['InProgressChapters'] ?? 0}'),
+              _buildInfoRow('Study Minutes',
+                  '${_fullProfileData?['TotalStudyMinutes'] ?? 0} mins'),
+              _buildInfoRow(
+                  'Last Active', _fullProfileData?['LastActive'] ?? 'N/A'),
             ],
           ),
         ],
@@ -508,18 +504,21 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
   }
 
   Widget _buildNotesTab() {
+    final notes = _fullProfileData?['teacher_notes'] as List?;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      physics: const BouncingScrollPhysics(),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              color: AppTheme.background,
+              borderRadius: AppTheme.defaultBorderRadius * 1.5, // 18.0
+              border: Border.all(color: AppTheme.borderGrey),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: AppTheme.shadowColor,
                   blurRadius: 12,
                   offset: const Offset(0, 2),
                 ),
@@ -533,19 +532,16 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.purple.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        color: AppTheme.primaryGreen.withOpacity(0.1),
+                        borderRadius: AppTheme.defaultBorderRadius, // 12.0
                       ),
-                      child: const Icon(Iconsax.edit, color: Colors.purple, size: 20),
+                      child: const Icon(Iconsax.edit,
+                          color: AppTheme.primaryGreen, size: 20),
                     ),
                     const SizedBox(width: 12),
                     Text(
                       'Add New Note',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.darkText,
-                      ),
+                      style: AppTheme.headline1.copyWith(fontSize: 16),
                     ),
                   ],
                 ),
@@ -555,67 +551,147 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
                   maxLines: 4,
                   decoration: InputDecoration(
                     hintText: 'Write a private note about this student...',
+                    hintStyle: AppTheme.bodyText1
+                        .copyWith(color: AppTheme.bodyText.withOpacity(0.7)),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: AppTheme.defaultBorderRadius, // 12.0
+                      borderSide: BorderSide(color: AppTheme.borderGrey),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: AppTheme.defaultBorderRadius, // 12.0
+                      borderSide: BorderSide(color: AppTheme.borderGrey),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: AppTheme.defaultBorderRadius, // 12.0
+                      borderSide: BorderSide(color: AppTheme.primaryGreen),
                     ),
                     filled: true,
-                    fillColor: Colors.grey.shade50,
+                    fillColor: AppTheme.lightGrey,
                   ),
                 ),
                 const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _isAddingNote ? null : _addNote,
-                      icon: _isAddingNote
-                          ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                          : const Icon(Iconsax.add, color: Colors.white), // make icon white too
-                      label: Text(
-                        _isAddingNote ? 'Adding Note...' : 'Add Note',
-                        style: const TextStyle(color: Colors.white), // text color white
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.purple,
-                        foregroundColor: Colors.white, // ensures white text/icon for all states
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isAddingNote ? null : _addNote,
+                    icon: _isAddingNote
+                        ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                        : const Icon(Iconsax.add, color: Colors.white),
+                    label: Text(
+                      _isAddingNote ? 'Adding Note...' : 'Add Note',
+                      style: AppTheme.buttonText,
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppTheme.defaultBorderRadius, // 12.0
                       ),
                     ),
                   ),
-                  ],
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
           // Display existing notes
-          if (_fullProfileData?['teacher_notes'] != null && (_fullProfileData!['teacher_notes'] as List).isNotEmpty)
-            ...(_fullProfileData!['teacher_notes'] as List).map((note) {
+          if (notes != null && notes.isNotEmpty)
+            ...notes.map((note) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.purple.withOpacity(0.2)),
+                  color: AppTheme.background,
+                  borderRadius: AppTheme.defaultBorderRadius, // 12.0
+                  border: Border.all(color: AppTheme.borderGrey),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       note['NoteText'] ?? '',
-                      style: GoogleFonts.inter(fontSize: 14, color: AppTheme.darkText),
+                      style: AppTheme.bodyText1.copyWith(color: AppTheme.darkText),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       note['Created_Date'] ?? '',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: AppTheme.bodyText,
+                      style: AppTheme.bodyText1
+                          .copyWith(fontSize: 11, color: AppTheme.bodyText),
+                    ),
+                  ],
+                ),
+              );
+            }).toList()
+          else
+            _buildEmptyTabState(
+                Iconsax.note_text, 'No notes yet', 'Add a note above to get started.'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityTab() {
+    final scores = _fullProfileData?['recent_scores'] as List?;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        children: [
+          if (scores != null && scores.isNotEmpty)
+            ...scores.map((score) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.background,
+                  borderRadius: AppTheme.defaultBorderRadius, // 12.0
+                  border: Border.all(color: AppTheme.borderGrey),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentGreen.withOpacity(0.1),
+                        borderRadius: AppTheme.defaultBorderRadius, // 12.0
+                      ),
+                      child: const Icon(Iconsax.document_text,
+                          color: AppTheme.accentGreen, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            score['AssessmentName'] ?? 'Assessment',
+                            style: AppTheme.labelText,
+                          ),
+                          Text(
+                            score['Date'] ?? '',
+                            style: AppTheme.bodyText1.copyWith(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentGreen.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${score['Score']}',
+                        style: AppTheme.labelText.copyWith(
+                          color: AppTheme.accentGreen,
+                        ),
                       ),
                     ),
                   ],
@@ -623,118 +699,22 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
               );
             }).toList()
           else
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(40),
-                child: Column(
-                  children: [
-                    Icon(Iconsax.note_text, size: 64, color: Colors.grey.shade300),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No notes yet',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.bodyText,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _buildEmptyTabState(Iconsax.activity, 'No activity recorded', 'Student activity will appear here.'),
         ],
       ),
     );
   }
 
-  Widget _buildActivityTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          if (_fullProfileData?['recent_scores'] != null && (_fullProfileData!['recent_scores'] as List).isNotEmpty)
-            _buildScoresSection()
-          else
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(40),
-                child: Column(
-                  children: [
-                    Icon(Iconsax.activity, size: 64, color: Colors.grey.shade300),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No activity recorded',
-                      style: GoogleFonts.inter(
-                        color: AppTheme.bodyText,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScoresSection() {
-    final scores = _fullProfileData!['recent_scores'] as List;
+  Widget _buildInfoSection(
+      String title, IconData icon, List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: AppTheme.background,
+        borderRadius: AppTheme.defaultBorderRadius * 1.5, // 18.0
+        border: Border.all(color: AppTheme.borderGrey),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: scores.map((score) {
-          return ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Iconsax.document_text, color: Colors.blue, size: 20),
-            ),
-            title: Text(
-              score['AssessmentName'] ?? 'Assessment',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(score['Date'] ?? ''),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '${score['Score']}',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w700,
-                  color: Colors.green,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildInfoSection(String title, IconData icon, Color color, List<Widget> children) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AppTheme.shadowColor,
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -744,32 +724,19 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
+              border: Border(
+                bottom: BorderSide(color: AppTheme.borderGrey),
               ),
             ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: color, size: 20),
-                ),
+                Icon(icon, color: AppTheme.primaryGreen, size: 20),
                 const SizedBox(width: 12),
                 Text(
                   title,
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.darkText,
-                  ),
+                  style: AppTheme.headline1.copyWith(fontSize: 16),
                 ),
               ],
             ),
@@ -793,20 +760,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
             flex: 2,
             child: Text(
               label,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: AppTheme.bodyText,
-                fontWeight: FontWeight.w500,
-              ),
+              style: AppTheme.bodyText1,
             ),
           ),
           Expanded(
             flex: 3,
             child: Text(
-              value,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+              value.isEmpty ? 'N/A' : value,
+              style: AppTheme.labelText.copyWith(
                 color: AppTheme.darkText,
               ),
             ),
@@ -816,12 +777,42 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> with SingleTi
     );
   }
 
+  Widget _buildEmptyTabState(IconData icon, String title, String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          children: [
+            Icon(icon, size: 64, color: AppTheme.borderGrey.withOpacity(0.7)),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: AppTheme.labelText
+                  .copyWith(color: AppTheme.bodyText, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              message,
+              style: AppTheme.bodyText1,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _getInitials(String name) {
     if (name.isEmpty) return '?';
     final parts = name.trim().split(' ');
     if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      if (parts[0].isNotEmpty && parts[1].isNotEmpty) {
+        return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      }
     }
-    return name[0].toUpperCase();
+    if (parts.isNotEmpty && parts[0].isNotEmpty) {
+      return parts[0][0].toUpperCase();
+    }
+    return '?';
   }
 }

@@ -129,147 +129,155 @@ class _SchoolsScreenContentState extends State<SchoolsScreenContent> {
 
             print('🏫 Pagination - Current page: $_currentPage, Total pages: $totalPages, Showing: ${paginatedSchools.length} schools');
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final bool isMobile = constraints.maxWidth < 600;
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        if (!isMobile)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Manage Schools',
-                                  style: GoogleFonts.poppins(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.darkText)),
-                              const SizedBox(height: 4),
-                              Text('Add, view, edit, and manage all schools.',
+            // --- ADDED THIS WRAPPER ---
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                // --- ADDED THIS LINE ---
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final bool isMobile = constraints.maxWidth < 600;
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          if (!isMobile)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Manage Schools',
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.darkText)),
+                                const SizedBox(height: 4),
+                                Text('Add, view, edit, and manage all schools.',
+                                    style: GoogleFonts.inter(
+                                        color: AppTheme.bodyText)),
+                              ],
+                            ),
+                          if (isMobile)
+                            Text('Manage School',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.darkText)),
+                          if (canAdd)
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                print('➕ Add New School button pressed');
+                                _navigateToAddEditSchool(null);
+                              },
+                              icon: const Icon(Iconsax.add, size: 20),
+                              label: isMobile
+                                  ? const SizedBox.shrink()
+                                  : Text('Add New School',
                                   style: GoogleFonts.inter(
-                                      color: AppTheme.bodyText)),
+                                      fontWeight: FontWeight.w600)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryGreen,
+                                foregroundColor: Colors.white,
+                                shape: isMobile
+                                    ? const CircleBorder()
+                                    : RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: isMobile ? 16 : 24, vertical: 20),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: AppTheme.defaultPadding * 1.5),
+                  _StyledContainer(
+                    child: Column(
+                      // --- ADDED THIS LINE (Good practice) ---
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const _SchoolsHeader(),
+                        const SizedBox(height: AppTheme.defaultPadding),
+                        if (state.isLoading)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(64.0),
+                              child: BeautifulLoader(
+                                type: LoaderType.dots,
+                                message: 'Loading schools...',
+                                color: AppTheme.primaryGreen,
+                                size: 50,
+                              ),
+                            ),
+                          )
+                        else if (state.filteredSchools.isEmpty)
+                          Center(
+                              child: Padding(
+                                  padding: const EdgeInsets.all(32.0),
+                                  child: Column(
+                                    children: [
+                                      const Text("No schools found."),
+                                      Text('Total schools: ${state.allSchools.length}'),
+                                      Text('Filtered schools: ${state.filteredSchools.length}'),
+                                    ],
+                                  )))
+                        else
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              bool isMobile = constraints.maxWidth < 700;
+                              print('🏫 Building table - isMobile: $isMobile, Schools: ${paginatedSchools.length}');
+                              return _ModernSchoolsTable(
+                                  schools: paginatedSchools,
+                                  isMobile: isMobile,
+                                  canEdit: userProvider.hasPermission('M002', 'edit'),
+                                  canDelete: userProvider.hasPermission('M002', 'delete'));
+                            },
+                          ),
+                        const SizedBox(height: AppTheme.defaultPadding),
+                        if (totalPages > 1)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              const Text("Rows:"),
+                              const SizedBox(width: 8),
+                              DropdownButton<int>(
+                                value: _rowsPerPage,
+                                items: [5, 8, 10, 15]
+                                    .map((e) => DropdownMenuItem(
+                                    value: e, child: Text(e.toString())))
+                                    .toList(),
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    print('📄 Rows per page changed to: $value');
+                                    setState(() {
+                                      _rowsPerPage = value;
+                                      _currentPage = 0;
+                                    });
+                                  }
+                                },
+                              ),
+                              const SizedBox(width: 16),
+                              Text('${_currentPage + 1} of $totalPages'),
+                              const SizedBox(width: 16),
+                              IconButton(
+                                  icon: const Icon(Iconsax.arrow_left_2),
+                                  onPressed: _currentPage == 0
+                                      ? null
+                                      : () => _goToPage(_currentPage - 1)),
+                              IconButton(
+                                  icon: const Icon(Iconsax.arrow_right_3),
+                                  onPressed: _currentPage >= totalPages - 1
+                                      ? null
+                                      : () => _goToPage(_currentPage + 1)),
                             ],
                           ),
-                        if (isMobile)
-                          Text('Manage School',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.darkText)),
-                        if (canAdd)
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              print('➕ Add New School button pressed');
-                              _navigateToAddEditSchool(null);
-                            },
-                            icon: const Icon(Iconsax.add, size: 20),
-                            label: isMobile
-                                ? const SizedBox.shrink()
-                                : Text('Add New School',
-                                style: GoogleFonts.inter(
-                                    fontWeight: FontWeight.w600)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryGreen,
-                              foregroundColor: Colors.white,
-                              shape: isMobile
-                                  ? const CircleBorder()
-                                  : RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: isMobile ? 16 : 24, vertical: 20),
-                            ),
-                          ),
                       ],
-                    );
-                  },
-                ),
-                const SizedBox(height: AppTheme.defaultPadding * 1.5),
-                _StyledContainer(
-                  child: Column(
-                    children: [
-                      const _SchoolsHeader(),
-                      const SizedBox(height: AppTheme.defaultPadding),
-                      if (state.isLoading)
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(64.0),
-                            child: BeautifulLoader(
-                              type: LoaderType.dots,
-                              message: 'Loading schools...',
-                              color: AppTheme.primaryGreen,
-                              size: 50,
-                            ),
-                          ),
-                        )
-                      else if (state.filteredSchools.isEmpty)
-                        Center(
-                            child: Padding(
-                                padding: const EdgeInsets.all(32.0),
-                                child: Column(
-                                  children: [
-                                    const Text("No schools found."),
-                                    Text('Total schools: ${state.allSchools.length}'),
-                                    Text('Filtered schools: ${state.filteredSchools.length}'),
-                                  ],
-                                )))
-                      else
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            bool isMobile = constraints.maxWidth < 700;
-                            print('🏫 Building table - isMobile: $isMobile, Schools: ${paginatedSchools.length}');
-                            return _ModernSchoolsTable(
-                                schools: paginatedSchools,
-                                isMobile: isMobile,
-                                canEdit: userProvider.hasPermission('M002', 'edit'),
-                                canDelete: userProvider.hasPermission('M002', 'delete'));
-                          },
-                        ),
-                      const SizedBox(height: AppTheme.defaultPadding),
-                      if (totalPages > 1)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            const Text("Rows:"),
-                            const SizedBox(width: 8),
-                            DropdownButton<int>(
-                              value: _rowsPerPage,
-                              items: [5, 8, 10, 15]
-                                  .map((e) => DropdownMenuItem(
-                                  value: e, child: Text(e.toString())))
-                                  .toList(),
-                              onChanged: (value) {
-                                if (value != null) {
-                                  print('📄 Rows per page changed to: $value');
-                                  setState(() {
-                                    _rowsPerPage = value;
-                                    _currentPage = 0;
-                                  });
-                                }
-                              },
-                            ),
-                            const SizedBox(width: 16),
-                            Text('${_currentPage + 1} of $totalPages'),
-                            const SizedBox(width: 16),
-                            IconButton(
-                                icon: const Icon(Iconsax.arrow_left_2),
-                                onPressed: _currentPage == 0
-                                    ? null
-                                    : () => _goToPage(_currentPage - 1)),
-                            IconButton(
-                                icon: const Icon(Iconsax.arrow_right_3),
-                                onPressed: _currentPage >= totalPages - 1
-                                    ? null
-                                    : () => _goToPage(_currentPage + 1)),
-                          ],
-                        ),
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             );
+            // --- END OF CHANGES ---
           },
         );
       },

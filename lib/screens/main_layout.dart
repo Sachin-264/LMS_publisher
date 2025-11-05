@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:google_fonts/google_fonts.dart'; // Still needed
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:lms_publisher/AdminScreen/AdminPublish/publisher_screen.dart';
 import 'package:lms_publisher/ParentPannel/select_child_screen.dart';
@@ -17,6 +17,7 @@ import 'package:lms_publisher/StudentPannel/Student_analytics/student_analytics_
 import 'package:lms_publisher/Teacher_Panel/MyClass/teacher_classes_screen.dart';
 import 'package:lms_publisher/Teacher_Panel/teacher_dashboard.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
+import 'package:lms_publisher/address_master_screen.dart';
 import 'package:lms_publisher/screens/AcademicsScreen/academics_screen.dart';
 import 'package:lms_publisher/screens/HomePage/HomePage.dart';
 import 'package:lms_publisher/screens/LogOutTransition.dart';
@@ -46,13 +47,15 @@ enum AppScreen {
   teacherStudents,
   teacherAnalytics,
   settings,
-  parentChildren
+  parentChildren,
+  addressMaster,
 }
 
 // ✅ State management for sidebar
 final ValueNotifier<bool> isSidebarCollapsed = ValueNotifier(true);
 final ValueNotifier<bool> isMobileMenuOpen = ValueNotifier(false);
 
+// ✅ UPDATED: MainLayout
 class MainLayout extends StatefulWidget {
   final Widget child;
   final AppScreen activeScreen;
@@ -86,17 +89,110 @@ class _MainLayoutState extends State<MainLayout> {
     super.dispose();
   }
 
+  // ✅ ADDED: Helper to get the icon for each screen
+  IconData _getIconForScreen(AppScreen screen) {
+    switch (screen) {
+      case AppScreen.dashboard:
+        return Iconsax.home;
+      case AppScreen.schools:
+        return Iconsax.building_4;
+      case AppScreen.students:
+        return Iconsax.profile_2user;
+      case AppScreen.teachers:
+        return Iconsax.teacher;
+      case AppScreen.subscriptions:
+        return Iconsax.receipt_text;
+      case AppScreen.academics:
+        return Iconsax.book_1;
+      case AppScreen.publishers:
+        return Iconsax.user_square;
+      case AppScreen.schoolPanel:
+        return Iconsax.monitor;
+      case AppScreen.classModule:
+        return Iconsax.building;
+      case AppScreen.subjectModule:
+        return Iconsax.book_square;
+      case AppScreen.mySubjects:
+        return Iconsax.book_1;
+      case AppScreen.analytics:
+        return Iconsax.chart_21;
+      case AppScreen.myFavourites:
+        return Iconsax.heart;
+      case AppScreen.teacherDashboard:
+        return Iconsax.teacher;
+      case AppScreen.teacherClasses:
+        return Iconsax.book_square;
+      case AppScreen.addressMaster:
+        return Iconsax.location;
+      case AppScreen.parentChildren:
+        return Iconsax.profile_2user;
+      case AppScreen.settings:
+        return Iconsax.setting_2;
+      default:
+        return Iconsax.home;
+    }
+  }
+
+  // ✅ ADDED: Helper to get the title for each screen
+  String _getTitleForScreen(AppScreen screen) {
+    switch (screen) {
+      case AppScreen.dashboard:
+        return 'Dashboard';
+      case AppScreen.schools:
+        return 'Manage Schools';
+      case AppScreen.students:
+        return 'Manage Students';
+      case AppScreen.teachers:
+        return 'Manage Teachers';
+      case AppScreen.subscriptions:
+        return 'Subscriptions';
+      case AppScreen.academics:
+        return 'Academics';
+      case AppScreen.publishers:
+        return 'Publishers';
+      case AppScreen.schoolPanel:
+        return 'School Panel';
+      case AppScreen.classModule:
+        return 'Class Management';
+      case AppScreen.subjectModule:
+        return 'Subject Module';
+      case AppScreen.mySubjects:
+        return 'My Subjects';
+      case AppScreen.analytics:
+        return 'My Analytics';
+      case AppScreen.myFavourites:
+        return 'My Favourites';
+      case AppScreen.teacherDashboard:
+        return 'Teacher Dashboard';
+      case AppScreen.teacherClasses:
+        return 'My Classes';
+      case AppScreen.addressMaster:
+        return 'Address Master';
+      case AppScreen.parentChildren:
+        return 'My Children';
+      case AppScreen.settings:
+        return 'Settings';
+      default:
+        return 'Dashboard';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
     final isMobile = screenWidth < 600;
-    final padding = MediaQuery.of(context).padding;
+
+    // ✅ Get title and icon here
+    final String title = _getTitleForScreen(widget.activeScreen);
+    final IconData icon = _getIconForScreen(widget.activeScreen);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F5),
-      drawer:
-      isMobile ? _MobileDrawer(activeScreen: widget.activeScreen) : null,
+      backgroundColor: AppTheme.lightGrey,
+      drawer: isMobile
+          ? _MobileDrawer(
+        activeScreen: widget.activeScreen,
+      )
+          : null,
       body: SafeArea(
         top: true,
         bottom: true,
@@ -128,57 +224,18 @@ class _MainLayoutState extends State<MainLayout> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _Header(isMobile: isMobile),
+                            // ✅ UPDATED: Pass title and icon to header
+                            _Header(
+                              isMobile: isMobile,
+                              title: title,
+                              icon: icon,
+                            ),
                             SizedBox(
                                 height: isMobile
                                     ? 12
                                     : AppTheme.defaultPadding * 1.5),
                             Expanded(
-                              child: LayoutBuilder(
-                                builder: (context, constraints) {
-                                  return NotificationListener<
-                                      ScrollNotification>(
-                                    onNotification:
-                                        (ScrollNotification notification) {
-                                      if (notification
-                                      is ScrollStartNotification) {
-                                      } else if (notification
-                                      is ScrollEndNotification) {
-                                        final percent =
-                                        (_scrollController.position.pixels /
-                                            _scrollController.position
-                                                .maxScrollExtent *
-                                            100)
-                                            .toStringAsFixed(0);
-                                      } else if (notification
-                                      is OverscrollNotification) {}
-                                      return false;
-                                    },
-                                    child: SingleChildScrollView(
-                                      controller: _scrollController,
-                                      physics: const ClampingScrollPhysics(),
-                                      child: Builder(
-                                        builder: (context) {
-                                          WidgetsBinding.instance
-                                              .addPostFrameCallback((_) {
-                                            final RenderBox? box =
-                                            context.findRenderObject()
-                                            as RenderBox?;
-                                            if (box != null && box.hasSize) {}
-                                          });
-                                          return Container(
-                                            width: double.infinity,
-                                            constraints: BoxConstraints(
-                                              minHeight: constraints.maxHeight,
-                                            ),
-                                            child: widget.child,
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
+                              child: widget.child,
                             ),
                           ],
                         ),
@@ -208,7 +265,7 @@ class _MainLayoutState extends State<MainLayout> {
   }
 }
 
-// ✅ Mobile Menu Item Widget
+// (This widget is unchanged)
 class _MobileMenuItem extends StatelessWidget {
   final IconData icon;
   final String text;
@@ -258,7 +315,7 @@ class _MobileMenuItem extends StatelessWidget {
                 Expanded(
                   child: Text(
                     text,
-                    style: GoogleFonts.inter(
+                    style: AppTheme.bodyText1.copyWith(
                       color: effectiveTextColor,
                       fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                       fontSize: 15,
@@ -283,11 +340,17 @@ class _MobileMenuItem extends StatelessWidget {
   }
 }
 
-// ✅ UPDATED: Header with Hamburger Menu
+// ✅ UPDATED: Header with Enhanced Title and Mobile Title
 class _Header extends StatelessWidget {
   final bool isMobile;
+  final String title;
+  final IconData icon; // ✅ ADDED
 
-  const _Header({required this.isMobile});
+  const _Header({
+    required this.isMobile,
+    required this.title,
+    required this.icon, // ✅ ADDED
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -305,15 +368,16 @@ class _Header extends StatelessWidget {
                   Container(
                     margin: const EdgeInsets.only(right: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppTheme.background,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                          color: AppTheme.shadowColor,
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
                       ],
+                      border: Border.all(color: AppTheme.borderGrey),
                     ),
                     child: IconButton(
                       icon: const Icon(Iconsax.menu_1,
@@ -325,63 +389,52 @@ class _Header extends StatelessWidget {
                     ),
                   ),
 
-                // Search Bar
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 12,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                      border: Border.all(
-                          color: AppTheme.borderGrey.withOpacity(0.1)),
-                    ),
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Search...',
-                        hintStyle: GoogleFonts.inter(
-                          color: AppTheme.bodyText.withOpacity(0.5),
-                          fontSize: 14,
-                        ),
-                        prefixIcon: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(
-                            Iconsax.search_normal_1,
-                            size: 18,
-                            color: AppTheme.bodyText.withOpacity(0.5),
-                          ),
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                      ),
+                // ✅ ADDED: Mobile Title
+                if (isMobile)
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: AppTheme.headline1.copyWith(fontSize: 18),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ),
 
-                const SizedBox(width: 12),
+                // ✅ UPDATED: Enhanced Desktop Title
+                if (!isMobile)
+                  Row(
+                    children: [
+                      Icon(
+                        icon,
+                        color: AppTheme.primaryGreen,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        title,
+                        style: AppTheme.headline1.copyWith(fontSize: 22),
+                      ),
+                    ],
+                  ),
+
+                // ✅ REMOVED: Search Bar
+                const Spacer(), // Pushes icons to the right
 
                 // Notification Icon
                 if (!isCompact)
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppTheme.background,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                          color: AppTheme.shadowColor,
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
                       ],
+                      border: Border.all(color: AppTheme.borderGrey),
                     ),
                     child: Stack(
                       children: [
@@ -412,15 +465,16 @@ class _Header extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppTheme.background,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+                        color: AppTheme.shadowColor,
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
                     ],
+                    border: Border.all(color: AppTheme.borderGrey),
                   ),
                   child: Row(
                     children: [
@@ -440,10 +494,7 @@ class _Header extends StatelessWidget {
                         const SizedBox(width: 12),
                         Text(
                           userName,
-                          style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
+                          style: AppTheme.labelText.copyWith(fontSize: 14),
                         ),
                         const SizedBox(width: 8),
                       ],
@@ -460,6 +511,7 @@ class _Header extends StatelessWidget {
 }
 
 // ==================== MODERN COLLAPSIBLE SIDEBAR ====================
+// (This widget is unchanged)
 class _ModernCollapsibleSidebar extends StatelessWidget {
   final bool isCollapsed;
   final AppScreen activeScreen;
@@ -477,10 +529,10 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
 
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppTheme.background,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
+                color: AppTheme.darkText.withOpacity(0.05),
                 blurRadius: 20,
                 offset: const Offset(2, 0),
               ),
@@ -505,14 +557,7 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            AppTheme.primaryGreen,
-                            AppTheme.mackColor,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        gradient: AppTheme.primaryGradient,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -526,10 +571,7 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                       Expanded(
                         child: RichText(
                           text: TextSpan(
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: AppTheme.logoStyle.copyWith(fontSize: 18),
                             children: const [
                               TextSpan(
                                 text: 'MACK',
@@ -575,8 +617,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.dashboard) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                    builder: (_) => const HomeScreen()),
+                                SmoothPageRoute(
+                                    page: const HomeScreen()),
                               );
                             }
                           },
@@ -594,8 +636,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.schools) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                    builder: (_) => const SchoolsScreen()),
+                                SmoothPageRoute(
+                                    page: const SchoolsScreen()),
                               );
                             }
                           },
@@ -613,8 +655,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.students) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                    builder: (_) => const StudentsScreen()),
+                                SmoothPageRoute(
+                                    page: const StudentsScreen()),
                               );
                             }
                           },
@@ -632,8 +674,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.teachers) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                    builder: (_) => const TeachersScreen()),
+                                SmoothPageRoute(
+                                    page: const TeachersScreen()),
                               );
                             }
                           },
@@ -651,9 +693,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.subscriptions) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                    const SubscriptionsScreen()),
+                                SmoothPageRoute(
+                                    page: const SubscriptionsScreen()),
                               );
                             }
                           },
@@ -671,8 +712,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.academics) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                    builder: (_) => const AcademicsScreen()),
+                                SmoothPageRoute(
+                                    page: const AcademicsScreen()),
                               );
                             }
                           },
@@ -690,8 +731,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.publishers) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                    builder: (_) => const PublisherScreen()),
+                                SmoothPageRoute(
+                                    page: const PublisherScreen()),
                               );
                             }
                           },
@@ -709,9 +750,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.schoolPanel) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                    const SchoolPanelDashboard()),
+                                SmoothPageRoute(
+                                    page: const SchoolPanelDashboard()),
                               );
                             }
                           },
@@ -729,8 +769,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.classModule) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (_) => ClassManageScreen(
+                                SmoothPageRoute(
+                                  page: ClassManageScreen(
                                     schoolRecNo: schoolRecNo,
                                   ),
                                 ),
@@ -751,8 +791,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.subjectModule) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (_) => SubjectModuleScreen(
+                                SmoothPageRoute(
+                                  page: SubjectModuleScreen(
                                     schoolRecNo: schoolRecNo,
                                     academicYear: '2025-26',
                                   ),
@@ -774,8 +814,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.mySubjects) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                    builder: (_) => const MySubjectsScreen()),
+                                SmoothPageRoute(
+                                    page: const MySubjectsScreen()),
                               );
                             }
                           },
@@ -792,8 +832,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.analytics) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
+                                SmoothPageRoute(
+                                    page:
                                     const StudentAnalyticsDashboard()),
                               );
                             }
@@ -812,9 +852,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.myFavourites) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                    const MyFavouritesScreen()),
+                                SmoothPageRoute(
+                                    page: const MyFavouritesScreen()),
                               );
                             }
                           },
@@ -832,8 +871,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.teacherDashboard) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (_) => const TeacherDashboard(),
+                                SmoothPageRoute(
+                                  page: const TeacherDashboard(),
                                 ),
                               );
                             }
@@ -852,9 +891,28 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.teacherClasses) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (_) => const TeacherClassesScreen(),
+                                SmoothPageRoute(
+                                  page: const TeacherClassesScreen(),
                                 ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+
+                      // Address Master - M017
+                      if (userProvider.hasMenuAccess('M017')) ...[
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.location,
+                          text: 'Address Master',
+                          isActive: activeScreen == AppScreen.addressMaster,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen != AppScreen.addressMaster) {
+                              Navigator.pushReplacement(
+                                context,
+                                SmoothPageRoute(
+                                    page: const AddressMasterScreen()),
                               );
                             }
                           },
@@ -872,8 +930,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                             if (activeScreen != AppScreen.parentChildren) {
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SelectChildScreen(),
+                                SmoothPageRoute(
+                                  page: const SelectChildScreen(),
                                 ),
                               );
                             }
@@ -896,10 +954,13 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                           text: 'Settings',
                           isActive: activeScreen == AppScreen.settings,
                           isCollapsed: isCollapsed,
+                          onTap: () {
+                            // TODO: Add navigation to SettingsScreen
+                          },
                         ),
                       ],
 
-                      // ✅ UPDATED: Logout - Navigate to LogoutTransitionScreen
+                      // ✅ UPDATED: Logout
                       _CollapsibleMenuItem(
                         icon: Iconsax.logout,
                         text: 'Logout',
@@ -910,8 +971,8 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                           // Navigate to logout transition screen
                           Navigator.pushAndRemoveUntil(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const LogoutTransitionScreen(),
+                            SmoothPageRoute(
+                              page: const LogoutTransitionScreen(),
                             ),
                                 (route) => false,
                           );
@@ -932,6 +993,7 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
 }
 
 // ==================== COLLAPSIBLE MENU ITEM ====================
+// (This widget is unchanged)
 class _CollapsibleMenuItem extends StatefulWidget {
   final IconData icon;
   final String text;
@@ -1036,7 +1098,7 @@ class _CollapsibleMenuItemState extends State<_CollapsibleMenuItem>
                     Expanded(
                       child: Text(
                         widget.text,
-                        style: GoogleFonts.inter(
+                        style: AppTheme.bodyText1.copyWith(
                           color: effectiveTextColor,
                           fontWeight: widget.isActive
                               ? FontWeight.w600
@@ -1063,7 +1125,7 @@ class _CollapsibleMenuItemState extends State<_CollapsibleMenuItem>
           color: Colors.grey.shade800,
           borderRadius: BorderRadius.circular(8),
         ),
-        textStyle: GoogleFonts.inter(
+        textStyle: AppTheme.bodyText1.copyWith(
           color: Colors.white,
           fontSize: 12,
         ),
@@ -1076,6 +1138,7 @@ class _CollapsibleMenuItemState extends State<_CollapsibleMenuItem>
 }
 
 // ==================== SIDEBAR TOGGLE BUTTON ====================
+// (This widget is unchanged)
 class _SidebarToggleButton extends StatelessWidget {
   final bool isCollapsed;
 
@@ -1105,7 +1168,7 @@ class _SidebarToggleButton extends StatelessWidget {
             if (!isCollapsed) ...[
               Text(
                 'Collapse',
-                style: GoogleFonts.inter(
+                style: AppTheme.bodyText1.copyWith(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: AppTheme.bodyText.withOpacity(0.7),
@@ -1128,7 +1191,8 @@ class _SidebarToggleButton extends StatelessWidget {
   }
 }
 
-// ✅ ADD THIS: Smooth Page Transition Helper
+// ==================== SMOOTH PAGE ROUTE ====================
+// (This widget is unchanged)
 class SmoothPageRoute<T> extends PageRouteBuilder<T> {
   final Widget page;
 
@@ -1157,24 +1221,21 @@ class SmoothPageRoute<T> extends PageRouteBuilder<T> {
   );
 }
 
-// ✅ CLEAN & PROFESSIONAL Mobile Drawer
+// ==================== MOBILE DRAWER ====================
+// (This widget is unchanged)
 class _MobileDrawer extends StatelessWidget {
   final AppScreen activeScreen;
 
-  const _MobileDrawer({required this.activeScreen});
+  const _MobileDrawer({
+    required this.activeScreen,
+  });
 
   void _navigateTo(BuildContext context, Widget screen) {
-    Navigator.pop(context);
+    Navigator.pop(context); // Close the drawer
     Future.delayed(const Duration(milliseconds: 250), () {
       Navigator.pushReplacement(
         context,
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => screen,
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 300),
-        ),
+        SmoothPageRoute(page: screen), // Use smooth transition
       );
     });
   }
@@ -1190,7 +1251,7 @@ class _MobileDrawer extends StatelessWidget {
 
           return Column(
             children: [
-              // ✅ IMPROVED HEADER with better close button
+              // HEADER
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
@@ -1288,7 +1349,7 @@ class _MobileDrawer extends StatelessWidget {
                         children: [
                           TextSpan(
                             text: 'MACK',
-                            style: GoogleFonts.spaceGrotesk(
+                            style: AppTheme.logoStyle.copyWith(
                               fontSize: 32,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
@@ -1298,7 +1359,7 @@ class _MobileDrawer extends StatelessWidget {
                           ),
                           TextSpan(
                             text: 'CLEO',
-                            style: GoogleFonts.spaceGrotesk(
+                            style: AppTheme.logoStyle.copyWith(
                               fontSize: 32,
                               fontWeight: FontWeight.w800,
                               color: AppTheme.mackColor,
@@ -1334,7 +1395,7 @@ class _MobileDrawer extends StatelessWidget {
                               const SizedBox(width: 6),
                               Text(
                                 'LMS',
-                                style: GoogleFonts.inter(
+                                style: AppTheme.bodyText1.copyWith(
                                   fontSize: 11,
                                   color: Colors.white,
                                   fontWeight: FontWeight.w700,
@@ -1357,7 +1418,7 @@ class _MobileDrawer extends StatelessWidget {
                         Flexible(
                           child: Text(
                             'Learning Management',
-                            style: GoogleFonts.inter(
+                            style: AppTheme.bodyText1.copyWith(
                               fontSize: 12,
                               color: Colors.white.withOpacity(0.85),
                               fontWeight: FontWeight.w500,
@@ -1371,7 +1432,7 @@ class _MobileDrawer extends StatelessWidget {
                 ),
               ),
 
-              // ✅ Menu List
+              // MENU LIST
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1519,6 +1580,15 @@ class _MobileDrawer extends StatelessWidget {
                             _navigateTo(context, const TeacherClassesScreen()),
                       ),
 
+                    if (userProvider.hasMenuAccess('M017'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.location,
+                        title: 'Address Master',
+                        isActive: activeScreen == AppScreen.addressMaster,
+                        onTap: () =>
+                            _navigateTo(context, const AddressMasterScreen()),
+                      ),
+
                     if (userProvider.hasMenuAccess('M000'))
                       _SimpleMenuItem(
                         icon: Iconsax.profile_2user,
@@ -1542,9 +1612,12 @@ class _MobileDrawer extends StatelessWidget {
                         icon: Iconsax.setting_2,
                         title: 'Settings',
                         isActive: activeScreen == AppScreen.settings,
+                        onTap: () {
+                          // TODO: Add navigation to SettingsScreen
+                        },
                       ),
 
-                    // ✅ UPDATED: Logout - Navigate to LogoutTransitionScreen
+                    // LOGOUT
                     _SimpleMenuItem(
                       icon: Iconsax.logout,
                       title: 'Logout',
@@ -1554,8 +1627,8 @@ class _MobileDrawer extends StatelessWidget {
                         Future.delayed(const Duration(milliseconds: 250), () {
                           Navigator.pushAndRemoveUntil(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const LogoutTransitionScreen(),
+                            SmoothPageRoute(
+                              page: const LogoutTransitionScreen(),
                             ),
                                 (route) => false,
                           );
@@ -1566,7 +1639,7 @@ class _MobileDrawer extends StatelessWidget {
                 ),
               ),
 
-              // ✅ IMPROVED Footer
+              // FOOTER
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -1597,11 +1670,7 @@ class _MobileDrawer extends StatelessWidget {
                       child: Center(
                         child: Text(
                           (userProvider.userName ?? 'U')[0].toUpperCase(),
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 18,
-                          ),
+                          style: AppTheme.headline2.copyWith(fontSize: 18),
                         ),
                       ),
                     ),
@@ -1613,11 +1682,7 @@ class _MobileDrawer extends StatelessWidget {
                         children: [
                           Text(
                             userProvider.userName ?? 'Admin',
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              color: AppTheme.darkText,
-                            ),
+                            style: AppTheme.labelText,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1634,7 +1699,7 @@ class _MobileDrawer extends StatelessWidget {
                               const SizedBox(width: 6),
                               Text(
                                 'v1.0.0',
-                                style: GoogleFonts.inter(
+                                style: AppTheme.bodyText1.copyWith(
                                   fontSize: 11,
                                   color: Colors.grey.shade600,
                                   fontWeight: FontWeight.w500,
@@ -1656,7 +1721,8 @@ class _MobileDrawer extends StatelessWidget {
   }
 }
 
-// ✅ Simple Clean Menu Item
+// ==================== SIMPLE MENU ITEM ====================
+// (This widget is unchanged)
 class _SimpleMenuItem extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -1703,7 +1769,7 @@ class _SimpleMenuItem extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: GoogleFonts.inter(
+                  style: AppTheme.bodyText1.copyWith(
                     fontSize: 15,
                     fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                     color: textColor ??
@@ -1730,7 +1796,8 @@ class _SimpleMenuItem extends StatelessWidget {
   }
 }
 
-// ✅ Section Header Widget
+// ==================== SECTION HEADER ====================
+// (This widget is unchanged)
 class _SectionHeader extends StatelessWidget {
   final String title;
 
@@ -1742,7 +1809,7 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.only(left: 4, bottom: 4),
       child: Text(
         title,
-        style: GoogleFonts.inter(
+        style: AppTheme.bodyText1.copyWith(
           fontSize: 11,
           fontWeight: FontWeight.w700,
           color: AppTheme.bodyText.withOpacity(0.5),
@@ -1753,7 +1820,8 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ✅ Modern Menu Item with gradient and subtitle
+// ==================== MODERN MENU ITEM ====================
+// (This widget is unchanged)
 class _ModernMenuItem extends StatelessWidget {
   final IconData icon;
   final String text;
@@ -1835,7 +1903,7 @@ class _ModernMenuItem extends StatelessWidget {
                     children: [
                       Text(
                         text,
-                        style: GoogleFonts.inter(
+                        style: AppTheme.bodyText1.copyWith(
                           color: textColor ??
                               (isActive
                                   ? AppTheme.primaryGreen
@@ -1848,7 +1916,7 @@ class _ModernMenuItem extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           subtitle!,
-                          style: GoogleFonts.inter(
+                          style: AppTheme.bodyText1.copyWith(
                             fontSize: 11,
                             color: AppTheme.bodyText.withOpacity(0.6),
                           ),

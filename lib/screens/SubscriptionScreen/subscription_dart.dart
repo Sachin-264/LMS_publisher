@@ -42,49 +42,55 @@ class _SubscriptionsViewState extends State<SubscriptionsView> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final bool isMobile = constraints.maxWidth < mobileBreakpoint;
+    // --- ADDED THIS WRAPPER ---
+    return SingleChildScrollView(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool isMobile = constraints.maxWidth < mobileBreakpoint;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            isMobile
-                ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeaderTitle(),
-                const SizedBox(height: 16),
-                _ViewSwitcher(
-                  currentView: _currentView,
-                  onViewChanged: (view) =>
-                      setState(() => _currentView = view),
-                ),
-              ],
-            )
-                : Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(child: _buildHeaderTitle()),
-                _ViewSwitcher(
-                  currentView: _currentView,
-                  onViewChanged: (view) =>
-                      setState(() => _currentView = view),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppTheme.defaultPadding * 1.5),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                return FadeTransition(opacity: animation, child: child);
-              },
-              child: _buildCurrentView(),
-            ),
-          ],
-        );
-      },
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            // --- ADDED THIS LINE ---
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              isMobile
+                  ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeaderTitle(),
+                  const SizedBox(height: 16),
+                  _ViewSwitcher(
+                    currentView: _currentView,
+                    onViewChanged: (view) =>
+                        setState(() => _currentView = view),
+                  ),
+                ],
+              )
+                  : Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: _buildHeaderTitle()),
+                  _ViewSwitcher(
+                    currentView: _currentView,
+                    onViewChanged: (view) =>
+                        setState(() => _currentView = view),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppTheme.defaultPadding * 1.5),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                child: _buildCurrentView(),
+              ),
+            ],
+          );
+        },
+      ),
     );
+    // --- AND CLOSED IT HERE ---
   }
 
   Widget _buildHeaderTitle() {
@@ -210,7 +216,7 @@ class _SubscriptionDashboardState extends State<SubscriptionDashboard> {
               style: GoogleFonts.poppins(
                   fontSize: 18, fontWeight: FontWeight.w600)),
           const SizedBox(height: 20),
-          SizedBox(height: 300, child: _MRRChart(chartData: mrrData)),
+          SizedBox(height: 300, child: MRRChart(chartData: mrrData)),
         ],
       ),
     );
@@ -1434,33 +1440,33 @@ class _StatusBadge extends StatelessWidget {
 }
 
 // IMPROVED REVENUE CHART WIDGET - WITH DEBUG PRINTS
-class _MRRChart extends StatelessWidget {
+class MRRChart extends StatelessWidget {
   final List<ChartData> chartData;
-  const _MRRChart({required this.chartData});
 
-  String _formatCurrency(double value) {
+  const MRRChart({required this.chartData});
+
+  String formatCurrency(double value) {
     // Print raw value for debugging
-    print('🔍 Raw value to format: $value');
-
+    print('Raw value to format: $value');
     if (value >= 10000000) {
       // 1 Crore and above
-      final formatted = '₹${(value / 10000000).toStringAsFixed(1)}Cr';
-      print('✅ Formatted as Crore: $formatted');
+      final formatted = '${(value / 10000000).toStringAsFixed(1)}Cr';
+      print('Formatted as Crore: $formatted');
       return formatted;
     } else if (value >= 100000) {
       // 1 Lakh and above
-      final formatted = '₹${(value / 100000).toStringAsFixed(1)}L';
-      print('✅ Formatted as Lakh: $formatted');
+      final formatted = '${(value / 100000).toStringAsFixed(1)}L';
+      print('Formatted as Lakh: $formatted');
       return formatted;
     } else if (value >= 1000) {
       // 1 Thousand and above
-      final formatted = '₹${(value / 1000).toStringAsFixed(1)}K';
-      print('✅ Formatted as Thousand: $formatted');
+      final formatted = '${(value / 1000).toStringAsFixed(1)}K';
+      print('Formatted as Thousand: $formatted');
       return formatted;
     } else {
       // Less than 1000
-      final formatted = '₹${value.toStringAsFixed(0)}';
-      print('✅ Formatted as plain: $formatted');
+      final formatted = value.toStringAsFixed(0);
+      print('Formatted as plain: $formatted');
       return formatted;
     }
   }
@@ -1468,10 +1474,10 @@ class _MRRChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Print all chart data for debugging
-    print('📊 MRR Chart Data:');
+    print('=== MRR Chart Data ===');
     print('Total items: ${chartData.length}');
     for (var i = 0; i < chartData.length; i++) {
-      print('  [$i] x: ${chartData[i].x}, y: ${chartData[i].y} (type: ${chartData[i].y.runtimeType})');
+      print('$i: x=${chartData[i].x}, y=${chartData[i].y} (type: ${chartData[i].y.runtimeType})');
     }
 
     final tooltip = TooltipBehavior(
@@ -1487,17 +1493,36 @@ class _MRRChart extends StatelessWidget {
         ? 100
         : chartData.map((e) => e.y).reduce((a, b) => a > b ? a : b);
 
-    print('📈 Max value in chart: $maxValue');
+    print('Max value in chart: $maxValue');
 
-    double yAxisMax = (maxValue * 1.2).ceilToDouble();
-    print('📈 Y-axis max (with 20% padding): $yAxisMax');
-    print('📈 Y-axis interval: ${yAxisMax / 5}');
+    // Add 20% padding and ensure minimum threshold
+    double yAxisMax = maxValue * 1.2;
+
+    // Ensure minimum axis range to prevent zero/negative intervals
+    if (yAxisMax < 10) {
+      yAxisMax = 10;
+    }
+
+    yAxisMax = yAxisMax.ceilToDouble();
+    print('Y-axis max with 20% padding: $yAxisMax');
+
+    // Calculate interval - ensure it's always greater than 0
+    double calculatedInterval = yAxisMax / 5;
+
+    // Ensure interval is at least 1
+    double finalInterval = calculatedInterval < 1 ? 1 : calculatedInterval;
+
+    print('Calculated interval: $calculatedInterval');
+    print('Final interval (minimum 1): $finalInterval');
 
     return SfCartesianChart(
       primaryXAxis: CategoryAxis(
         majorGridLines: const MajorGridLines(width: 0),
         axisLine: const AxisLine(width: 0),
-        labelStyle: GoogleFonts.inter(color: AppTheme.bodyText, fontSize: 12),
+        labelStyle: GoogleFonts.inter(
+          color: AppTheme.bodyText,
+          fontSize: 12,
+        ),
       ),
       primaryYAxis: NumericAxis(
         isVisible: true,
@@ -1508,10 +1533,13 @@ class _MRRChart extends StatelessWidget {
           color: AppTheme.borderGrey.withOpacity(0.3),
           dashArray: <double>[5, 5],
         ),
-        labelStyle: GoogleFonts.inter(color: AppTheme.bodyText, fontSize: 11),
+        labelStyle: GoogleFonts.inter(
+          color: AppTheme.bodyText,
+          fontSize: 11,
+        ),
         minimum: 0,
         maximum: yAxisMax,
-        interval: yAxisMax / 5,
+        interval: finalInterval,  // Use the validated interval
         numberFormat: NumberFormat.currency(
           locale: 'en_IN',
           symbol: '₹',
@@ -1525,7 +1553,7 @@ class _MRRChart extends StatelessWidget {
           dataSource: chartData,
           xValueMapper: (ChartData data, _) => data.x,
           yValueMapper: (ChartData data, _) {
-            print('🎯 Y-value mapping: ${data.x} -> ${data.y}');
+            print('Y-value mapping: ${data.x} -> ${data.y}');
             return data.y;
           },
           gradient: AppTheme.primaryGradient,
@@ -1541,13 +1569,15 @@ class _MRRChart extends StatelessWidget {
             labelAlignment: ChartDataLabelAlignment.top,
             builder: (dynamic data, dynamic point, dynamic series,
                 int pointIndex, int seriesIndex) {
-              print('🏷️ Data label builder - Point index: $pointIndex');
-              print('   Data object: $data');
-              print('   Data.y value: ${data.y}');
-              print('   Point object: $point');
-
+              print('Data label builder - Point index: $pointIndex');
+              print('Data object: $data');
+              print('Data.y value: ${data.y}');
+              print('Point object: $point');
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(4),
@@ -1559,7 +1589,7 @@ class _MRRChart extends StatelessWidget {
                   ],
                 ),
                 child: Text(
-                  _formatCurrency(data.y),
+                  formatCurrency(data.y),
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.bold,
                     fontSize: 10,
@@ -1569,11 +1599,12 @@ class _MRRChart extends StatelessWidget {
               );
             },
           ),
-        )
+        ),
       ],
     );
   }
 }
+
 
 
 class _PlanPopularityChart extends StatelessWidget {
