@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class TeacherMaterialService {
   static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/teacher_material.php';
-  static const String assignmentBaseUrl = 'http://localhost/AquareLMS/assignment_api.php';
+  static const String assignmentBaseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/assignment_api.php';
 
   // Get materials for a chapter (publisher + teacher materials)
   static Future<Map<String, dynamic>> getChapterMaterials({
