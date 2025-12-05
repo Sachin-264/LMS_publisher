@@ -30,12 +30,10 @@ class StudentApiService {
   static const String baseUrl =  'https://aquare.co.in/mobileAPI/sachin/lms';
   static const String _imageBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
   // static const String _imageUploadUrl = "$baseUrl/upload-image-gcp/uploadgcp.php";
-
   static const String _imageUploadUrl = "https://www.aquare.co.in/mobileAPI/sachin/photogcp1.php";
   // School RecNo must be provided by callers via parameters or payload
 
   // List Students
-// List Students
   Future<List<StudentModel>> fetchStudents({
     required int schoolRecNo,
     int? classRecNo,

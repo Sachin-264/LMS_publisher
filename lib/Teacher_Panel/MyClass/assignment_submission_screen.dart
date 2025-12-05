@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:lms_publisher/Teacher_Panel/MyClass/AiPaperGradingScreen.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/Teacher_Panel/teacher_material_service.dart';
 import 'package:lms_publisher/Util/beautiful_loader.dart';
@@ -526,7 +527,14 @@ class _AssignmentSubmissionsScreenState
     final classSection = _safeString(submission['ClassSection']);
     final submissionDate = submission['SubmissionDate'];
     final gradeStatus = _safeString(submission['GradeStatus'], 'Pending');
-    final marks = _safeNum(submission['MarksAfterPenalty']);
+
+    // ✅ UPDATE: Use MarksObtained if MarksAfterPenalty is null
+    final marksAfterPenalty = submission['MarksAfterPenalty'];
+    final marksObtained = _safeNum(submission['MarksObtained']);
+    final finalMarks = marksAfterPenalty != null
+        ? _safeNum(marksAfterPenalty)
+        : marksObtained;
+
     final isLate = _safeBool(submission['IsLateSubmission']);
     final daysLate = _safeNum(submission['DaysLate']).toInt();
     final filePath = submission['SubmissionFilePath'];
@@ -537,13 +545,13 @@ class _AssignmentSubmissionsScreenState
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _showSubmissionDetailsDialog(submission),
-        borderRadius: AppTheme.defaultBorderRadius, // 14.0
+        borderRadius: AppTheme.defaultBorderRadius,
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: AppTheme.background,
-            borderRadius: AppTheme.defaultBorderRadius, // 14.0
+            borderRadius: AppTheme.defaultBorderRadius,
             border: Border.all(
               color: AppTheme.borderGrey,
               width: 1,
@@ -566,8 +574,7 @@ class _AssignmentSubmissionsScreenState
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: AppTheme.assignmentColor
-                            .withOpacity(0.3), // Use new theme color
+                        color: AppTheme.assignmentColor.withOpacity(0.3),
                         width: 2,
                       ),
                     ),
@@ -584,7 +591,7 @@ class _AssignmentSubmissionsScreenState
                         Text(
                           studentName,
                           style: AppTheme.labelText.copyWith(
-                            fontSize: 16, // Made name larger
+                            fontSize: 16,
                             color: AppTheme.darkText,
                           ),
                           maxLines: 1,
@@ -618,30 +625,28 @@ class _AssignmentSubmissionsScreenState
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: AppTheme.assignmentColor
-                            .withOpacity(0.12), // Use new theme color
-                        borderRadius:
-                        AppTheme.defaultBorderRadius * 0.75, // 8.0
+                        color: AppTheme.assignmentColor.withOpacity(0.12),
+                        borderRadius: AppTheme.defaultBorderRadius * 0.75,
                         border: Border.all(
-                          color: AppTheme.assignmentColor
-                              .withOpacity(0.3), // Use new theme color
+                          color: AppTheme.assignmentColor.withOpacity(0.3),
                         ),
                       ),
                       child: Text(
                         'Pending',
                         style: AppTheme.labelText.copyWith(
-                            fontSize: 12, // Made status text larger
-                            color: AppTheme.assignmentColor), // Use new theme color
+                          fontSize: 12,
+                          color: AppTheme.assignmentColor,
+                        ),
                       ),
                     )
                   else
-                  // NEW: Improved Marks display
+                  // ✅ UPDATED: Display finalMarks (MarksObtained or MarksAfterPenalty)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
                       children: [
                         Text(
-                          marks.toStringAsFixed(1),
+                          finalMarks.toStringAsFixed(1),
                           style: AppTheme.headline1.copyWith(
                             fontSize: 18,
                             color: AppTheme.accentGreen,
@@ -724,8 +729,7 @@ class _AssignmentSubmissionsScreenState
                                 mode: LaunchMode.externalApplication);
                           }
                         },
-                        borderRadius:
-                        AppTheme.defaultBorderRadius * 0.75, // 8.0
+                        borderRadius: AppTheme.defaultBorderRadius * 0.75,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -737,16 +741,14 @@ class _AssignmentSubmissionsScreenState
                               Icon(
                                 Iconsax.document_download,
                                 size: 14,
-                                color: AppTheme
-                                    .assignmentColor, // Use new theme color
+                                color: AppTheme.assignmentColor,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 'View',
                                 style: AppTheme.labelText.copyWith(
                                   fontSize: 11,
-                                  color: AppTheme
-                                      .assignmentColor, // Use new theme color
+                                  color: AppTheme.assignmentColor,
                                 ),
                               ),
                             ],
@@ -757,9 +759,24 @@ class _AssignmentSubmissionsScreenState
                   Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () => _showGradingDialog(submission),
-                      borderRadius:
-                      AppTheme.defaultBorderRadius * 0.75, // 8.0
+                      onTap: () {
+                        if (submission['SubmissionType'] == 'Online') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AiPaperGradingScreen(
+                                submission: submission,
+                                teacherCode: widget.teacherCode,
+                              ),
+                            ),
+                          ).then((value) {
+                            if (value == true) _loadSubmissions();
+                          });
+                        } else {
+                          _showGradingDialog(submission);
+                        }
+                      },
+                      borderRadius: AppTheme.defaultBorderRadius * 0.75,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -771,16 +788,14 @@ class _AssignmentSubmissionsScreenState
                             Icon(
                               isPending ? Iconsax.edit : Iconsax.refresh,
                               size: 14,
-                              color: AppTheme
-                                  .assignmentColor, // Use new theme color
+                              color: AppTheme.assignmentColor,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               isPending ? 'Grade' : 'Edit',
                               style: AppTheme.labelText.copyWith(
                                 fontSize: 11,
-                                color: AppTheme
-                                    .assignmentColor, // Use new theme color
+                                color: AppTheme.assignmentColor,
                               ),
                             ),
                           ],
@@ -796,6 +811,7 @@ class _AssignmentSubmissionsScreenState
       ),
     );
   }
+
 
   Widget _buildNotSubmittedCard(Map<String, dynamic> student) {
     final studentName = _safeString(student['StudentName'], 'Unknown');
@@ -1067,123 +1083,359 @@ class _AssignmentSubmissionsScreenState
 
   void _showSubmissionDetailsDialog(Map<String, dynamic> submission) {
     final studentName = _safeString(submission['StudentName'], 'Unknown');
+    final rollNumber = _safeString(submission['RollNumber'], 'N/A');
     final classSection = _safeString(submission['ClassSection']);
     final submissionDate = submission['SubmissionDate'];
+    final gradedDate = submission['GradedDate'];
     final gradeStatus = _safeString(submission['GradeStatus'], 'Pending');
-    final marks = _safeNum(submission['MarksAfterPenalty']);
+
+    // ✅ UPDATE: Handle null MarksAfterPenalty
+    final marksAfterPenalty = submission['MarksAfterPenalty'];
     final marksObtained = _safeNum(submission['MarksObtained']);
-    final penalty = _safeNum(submission['PenaltyMarks']);
+    final finalMarks = marksAfterPenalty != null
+        ? _safeNum(marksAfterPenalty)
+        : marksObtained;
+
+    final lateSubmissionPenalty = _safeNum(submission['LateSubmissionPenalty']);
     final feedback =
     _safeString(submission['TeacherFeedback'], 'No feedback provided');
     final isLate = _safeBool(submission['IsLateSubmission']);
     final daysLate = _safeNum(submission['DaysLate']).toInt();
     final filePath = submission['SubmissionFilePath'];
+    final submissionLink = submission['SubmissionLink'];
+    final submissionText = submission['SubmissionText'];
+    final submissionType = _safeString(submission['SubmissionType'], 'Unknown');
+    final studentPhoto = submission['StudentPhotoPath'];
 
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(
-            borderRadius: AppTheme.defaultBorderRadius * 1.5), // 20.0
+            borderRadius: AppTheme.defaultBorderRadius * 1.5),
         backgroundColor: AppTheme.background,
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 500),
+          constraints: const BoxConstraints(maxWidth: 600),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildDialogHeader(ctx,
                   icon: Iconsax.document_text, title: 'Submission Details'),
-              Padding(
+              Flexible(
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.all(24),
                   child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                      _buildDetailRow('Student Name', studentName, Iconsax.user),
-                  _buildDetailRow('Class', classSection, Iconsax.book),
-                  _buildDetailRow(
-                      'Submission Date',
-                      submissionDate != null
-                          ? DateFormat('MMM dd, yyyy hh:mm a')
-                  .format(DateTime.parse(submissionDate))
-                  : 'N/A',
-              Iconsax.calendar,
-              ),
-              _buildDetailRow('Status', gradeStatus, Iconsax.info_circle),
-              if (gradeStatus != 'Pending') ...[
-                _buildDetailRow('Marks Obtained',
-                    marksObtained.toStringAsFixed(1), Iconsax.medal_star),
-                if (penalty > 0)
-                  _buildDetailRow('Penalty',
-                      '-${penalty.toStringAsFixed(1)}', Iconsax.minus_cirlce),
-                _buildDetailRow(
-                    'Final Marks',
-                    '${marks.toStringAsFixed(1)} / ${widget.totalMarks}',
-                    Iconsax.chart),
-              ],
-              if (isLate)
-                _buildDetailRow('Late Submission', '$daysLate days late',
-                    Iconsax.clock,
-                    color: AppTheme.mackColor),
-              const SizedBox(height: 16),
-              if (gradeStatus != 'Pending') ...[
-                Text(
-                  'Teacher Feedback',
-                  style: AppTheme.labelText.copyWith(fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.lightGrey,
-                    borderRadius: AppTheme.defaultBorderRadius, // 12.0
-                  ),
-                  child: Text(
-                    feedback,
-                    style: AppTheme.bodyText1.copyWith(
-                        color: AppTheme.darkText),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (filePath != null && filePath.toString().isNotEmpty)
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      final url =
-                      getFullDocumentUrl(filePath.toString());
-                      final uri = Uri.parse(url);
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri,
-                            mode: LaunchMode.externalApplication);
-                      }
-                    },
-                    icon:
-                    const Icon(Iconsax.document_download, size: 18),
-                    label: Text('View Submission',
-                        style: AppTheme.buttonText),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme
-                          .assignmentColor, // Use new theme color
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                        AppTheme.defaultBorderRadius, // 12.0
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Student Info Card
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppTheme.assignmentColor.withOpacity(0.05),
+                          borderRadius: AppTheme.defaultBorderRadius,
+                          border: Border.all(
+                            color: AppTheme.assignmentColor.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppTheme.assignmentColor.withOpacity(0.3),
+                                  width: 2,
+                                ),
+                              ),
+                              child: ClipOval(
+                                child: _buildAvatar(
+                                  studentPhoto,
+                                  studentName,
+                                  AppTheme.assignmentColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    studentName,
+                                    style: AppTheme.headline1.copyWith(fontSize: 18),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Roll No: $rollNumber',
+                                    style: AppTheme.bodyText1.copyWith(fontSize: 13),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.cleoColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      classSection,
+                                      style: AppTheme.labelText.copyWith(
+                                        fontSize: 11,
+                                        color: AppTheme.cleoColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 20),
+
+                      // Submission Details
+                      Text(
+                        'Submission Information',
+                        style: AppTheme.headline1.copyWith(fontSize: 16),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildDetailRow('Submission Type', submissionType, Iconsax.document_text),
+                      _buildDetailRow(
+                        'Submitted On',
+                        submissionDate != null
+                            ? DateFormat('MMM dd, yyyy hh:mm a')
+                            .format(DateTime.parse(submissionDate))
+                            : 'N/A',
+                        Iconsax.calendar,
+                      ),
+                      if (isLate)
+                        _buildDetailRow(
+                          'Late Submission',
+                          '$daysLate days late',
+                          Iconsax.clock,
+                          color: AppTheme.mackColor,
+                        ),
+                      const SizedBox(height: 16),
+
+                      // Grade Information
+                      if (gradeStatus != 'Pending') ...[
+                        Text(
+                          'Grade Information',
+                          style: AppTheme.headline1.copyWith(fontSize: 16),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentGreen.withOpacity(0.05),
+                            borderRadius: AppTheme.defaultBorderRadius,
+                            border: Border.all(
+                              color: AppTheme.accentGreen.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Marks Obtained:',
+                                    style: AppTheme.bodyText1.copyWith(fontSize: 14),
+                                  ),
+                                  Text(
+                                    marksObtained.toStringAsFixed(1),
+                                    style: AppTheme.headline1.copyWith(
+                                      fontSize: 18,
+                                      color: AppTheme.accentGreen,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (lateSubmissionPenalty > 0) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Late Penalty:',
+                                      style: AppTheme.bodyText1.copyWith(fontSize: 14),
+                                    ),
+                                    Text(
+                                      '-${lateSubmissionPenalty.toStringAsFixed(1)}',
+                                      style: AppTheme.headline1.copyWith(
+                                        fontSize: 16,
+                                        color: AppTheme.mackColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              const SizedBox(height: 12),
+                              Divider(color: AppTheme.borderGrey),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Final Marks:',
+                                    style: AppTheme.headline1.copyWith(fontSize: 16),
+                                  ),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                                    textBaseline: TextBaseline.alphabetic,
+                                    children: [
+                                      Text(
+                                        finalMarks.toStringAsFixed(1),
+                                        style: AppTheme.headline1.copyWith(
+                                          fontSize: 24,
+                                          color: AppTheme.accentGreen,
+                                        ),
+                                      ),
+                                      Text(
+                                        ' / ${widget.totalMarks}',
+                                        style: AppTheme.bodyText1.copyWith(
+                                          fontSize: 14,
+                                          color: AppTheme.bodyText,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (gradedDate != null)
+                          _buildDetailRow(
+                            'Graded On',
+                            DateFormat('MMM dd, yyyy hh:mm a')
+                                .format(DateTime.parse(gradedDate)),
+                            Iconsax.verify,
+                            color: AppTheme.accentGreen,
+                          ),
+                        const SizedBox(height: 16),
+
+                        // Feedback Section
+                        Text(
+                          'Teacher Feedback',
+                          style: AppTheme.headline1.copyWith(fontSize: 16),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppTheme.lightGrey,
+                            borderRadius: AppTheme.defaultBorderRadius,
+                            border: Border.all(color: AppTheme.borderGrey),
+                          ),
+                          child: Text(
+                            feedback,
+                            style: AppTheme.bodyText1.copyWith(
+                              color: AppTheme.darkText,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Submission Content
+                      if (submissionText != null && submissionText.toString().isNotEmpty) ...[
+                        Text(
+                          'Submission Text',
+                          style: AppTheme.headline1.copyWith(fontSize: 16),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppTheme.lightGrey,
+                            borderRadius: AppTheme.defaultBorderRadius,
+                            border: Border.all(color: AppTheme.borderGrey),
+                          ),
+                          child: Text(
+                            submissionText.toString(),
+                            style: AppTheme.bodyText1.copyWith(
+                              color: AppTheme.darkText,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      if (submissionLink != null && submissionLink.toString().isNotEmpty) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              final uri = Uri.parse(submissionLink.toString());
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri,
+                                    mode: LaunchMode.externalApplication);
+                              }
+                            },
+                            icon: const Icon(Iconsax.link, size: 18),
+                            label: Text('Open Submission Link',
+                                style: AppTheme.buttonText),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.cleoColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: AppTheme.defaultBorderRadius,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      if (filePath != null && filePath.toString().isNotEmpty)
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              final url = getFullDocumentUrl(filePath.toString());
+                              final uri = Uri.parse(url);
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri,
+                                    mode: LaunchMode.externalApplication);
+                              }
+                            },
+                            icon: const Icon(Iconsax.document_download, size: 18),
+                            label: Text('Download Submission File',
+                                style: AppTheme.buttonText),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.assignmentColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: AppTheme.defaultBorderRadius,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
+              ),
             ],
           ),
         ),
-        ],
       ),
-    ),
-    ),
     );
   }
+
 
   Widget _buildDetailRow(String label, String value, IconData icon,
       {Color? color}) {

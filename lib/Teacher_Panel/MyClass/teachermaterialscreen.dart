@@ -1,17 +1,23 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:lms_publisher/Teacher_Panel/MyClass/ai_generator_dialog.dart';
 import 'package:lms_publisher/Teacher_Panel/MyClass/assignment_submission_screen.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/Teacher_Panel/teacher_material_service.dart';
 import 'package:lms_publisher/Service/academics_service.dart';
 import 'package:lms_publisher/Util/beautiful_loader.dart';
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:lms_publisher/Util/custom_snackbar.dart'; // Assuming CustomSnackbar is here
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 const String _documentBaseUrl =
     "https://storage.googleapis.com/upload-images-34/documents/LMS/";
@@ -100,7 +106,9 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _publisherMaterials = [];
   List<Map<String, dynamic>> _teacherMaterials = [];
+  List<Map<String, dynamic>> _aiPapers = []; // ⭐ NEW: Store AI papers
   bool _isUploading = false;
+
 
   @override
   void initState() {
@@ -120,6 +128,8 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
         List<Map<String, dynamic>>.from(response['publisher_materials'] ?? []);
         _teacherMaterials =
         List<Map<String, dynamic>>.from(response['teacher_materials'] ?? []);
+        _aiPapers =
+        List<Map<String, dynamic>>.from(response['ai_papers'] ?? []); // ⭐ NEW: Load AI papers
         _isLoading = false;
       });
     } catch (e) {
@@ -257,6 +267,90 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
       }
     }
   }
+  Future<void> _deleteAiPaper(int paperId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: AppTheme.defaultBorderRadius * 1.5),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.mackColor.withOpacity(0.1),
+                borderRadius: AppTheme.defaultBorderRadius,
+              ),
+              child: const Icon(Iconsax.warning_2,
+                  color: AppTheme.mackColor, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Text('Delete AI Paper?',
+                style: AppTheme.headline1.copyWith(fontSize: 18)),
+          ],
+        ),
+        content: Text(
+          'This action cannot be undone. Are you sure you want to delete this AI generated paper?',
+          style: AppTheme.bodyText1,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: Text('Cancel',
+                style: AppTheme.labelText.copyWith(color: AppTheme.bodyText)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.mackColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: AppTheme.defaultBorderRadius),
+            ),
+            child: Text('Delete', style: AppTheme.buttonText),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final response = await TeacherMaterialService.deleteAiPaper(
+        teacherCode: widget.teacherCode,
+        paperId: paperId,
+      );
+
+      if (response['status'] == 'success') {
+        await _loadMaterials();
+        if (mounted) {
+          CustomSnackbar.showSuccess(context, 'AI Paper deleted successfully',
+              title: 'Deleted');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        CustomSnackbar.showError(context, 'Delete failed: $e', title: 'Error');
+      }
+    }
+  }
+
+  Future<void> _viewAiPaper(int paperId) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AiPaperPreviewDialog(
+        teacherCode: widget.teacherCode,
+        paperId: paperId,
+      ),
+    );
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -498,6 +592,31 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
             spacing: 12,
             runSpacing: 12,
             children: [
+              ElevatedButton.icon(
+                onPressed: () async {
+                  // Wait for boolean result (true = refresh needed)
+                  final result = await showDialog<bool>(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (ctx) => AiGeneratorDialog(
+                      teacherCode: widget.teacherCode,
+                      chapterId: widget.chapterId,
+                    ),
+                  );
+
+                  if (result == true) {
+                    _loadMaterials(); // Refresh list to show new AI paper
+                  }
+                },
+                icon: const Icon(Iconsax.magic_star, size: 18),
+                label: Text('AI Generator', style: AppTheme.buttonText.copyWith(fontSize: 14)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple, // Distinct color
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: AppTheme.defaultBorderRadius),
+                ),
+              ),
               _buildUploadButton(
                   'Assignment', Iconsax.task_square, AppTheme.mackColor),
               _buildUploadButton('Worksheet', Iconsax.document, Colors.blue),
@@ -509,7 +628,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
           const SizedBox(height: 24),
           Divider(color: AppTheme.borderGrey),
           const SizedBox(height: 24),
-          if (_teacherMaterials.isEmpty)
+          if (_teacherMaterials.isEmpty && _aiPapers.isEmpty)
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(40),
@@ -532,14 +651,486 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                 ),
               ),
             )
-          else
-            ..._teacherMaterials.map((material) {
-              return _buildTeacherMaterialCard(material);
-            }).toList(),
+          else ...[
+            // ⭐ NEW: Show AI Papers First
+            if (_aiPapers.isNotEmpty) ...[
+              Text(
+                'AI Generated Papers',
+                style: AppTheme.labelText.copyWith(
+                  fontSize: 15,
+                  color: AppTheme.darkText,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ..._aiPapers.map((paper) {
+                return _buildAiPaperCard(paper);
+              }).toList(),
+              const SizedBox(height: 24),
+              Divider(color: AppTheme.borderGrey),
+              const SizedBox(height: 24),
+            ],
+
+            // Regular Teacher Materials
+            if (_teacherMaterials.isNotEmpty) ...[
+              Text(
+                'Other Materials',
+                style: AppTheme.labelText.copyWith(
+                  fontSize: 15,
+                  color: AppTheme.darkText,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ..._teacherMaterials.map((material) {
+                return _buildTeacherMaterialCard(material);
+              }).toList(),
+            ],
+          ],
         ],
       ),
     );
   }
+
+  Widget _buildAiPaperCard(Map<String, dynamic> paper) {
+    final paperTitle = paper['PaperTitle'] ?? 'AI Generated Paper';
+    final examName = paper['ExamName'] ?? '';
+    final totalMarks = paper['TotalMarks'] ?? 0;
+    final difficulty = paper['DifficultyLevel'] ?? 'Medium';
+    final createdDate = paper['CreatedDate'] ?? '';
+    final paperId = paper['PaperID'];
+    final materialRecNo = paper['MaterialRecNo'];
+    final isPublished = materialRecNo != null;
+
+    Color difficultyColor;
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
+        difficultyColor = Colors.green;
+        break;
+      case 'hard':
+        difficultyColor = Colors.red;
+        break;
+      default:
+        difficultyColor = Colors.orange;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isPublished
+              ? Colors.purple.withOpacity(0.3)
+              : Colors.grey.withOpacity(0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isPublished
+                ? Colors.purple.withOpacity(0.08)
+                : Colors.grey.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header Section
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isPublished
+                    ? [Colors.purple.withOpacity(0.05), Colors.deepPurple.withOpacity(0.08)]
+                    : [Colors.grey.withOpacity(0.03), Colors.grey.withOpacity(0.05)],
+              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Row(
+              children: [
+                // AI Icon
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isPublished
+                          ? [Colors.purple, Colors.deepPurple]
+                          : [Colors.grey.shade400, Colors.grey.shade600],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isPublished
+                            ? Colors.purple.withOpacity(0.3)
+                            : Colors.grey.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Iconsax.magic_star,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Title & Exam Name
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        paperTitle,
+                        style: AppTheme.labelText.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          color: AppTheme.darkText,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (examName.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          examName,
+                          style: AppTheme.bodyText1.copyWith(
+                            fontSize: 13,
+                            color: AppTheme.bodyText,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Status Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isPublished
+                        ? Colors.green.withOpacity(0.15)
+                        : Colors.orange.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isPublished
+                          ? Colors.green.withOpacity(0.5)
+                          : Colors.orange.withOpacity(0.5),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isPublished ? Iconsax.tick_circle : Iconsax.info_circle,
+                        size: 12,
+                        color: isPublished ? Colors.green : Colors.orange,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isPublished ? 'Published' : 'Draft',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isPublished ? Colors.green : Colors.orange,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Content Section
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // Marks & Difficulty Row
+                Row(
+                  children: [
+                    // Total Marks
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Iconsax.award, size: 16, color: Colors.purple),
+                            const SizedBox(width: 6),
+                            Text(
+                              '$totalMarks Marks',
+                              style: AppTheme.labelText.copyWith(
+                                fontSize: 13,
+                                color: Colors.purple,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Difficulty
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: difficultyColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: difficultyColor.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Iconsax.chart, size: 16, color: difficultyColor),
+                          const SizedBox(width: 6),
+                          Text(
+                            difficulty,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: difficultyColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // Created Date
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.lightGrey,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Iconsax.clock, size: 14, color: AppTheme.bodyText),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Created: ${_formatDate(createdDate)}',
+                        style: AppTheme.bodyText1.copyWith(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    // View Submissions (if published)
+                    if (isPublished)
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            if (materialRecNo == null) {
+                              CustomSnackbar.showError(
+                                context,
+                                'Material ID not found',
+                                title: 'Error',
+                              );
+                              return;
+                            }
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AssignmentSubmissionsScreen(
+                                  teacherCode: widget.teacherCode,
+                                  materialRecNo: materialRecNo,
+                                  materialTitle: paperTitle,
+                                  totalMarks: totalMarks is int
+                                      ? totalMarks
+                                      : (totalMarks is double
+                                      ? totalMarks.toInt()
+                                      : int.tryParse(totalMarks.toString()) ?? 0),
+                                  classRecNo: widget.classRecNo,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Iconsax.clipboard_text, size: 16),
+                          label: const Text('Submissions'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+
+                    if (isPublished) const SizedBox(width: 8),
+
+                    // View Paper
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _viewAiPaper(paperId),
+                        icon: Icon(
+                          Iconsax.eye,
+                          size: 16,
+                          color: isPublished ? Colors.purple : Colors.grey.shade700,
+                        ),
+                        label: const Text('View'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: isPublished ? Colors.purple : Colors.grey.shade700,
+                          side: BorderSide(
+                            color: isPublished
+                                ? Colors.purple.withOpacity(0.5)
+                                : Colors.grey.withOpacity(0.5),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    // Delete Button
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.mackColor.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Iconsax.trash, size: 18),
+                        color: AppTheme.mackColor,
+                        onPressed: () => _deleteAiPaper(paperId),
+                        tooltip: 'Delete',
+                        padding: const EdgeInsets.all(10),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Publish Button (if not published)
+                if (!isPublished) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _publishAiPaper(paper),
+                      icon: const Icon(Iconsax.send_1, size: 18),
+                      label: const Text('Publish to Students'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Helper method to format date
+  String _formatDate(String dateStr) {
+    if (dateStr.isEmpty) return '';
+    try {
+      final date = DateTime.parse(dateStr);
+      final now = DateTime.now();
+      final diff = now.difference(date);
+
+      if (diff.inDays == 0) {
+        return 'Today';
+      } else if (diff.inDays == 1) {
+        return 'Yesterday';
+      } else if (diff.inDays < 7) {
+        return '${diff.inDays} days ago';
+      } else {
+        return DateFormat('MMM dd, yyyy').format(date);
+      }
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+
+  Future<void> _publishAiPaper(Map<String, dynamic> paper) async {
+    final paperId = paper['PaperID'];
+    final paperTitle = paper['PaperTitle'] ?? 'AI Paper';
+    final totalMarks = paper['TotalMarks'] ?? 0;
+
+    // Show confirmation dialog with due date picker
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => _PublishAiPaperDialog(
+        paperTitle: paperTitle,
+        totalMarks: totalMarks,
+      ),
+    );
+
+    if (result == null) return;
+
+    try {
+      setState(() => _isUploading = true);
+
+      final response = await TeacherMaterialService.publishAiPaper(
+        teacherCode: widget.teacherCode,
+        paperId: paperId,
+        chapterId: widget.chapterId,
+        dueDate: result['dueDate'],
+        allowLateSubmission: result['allowLateSubmission'] ?? false,
+      );
+
+      if (response['status'] == 'success') {
+        await _loadMaterials(); // Refresh to show updated status
+        if (mounted) {
+          CustomSnackbar.showSuccess(
+            context,
+            'AI Paper published to students successfully!',
+            title: 'Published',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        CustomSnackbar.showError(
+          context,
+          'Failed to publish: $e',
+          title: 'Error',
+        );
+      }
+    } finally {
+      setState(() => _isUploading = false);
+    }
+  }
+
+
+
+
+
 
   Widget _buildUploadButton(String label, IconData icon, Color color) {
     return ElevatedButton.icon(
@@ -683,10 +1274,14 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
     final materialType = material['MaterialType'] ?? 'Document';
     final title = material['MaterialTitle'] ?? 'Untitled';
     final description = material['Description'];
-    final materialRecNo = material['RecNo'];
+    final materialRecNo = material['MaterialRecNo'];
     final uploadedOn = material['Created_Date'] ?? '';
     final materialPath = material['MaterialPath'];
     final materialLink = material['MaterialLink'];
+
+    // ✅ NEW: Extract PaperID to detect AI Papers in the list
+    final paperId = material['PaperID'];
+    final isAiPaper = paperId != null && (paperId is int ? paperId > 0 : int.tryParse(paperId.toString()) != null);
 
     Color color;
     IconData icon;
@@ -713,6 +1308,12 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
         icon = Iconsax.document_text;
     }
 
+    // If it's an AI paper, override icon/color
+    if (isAiPaper) {
+      color = Colors.purple;
+      icon = Iconsax.magic_star;
+    }
+
     final isVideo = materialLink != null && materialLink.isNotEmpty;
 
     return Container(
@@ -721,7 +1322,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
       decoration: BoxDecoration(
         color: AppTheme.background,
         borderRadius: AppTheme.defaultBorderRadius,
-        border: Border.all(color: AppTheme.borderGrey),
+        border: Border.all(color: isAiPaper ? Colors.purple.withOpacity(0.3) : AppTheme.borderGrey),
         boxShadow: [
           BoxShadow(
             color: AppTheme.shadowColor,
@@ -770,7 +1371,7 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                 Tooltip(
                   message: 'View Submissions',
                   child: IconButton(
-                    icon: const Icon(Iconsax.eye, color: Colors.blue),
+                    icon: const Icon(Iconsax.clipboard_text, color: Colors.blue),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -787,14 +1388,25 @@ class _TeacherMaterialScreenState extends State<TeacherMaterialScreen> {
                     },
                   ),
                 ),
+
+              // ✅ UPDATED: Action Button (Handles PaperID or File)
               IconButton(
                 icon: Icon(
-                    isVideo ? Iconsax.play : Iconsax.document_download,
+                    isAiPaper ? Iconsax.eye : (isVideo ? Iconsax.play : Iconsax.document_download),
                     color: color),
-                onPressed: () =>
-                    _openFile(isVideo ? materialLink : materialPath, isVideo),
-                tooltip: isVideo ? 'Play' : 'Open',
+                onPressed: () {
+                  if (isAiPaper) {
+                    // Open AI Paper Preview using PaperID
+                    int pId = paperId is int ? paperId : int.parse(paperId.toString());
+                    _viewAiPaper(pId);
+                  } else {
+                    // Open File or Link
+                    _openFile(isVideo ? materialLink : materialPath, isVideo);
+                  }
+                },
+                tooltip: isAiPaper ? 'View Paper' : (isVideo ? 'Play' : 'Open'),
               ),
+
               IconButton(
                 icon: const Icon(Iconsax.trash, color: AppTheme.mackColor),
                 onPressed: () => _deleteMaterial(materialRecNo),
@@ -860,6 +1472,7 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
   final _totalMarksController = TextEditingController();
   final _passingMarksController = TextEditingController();
   final _maxAttemptsController = TextEditingController(text: '1');
+  final _penaltyController = TextEditingController(text: '0');
 
   int _currentStep = 0;
   bool _isFile = true;
@@ -1586,13 +2199,31 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
   }
 
   Widget _buildAssignmentSteps() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (_currentStep == 0) ..._buildStep1Material(),
-        if (_currentStep == 1) ..._buildStep2Assignment(),
-        if (_currentStep == 2) ..._buildStep3Review(),
-      ],
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.02, 0),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
+            child: child,
+          ),
+        );
+      },
+      child: KeyedSubtree(
+        key: ValueKey<int>(_currentStep),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_currentStep == 0) ..._buildStep1Material(),
+            if (_currentStep == 1) ..._buildStep2Assignment(),
+            if (_currentStep == 2) ..._buildStep3Review(),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1867,16 +2498,12 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Due Date',
-            style: AppTheme.labelText,
-          ),
+          Text('Due Date', style: AppTheme.labelText),
           const SizedBox(height: 10),
           GestureDetector(
             onTap: _selectDate,
             child: Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
                 border: Border.all(
                   color: _selectedDueDate != null
@@ -1884,7 +2511,7 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
                       : AppTheme.borderGrey,
                   width: 2,
                 ),
-                borderRadius: AppTheme.defaultBorderRadius, // 14.0
+                borderRadius: AppTheme.defaultBorderRadius,
                 color: _selectedDueDate != null
                     ? AppTheme.primaryGreen.withOpacity(0.05)
                     : AppTheme.background,
@@ -1956,14 +2583,14 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
         isNumeric: true,
       ),
       const SizedBox(height: 18),
-      // Late Submission Toggle
+      // Late Submission Toggle & Penalty
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: _allowLateSubmission
               ? AppTheme.primaryGreen.withOpacity(0.1)
               : AppTheme.lightGrey,
-          borderRadius: AppTheme.defaultBorderRadius, // 14.0
+          borderRadius: AppTheme.defaultBorderRadius,
           border: Border.all(
             color: _allowLateSubmission
                 ? AppTheme.primaryGreen.withOpacity(0.4)
@@ -1971,49 +2598,67 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
             width: 1.5,
           ),
         ),
-        child: Row(
+        child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: _allowLateSubmission
-                    ? AppTheme.primaryGreen.withOpacity(0.15)
-                    : AppTheme.lightGrey,
-                borderRadius: AppTheme.defaultBorderRadius, // 10.0
-              ),
-              child: Icon(
-                Iconsax.clock,
-                size: 22,
-                color: _allowLateSubmission
-                    ? AppTheme.primaryGreen
-                    : AppTheme.bodyText,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Allow Late Submission',
-                    style: AppTheme.labelText.copyWith(
-                      fontSize: 14,
-                      color: AppTheme.darkText,
-                    ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _allowLateSubmission
+                        ? AppTheme.primaryGreen.withOpacity(0.15)
+                        : AppTheme.lightGrey,
+                    borderRadius: AppTheme.defaultBorderRadius,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Students can submit after deadline',
-                    style: AppTheme.bodyText1.copyWith(fontSize: 11),
+                  child: Icon(
+                    Iconsax.clock,
+                    size: 22,
+                    color: _allowLateSubmission
+                        ? AppTheme.primaryGreen
+                        : AppTheme.bodyText,
                   ),
-                ],
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Allow Late Submission',
+                        style: AppTheme.labelText.copyWith(
+                          fontSize: 14,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Students can submit after deadline',
+                        style: AppTheme.bodyText1.copyWith(fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  value: _allowLateSubmission,
+                  onChanged: (value) =>
+                      setState(() => _allowLateSubmission = value),
+                  activeColor: AppTheme.primaryGreen,
+                ),
+              ],
+            ),
+            // ⭐ NEW: Penalty Field (Only shows if Late Submission is Allowed)
+            if (_allowLateSubmission) ...[
+              const SizedBox(height: 16),
+              Divider(color: AppTheme.primaryGreen.withOpacity(0.2)),
+              const SizedBox(height: 12),
+              _buildFormField(
+                'Penalty per day (%)',
+                _penaltyController, // Ensure you add this controller to your state
+                '0',
+                Iconsax.minus_cirlce,
+                isNumeric: true,
               ),
-            ),
-            Switch.adaptive(
-              value: _allowLateSubmission,
-              onChanged: (value) => setState(() => _allowLateSubmission = value),
-              activeColor: AppTheme.primaryGreen,
-            ),
+            ],
           ],
         ),
       ),
@@ -2277,7 +2922,772 @@ class _UploadMaterialDialogState extends State<_UploadMaterialDialog>
     _totalMarksController.dispose();
     _passingMarksController.dispose();
     _maxAttemptsController.dispose();
+    _penaltyController.dispose();
     _fadeController.dispose();
     super.dispose();
   }
 }
+
+// ⭐ NEW: AI Paper Preview Dialog (Read-Only)
+class AiPaperPreviewDialog extends StatefulWidget {
+  final String teacherCode;
+  final int paperId;
+
+  const AiPaperPreviewDialog({
+    super.key,
+    required this.teacherCode,
+    required this.paperId,
+  });
+
+  @override
+  State<AiPaperPreviewDialog> createState() => _AiPaperPreviewDialogState();
+}
+
+class _AiPaperPreviewDialogState extends State<AiPaperPreviewDialog> {
+  bool _isLoading = true;
+  Map<String, dynamic>? _paperData;
+  bool _isGeneratingPdf = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPaperDetails();
+  }
+
+  Future<void> _loadPaperDetails() async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await TeacherMaterialService.getAiPaperDetails(
+        teacherCode: widget.teacherCode,
+        paperId: widget.paperId,
+      );
+
+      setState(() {
+        _paperData = response['paper_data'];
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        CustomSnackbar.showError(context, 'Failed to load paper: $e');
+        Navigator.pop(context);
+      }
+    }
+  }
+
+  Future<void> _downloadPdf() async {
+    if (_paperData == null) return;
+
+    setState(() => _isGeneratingPdf = true);
+    try {
+      final pdf = pw.Document();
+      final font = await PdfGoogleFonts.nunitoExtraLight();
+      final fontBold = await PdfGoogleFonts.nunitoBold();
+      final fontItalic = await PdfGoogleFonts.nunitoItalic();
+
+      // Parse sections from JSON
+      final sectionsJson = _paperData!['SectionsJSON'] as List<dynamic>? ?? [];
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(40),
+          build: (pw.Context context) {
+            return [
+              // Professional Header
+              pw.Center(
+                child: pw.Text(
+                  (_paperData!['SchoolName'] ?? 'SCHOOL NAME').toUpperCase(),
+                  style: pw.TextStyle(font: fontBold, fontSize: 18),
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(
+                  _paperData!['ExamName'] ?? '',
+                  style: pw.TextStyle(font: font, fontSize: 14),
+                ),
+              ),
+              pw.SizedBox(height: 12),
+              pw.Divider(),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    "Time: ${_paperData!['TimeAllowed'] ?? ''}",
+                    style: pw.TextStyle(font: fontBold, fontSize: 12),
+                  ),
+                  pw.Text(
+                    "Max Marks: ${_paperData!['TotalMarks'] ?? 0}",
+                    style: pw.TextStyle(font: fontBold, fontSize: 12),
+                  ),
+                ],
+              ),
+              pw.Divider(),
+              pw.SizedBox(height: 8),
+
+              // Instructions
+              if (_paperData!['Instructions']?.toString().isNotEmpty == true) ...[
+                pw.Text(
+                  "General Instructions:",
+                  style: pw.TextStyle(font: fontBold, fontSize: 10),
+                ),
+                pw.Text(
+                  _paperData!['Instructions'],
+                  style: pw.TextStyle(font: fontItalic, fontSize: 10),
+                ),
+                pw.SizedBox(height: 16),
+              ],
+
+              // Sections Loop
+              ...sectionsJson.asMap().entries.map((secEntry) {
+                final section = secEntry.value as Map<String, dynamic>;
+                final questions = section['questions'] as List<dynamic>? ?? [];
+
+                if (questions.isEmpty) return pw.SizedBox();
+
+                return pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    // Section Header
+                    pw.Container(
+                      alignment: pw.Alignment.center,
+                      margin: const pw.EdgeInsets.symmetric(vertical: 10),
+                      padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                      child: pw.Text(
+                        (section['title'] ?? '').toUpperCase(),
+                        style: pw.TextStyle(font: fontBold, fontSize: 12),
+                      ),
+                    ),
+
+                    // Questions
+                    ...questions.asMap().entries.map((qEntry) {
+                      int qIdx = qEntry.key + 1;
+                      final q = qEntry.value as Map<String, dynamic>;
+                      final options = q['options'] as List<dynamic>? ?? [];
+
+                      return pw.Container(
+                        margin: const pw.EdgeInsets.only(bottom: 12),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Row(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: [
+                                pw.Text(
+                                  "$qIdx. ",
+                                  style: pw.TextStyle(font: fontBold, fontSize: 11),
+                                ),
+                                pw.Expanded(
+                                  child: pw.Text(
+                                    q['question'] ?? '',
+                                    style: pw.TextStyle(font: font, fontSize: 11),
+                                  ),
+                                ),
+                                pw.Text(
+                                  " [${q['marks'] ?? 1}]",
+                                  style: pw.TextStyle(font: fontBold, fontSize: 10),
+                                ),
+                              ],
+                            ),
+                            if (options.isNotEmpty)
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.only(top: 4, left: 15),
+                                child: pw.Wrap(
+                                  spacing: 20,
+                                  runSpacing: 4,
+                                  children: options.asMap().entries.map((opt) {
+                                    String char = String.fromCharCode(65 + opt.key);
+                                    return pw.Text(
+                                      "($char) ${opt.value}",
+                                      style: pw.TextStyle(font: font, fontSize: 10),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                );
+              }).toList(),
+            ];
+          },
+        ),
+      );
+
+      final data = await pdf.save();
+      await Printing.sharePdf(
+        bytes: data,
+        filename: '${_paperData!['PaperTitle'] ?? 'Exam_Paper'}.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        CustomSnackbar.showError(context, 'PDF Error: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isGeneratingPdf = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(16),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 900, maxHeight: 900),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8F9FA),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 40,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
+                ),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Iconsax.document_text, color: Colors.white, size: 24),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      _paperData?['PaperTitle'] ?? 'AI Generated Paper',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  if (_isGeneratingPdf)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 12),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                    ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+
+            // Body
+            Expanded(
+              child: _isLoading
+                  ? Center(
+                child: BeautifulLoader(
+                  type: LoaderType.pulse,
+                  size: 60,
+                  color: AppTheme.primaryGreen,
+                  message: 'Loading paper...',
+                ),
+              )
+                  : _paperData == null
+                  ? Center(
+                child: Text(
+                  'Failed to load paper',
+                  style: AppTheme.bodyText1,
+                ),
+              )
+                  : SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: _buildPaperPreview(),
+                ),
+              ),
+            ),
+
+            // Footer
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      'Close',
+                      style: AppTheme.buttonText.copyWith(
+                        color: AppTheme.bodyText,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: _isGeneratingPdf ? null : _downloadPdf,
+                    icon: const Icon(Iconsax.document_download, size: 18),
+                    label: const Text('Download PDF'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6A11CB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaperPreview() {
+    final sectionsJson = _paperData!['SectionsJSON'] as List<dynamic>? ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Professional Header
+        Center(
+          child: Text(
+            (_paperData!['SchoolName'] ?? 'SCHOOL NAME').toUpperCase(),
+            style: AppTheme.headline1.copyWith(fontSize: 20),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: Text(
+            _paperData!['ExamName'] ?? '',
+            style: AppTheme.bodyText1.copyWith(fontSize: 16),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Divider(color: AppTheme.borderGrey),
+        const SizedBox(height: 12),
+
+        // Time and Marks
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Iconsax.clock, size: 16, color: AppTheme.bodyText),
+                const SizedBox(width: 6),
+                Text(
+                  'Time: ${_paperData!['TimeAllowed'] ?? ''}',
+                  style: AppTheme.labelText,
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                const Icon(Iconsax.award, size: 16, color: AppTheme.bodyText),
+                const SizedBox(width: 6),
+                Text(
+                  'Max Marks: ${_paperData!['TotalMarks'] ?? 0}',
+                  style: AppTheme.labelText,
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Divider(color: AppTheme.borderGrey),
+        const SizedBox(height: 16),
+
+        // Instructions
+        if (_paperData!['Instructions']?.toString().isNotEmpty == true) ...[
+          Text(
+            'General Instructions:',
+            style: AppTheme.labelText.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _paperData!['Instructions'],
+            style: AppTheme.bodyText1.copyWith(fontStyle: FontStyle.italic),
+          ),
+          const SizedBox(height: 24),
+        ],
+
+        // Sections
+        ...sectionsJson.asMap().entries.map((secEntry) {
+          final section = secEntry.value as Map<String, dynamic>;
+          final questions = section['questions'] as List<dynamic>? ?? [];
+
+          if (questions.isEmpty) return const SizedBox.shrink();
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6A11CB).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  (section['title'] ?? '').toUpperCase(),
+                  style: AppTheme.labelText.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF6A11CB),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              ...questions.asMap().entries.map((qEntry) {
+                int qIdx = qEntry.key + 1;
+                final q = qEntry.value as Map<String, dynamic>;
+                final options = q['options'] as List<dynamic>? ?? [];
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "$qIdx. ",
+                            style: AppTheme.labelText.copyWith(fontSize: 14),
+                          ),
+                          Expanded(
+                            child: Text(
+                              q['question'] ?? '',
+                              style: AppTheme.bodyText1.copyWith(fontSize: 14),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '[${q['marks'] ?? 1}]',
+                              style: AppTheme.labelText.copyWith(
+                                fontSize: 11,
+                                color: Colors.amber[900],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (options.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 20),
+                          child: Wrap(
+                            spacing: 16,
+                            runSpacing: 8,
+                            children: options.asMap().entries.map((opt) {
+                              String char = String.fromCharCode(65 + opt.key);
+                              return Text(
+                                "($char) ${opt.value}",
+                                style: AppTheme.bodyText1.copyWith(fontSize: 13),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }).toList(),
+
+              const SizedBox(height: 24),
+            ],
+          );
+        }).toList(),
+      ],
+    );
+  }
+}
+
+class _PublishAiPaperDialog extends StatefulWidget {
+  final String paperTitle;
+  final dynamic totalMarks;
+
+  const _PublishAiPaperDialog({
+    required this.paperTitle,
+    required this.totalMarks,
+  });
+
+  @override
+  State<_PublishAiPaperDialog> createState() => _PublishAiPaperDialogState();
+}
+
+class _PublishAiPaperDialogState extends State<_PublishAiPaperDialog> {
+  DateTime? _selectedDueDate;
+  bool _allowLateSubmission = false;
+  final _dueDateController = TextEditingController();
+
+  Future<void> _selectDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 7)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppTheme.primaryGreen,
+              onPrimary: Colors.white,
+              surface: AppTheme.background,
+              onSurface: AppTheme.darkText,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDueDate = picked;
+        _dueDateController.text = DateFormat('MMM dd, yyyy').format(picked);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: AppTheme.defaultBorderRadius * 1.5,
+      ),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryGreen.withOpacity(0.1),
+              borderRadius: AppTheme.defaultBorderRadius,
+            ),
+            child: const Icon(
+              Iconsax.send_1,
+              color: AppTheme.primaryGreen,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Publish to Students',
+              style: AppTheme.headline1.copyWith(fontSize: 18),
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.purple.withOpacity(0.1),
+                borderRadius: AppTheme.defaultBorderRadius,
+                border: Border.all(color: Colors.purple.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.paperTitle,
+                    style: AppTheme.labelText.copyWith(
+                      fontSize: 14,
+                      color: Colors.purple,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Total Marks: ${widget.totalMarks}',
+                    style: AppTheme.bodyText1.copyWith(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Due Date (Optional)',
+              style: AppTheme.labelText,
+            ),
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: _selectDate,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: _selectedDueDate != null
+                        ? AppTheme.primaryGreen
+                        : AppTheme.borderGrey,
+                    width: 2,
+                  ),
+                  borderRadius: AppTheme.defaultBorderRadius,
+                  color: _selectedDueDate != null
+                      ? AppTheme.primaryGreen.withOpacity(0.05)
+                      : AppTheme.background,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Iconsax.calendar_1,
+                      size: 22,
+                      color: _selectedDueDate != null
+                          ? AppTheme.primaryGreen
+                          : AppTheme.bodyText,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        _dueDateController.text.isEmpty
+                            ? 'Select deadline (optional)'
+                            : _dueDateController.text,
+                        style: AppTheme.labelText.copyWith(
+                          fontSize: 15,
+                          color: _dueDateController.text.isEmpty
+                              ? AppTheme.bodyText
+                              : AppTheme.darkText,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (_selectedDueDate != null)
+                      const Icon(
+                        Iconsax.verify,
+                        color: AppTheme.accentGreen,
+                        size: 20,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _allowLateSubmission
+                    ? AppTheme.primaryGreen.withOpacity(0.1)
+                    : AppTheme.lightGrey,
+                borderRadius: AppTheme.defaultBorderRadius,
+                border: Border.all(
+                  color: _allowLateSubmission
+                      ? AppTheme.primaryGreen.withOpacity(0.4)
+                      : AppTheme.borderGrey,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Iconsax.clock,
+                    size: 20,
+                    color: _allowLateSubmission
+                        ? AppTheme.primaryGreen
+                        : AppTheme.bodyText,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Allow Late Submission',
+                          style: AppTheme.labelText.copyWith(fontSize: 14),
+                        ),
+                        Text(
+                          'Students can submit after deadline',
+                          style: AppTheme.bodyText1.copyWith(fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: _allowLateSubmission,
+                    onChanged: (value) {
+                      setState(() => _allowLateSubmission = value);
+                    },
+                    activeColor: AppTheme.primaryGreen,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'Cancel',
+            style: AppTheme.labelText.copyWith(color: AppTheme.bodyText),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: () {
+            Navigator.pop(context, {
+              'dueDate': _dueDateController.text,
+              'allowLateSubmission': _allowLateSubmission,
+            });
+          },
+          icon: const Icon(Iconsax.send_1, size: 16),
+          label: const Text('Publish'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryGreen,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: AppTheme.defaultBorderRadius,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+

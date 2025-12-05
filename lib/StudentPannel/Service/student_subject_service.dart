@@ -6,6 +6,8 @@ class StudentSubjectService {
   // API URLs
   static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
   static const String documentBaseUrl = "https://storage.googleapis.com/upload-images-34/documents/LMS/";
+  static const String manageAiPaperUrl = 'http://localhost/AquareLMS/manage_ai_paper.php';
+  static const String submitUrl = 'http://localhost/AquareLMS/submit_ai_paper_api.php';
 
   // Helper function to get YouTube thumbnail
   static String getYouTubeThumbnail(String videoUrl) {
@@ -32,6 +34,95 @@ class StudentSubjectService {
     if (relativePath == null || relativePath.isEmpty) return '';
     return '$documentBaseUrl$relativePath';
   }
+
+
+  // ✅ ADD: Submit AI Paper Method
+  static Future<Map<String, dynamic>> submitAiPaper({
+    required String studentCode,  // Student RecNo (e.g., from user profile)
+    required int materialRecNo, // From TeacherMaterialModel
+    required int paperId,       // From TeacherMaterialModel
+    required List<Map<String, dynamic>> answers, // [{ "question_id": 1, "answer": "OptionA" }]
+  }) async {
+    // NOTE: Replace with your actual PHP API URL
+
+
+    try {
+      print('📤 Submitting AI Paper...');
+      final requestBody = {
+        "action": "SUBMIT_AI_PAPER",
+        "student_code": studentCode, // Send String
+        "material_rec_no": materialRecNo,
+        "paper_id": paperId,
+        "answers": answers
+      };
+
+      print('   Body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(submitUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(requestBody),
+      );
+
+      print('   Response: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['status'] == 'success') {
+          return decoded;
+        } else {
+          throw Exception(decoded['message'] ?? 'Submission failed');
+        }
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error submitting paper: $e');
+      rethrow;
+    }
+  }
+
+
+  static Future<Map<String, dynamic>> getAiPaperDetails({
+    required int paperId,
+    required String teacherCode
+  }) async {
+    try {
+      print('📄 [Student] Fetching AI Paper Details: $paperId');
+
+      final requestBody = {
+        "action": "MANAGE_AI_PAPER",
+        "SubAction": "GET_PAPER_DETAILS",
+        "TeacherCode": teacherCode, // ✅ USING REAL TEACHER CODE
+        "PaperID": paperId,
+      };
+
+      print('   Request Body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(manageAiPaperUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(requestBody),
+      );
+
+      print('   Response: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['status'] == 'success') {
+          return decoded;
+        } else {
+          throw Exception(decoded['message'] ?? 'Failed to load paper details');
+        }
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error fetching paper: $e');
+      rethrow;
+    }
+  }
+
 
   // Existing methods...
   static Future<SubjectsResponse> getStudentSubjects(String studentId) async {
@@ -252,14 +343,9 @@ class TeacherMaterialsResponse {
   }
 }
 
-
-// Add this to student_subject_service.dart - COMPLETE MODELS
-
-// ADD THIS to student_subject_service.dart in the TeacherMaterialModel class
-
 class TeacherMaterialModel {
   final int recNo;
-  final int materialRecNo;  // ✅ ADD THIS LINE
+  final int materialRecNo;
   final int teacherRecNo;
   final int chapterId;
   final String materialType;
@@ -285,6 +371,9 @@ class TeacherMaterialModel {
   final String? publishStatus;
   final String? instructionFilePath;
 
+  // ✅ ADD THIS: Paper ID for AI generated papers
+  final int? paperId;
+
   // Teacher Info
   final String teacherCode;
   final String teacherName;
@@ -307,7 +396,7 @@ class TeacherMaterialModel {
 
   TeacherMaterialModel({
     required this.recNo,
-    required this.materialRecNo,  // ✅ ADD THIS
+    required this.materialRecNo,
     required this.teacherRecNo,
     required this.chapterId,
     required this.materialType,
@@ -332,6 +421,7 @@ class TeacherMaterialModel {
     this.allowedFileTypes,
     this.publishStatus,
     this.instructionFilePath,
+    this.paperId, // ✅ ADD THIS
     required this.teacherCode,
     required this.teacherName,
     required this.chapterName,
@@ -349,7 +439,7 @@ class TeacherMaterialModel {
   factory TeacherMaterialModel.fromJson(Map<String, dynamic> json) {
     return TeacherMaterialModel(
       recNo: json['RecNo'] ?? 0,
-      materialRecNo: json['MaterialRecNo'] ?? json['RecNo'] ?? 0,  // ✅ ADD THIS - fallback to RecNo
+      materialRecNo: json['MaterialRecNo'] ?? json['RecNo'] ?? 0,
       teacherRecNo: json['TeacherRecNo'] ?? 0,
       chapterId: json['ChapterID'] ?? 0,
       materialType: json['MaterialType'] ?? 'Material',
@@ -382,6 +472,12 @@ class TeacherMaterialModel {
       allowedFileTypes: json['AllowedFileTypes'],
       publishStatus: json['PublishStatus'],
       instructionFilePath: json['InstructionFilePath'],
+
+      // ✅ ADD THIS: Safe parsing for PaperID
+      paperId: json['PaperID'] is int
+          ? json['PaperID']
+          : (json['PaperID'] != null ? int.tryParse(json['PaperID'].toString()) : null),
+
       teacherCode: json['TeacherCode'] ?? '',
       teacherName: json['TeacherName'] ?? 'Unknown',
       chapterName: json['ChapterName'] ?? '',

@@ -1,9 +1,218 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
+// Make sure to import your AiGeneratorDialog to access PaperSection or define it in a shared model file
+import 'package:lms_publisher/Teacher_Panel/MyClass/ai_generator_dialog.dart';
+
+
 
 class TeacherMaterialService {
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/teacher_material.php';
-  static const String assignmentBaseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/assignment_api.php';
+  static const String baseUrl = 'http://localhost/AquareLMS/teacher_material.php';
+  static const String assignmentBaseUrl = 'http://localhost/AquareLMS/assignment_api.php';
+  static const String aiBaseUrl = 'http://localhost/AquareLMS/ai_generator.php';
+  // New API URL for managing papers
+  static const String manageAiPaperUrl = 'http://localhost/AquareLMS/manage_ai_paper.php';
+
+  // ✅ ADD THIS TO TeacherMaterialService
+  static Future<void> gradeAiPaper({
+    required int submissionRecNo,
+    required String teacherFeedback,
+    required List<Map<String, dynamic>> gradedQuestions,
+  }) async {
+    const String aiApiUrl = 'http://localhost/AquareLMS/submit_ai_paper_api.php';
+
+    try {
+      final response = await http.post(
+        Uri.parse(aiApiUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "action": "GRADE_SUBMISSION",
+          "submission_rec_no": submissionRecNo,
+          "teacher_feedback": teacherFeedback,
+          "graded_questions": gradedQuestions,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body);
+      if (data['status'] == 'error') {
+        throw Exception(data['message']);
+      }
+    } catch (e) {
+      throw Exception('Failed to save grades: $e');
+    }
+  }
+
+  // ⭐ NEW: Publish AI Paper to Students
+  static Future<Map<String, dynamic>> publishAiPaper({
+    required String teacherCode,
+    required int paperId,
+    required int chapterId,
+    String? dueDate,
+    bool allowLateSubmission = false,
+  }) async {
+    print('📤 [PUBLISH_AI_PAPER] Publishing paper...');
+    try {
+      final requestBody = {
+        "action": "PUBLISH_AI_PAPER",
+        "TeacherCode": teacherCode,
+        "PaperID": paperId,
+        "ChapterID": chapterId,
+        "DueDate": dueDate,
+        "AllowLateSubmission": allowLateSubmission,
+      };
+
+      final response = await http.post(
+        Uri.parse(manageAiPaperUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(requestBody),
+      );
+
+      print('📤 Response: ${response.body}');
+      final decoded = jsonDecode(response.body);
+
+      if (decoded['status'] == 'success') {
+        return decoded;
+      } else {
+        throw Exception(decoded['message'] ?? 'Failed to publish paper');
+      }
+    } catch (e) {
+      print('❌ [PUBLISH_AI_PAPER] Error: $e');
+      rethrow;
+    }
+  }
+
+  // ... existing code ...
+
+  // ✅ ADD THIS: Fetch detailed answers for grading
+  static Future<Map<String, dynamic>> getStudentExamAnswers(int submissionRecNo) async {
+    // Point to the AI specific API
+    const String aiApiUrl = 'http://localhost/AquareLMS/submit_ai_paper_api.php';
+
+    try {
+      final response = await http.post(
+        Uri.parse(aiApiUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "action": "GET_EXAM_ANSWERS",
+          "submission_rec_no": submissionRecNo,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'success') {
+          return data;
+        } else {
+          throw Exception(data['message']);
+        }
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to load answers: $e');
+    }
+  }
+
+
+  // ⭐ NEW: Delete AI Paper
+  static Future<Map<String, dynamic>> deleteAiPaper({
+    required String teacherCode,
+    required int paperId,
+  }) async {
+    print('🗑️ [DELETE_AI_PAPER] Starting...');
+    try {
+      final requestBody = {
+        "action": "MANAGE_AI_PAPER",
+        "SubAction": "DELETE",
+        "TeacherCode": teacherCode,
+        "PaperID": paperId,
+      };
+
+      final response = await http.post(
+        Uri.parse(manageAiPaperUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(requestBody),
+      );
+
+      print('🗑️ Response: ${response.body}');
+      final decoded = jsonDecode(response.body);
+
+      if (decoded['status'] == 'success') {
+        return decoded;
+      } else {
+        throw Exception(decoded['message'] ?? 'Failed to delete paper');
+      }
+    } catch (e) {
+      print('❌ [DELETE_AI_PAPER] Error: $e');
+      rethrow;
+    }
+  }
+
+
+
+  static Future<Map<String, dynamic>> generateAiContent({
+    required PlatformFile file, // Changed from File to PlatformFile
+    required String questionType,
+    required int count,
+    required String difficulty,
+  }) async {
+    print('🤖 [AI] Processing file: ${file.name}...');
+
+    try {
+      var request = http.MultipartRequest('POST', Uri.parse(aiBaseUrl));
+
+      request.fields['action'] = 'GENERATE_QUESTIONS';
+      request.fields['questionType'] = questionType;
+      request.fields['count'] = count.toString();
+      request.fields['difficulty'] = difficulty;
+
+      // ⭐ SMART BYTE EXTRACTION
+      List<int> fileBytes;
+      if (file.bytes != null) {
+        // WEB: Bytes are already in memory
+        fileBytes = file.bytes!;
+      } else if (file.path != null) {
+        // MOBILE: Read from path
+        fileBytes = await File(file.path!).readAsBytes();
+      } else {
+        throw Exception("Cannot read file data. File might be corrupted.");
+      }
+
+      // Send as Bytes
+      request.files.add(http.MultipartFile.fromBytes(
+        'pdf_file',
+        fileBytes,
+        filename: file.name, // PlatformFile has a direct .name property
+      ));
+
+      print('🤖 [AI] Sending ${fileBytes.length} bytes to server...');
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('🤖 Response: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['status'] == 'success') {
+          return decoded;
+        } else {
+          throw Exception(decoded['message'] ?? 'AI generation failed');
+        }
+      } else {
+        throw Exception('Server Error: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ [AI] Error: $e');
+      rethrow;
+    }
+  }
+
 
   // Get materials for a chapter (publisher + teacher materials)
   static Future<Map<String, dynamic>> getChapterMaterials({
@@ -344,7 +553,7 @@ class TeacherMaterialService {
     }
   }
 
-// Get submissions for an assignment - FIXED
+  // Get submissions for an assignment - FIXED
   static Future<Map<String, dynamic>> getSubmissions({
     required String teacherCode,
     required int materialRecNo,
@@ -479,6 +688,111 @@ class TeacherMaterialService {
       }
     } catch (e) {
       print('❌ [GET_MATERIAL_STATS] Exception: $e');
+      rethrow;
+    }
+  }
+
+  // ⭐ NEW METHOD: SAVE AI PAPER (Updated for Professional Schema)
+  static Future<Map<String, dynamic>> saveAiQuestionPaper({
+    required String teacherCode,
+    required int chapterId,
+    required String paperTitle,
+    required double totalMarks,
+    required String difficulty,
+    // New Header Fields
+    required String schoolName,
+    required String examName,
+    required String timeAllowed,
+    required String instructions,
+    // New: List of Sections (Hierarchical)
+    required List<PaperSection> sections,
+  }) async {
+    print('🧠 [SAVE_AI_PAPER] Saving Professional Paper...');
+
+    // Convert Sections to Nested JSON Structure
+    List<Map<String, dynamic>> sectionsJson = sections.map((sec) {
+      return {
+        "title": sec.title,
+        "questions": sec.questions.where((q) => q.model.isSelected).map((q) => {
+          "question": q.model.question,
+          "type": "MCQ", // You might want to pass dynamic type if available in QuestionModel
+          "answer": q.model.answer,
+          "explanation": q.model.explanation,
+          "options": q.model.options,
+          "marks": q.marks // Send individual marks per question
+        }).toList()
+      };
+    }).toList();
+
+    try {
+      final requestBody = {
+        "action": "MANAGE_AI_PAPER",
+        "SubAction": "INSERT",
+        "TeacherCode": teacherCode,
+        "ChapterID": chapterId,
+        "PaperTitle": paperTitle, // Used as internal tracking title
+
+        // Professional Header Data
+        "SchoolName": schoolName,
+        "ExamName": examName,
+        "TimeAllowed": timeAllowed,
+        "Instructions": instructions,
+
+        "TotalMarks": totalMarks,
+        "DifficultyLevel": difficulty,
+
+        // Nested JSON for Sections -> Questions
+        "SectionsJSON": sectionsJson
+      };
+
+      print('🧠 Request Body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(manageAiPaperUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(requestBody),
+      );
+
+      print('🧠 Response: ${response.body}');
+
+      final decoded = jsonDecode(response.body);
+      if (decoded['status'] == 'success') {
+        return decoded;
+      } else {
+        throw Exception(decoded['message'] ?? 'Failed to save paper');
+      }
+    } catch (e) {
+      print('❌ [SAVE_AI_PAPER] Error: $e');
+      rethrow;
+    }
+  }
+
+  static Future<Map<String, dynamic>> getAiPaperDetails({
+    required String teacherCode,
+    required int paperId,
+  }) async {
+    try {
+      final requestBody = {
+        "action": "MANAGE_AI_PAPER",
+        "SubAction": "GET_PAPER_DETAILS",
+        "TeacherCode": teacherCode,
+        "PaperID": paperId,
+      };
+
+      final response = await http.post(
+        Uri.parse(manageAiPaperUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(requestBody),
+      );
+
+      final decoded = jsonDecode(response.body);
+      if (decoded['status'] == 'success') {
+        return decoded;
+      } else {
+        throw Exception(decoded['message'] ?? 'Failed to load paper details');
+      }
+    } catch (e) {
+      print('❌ [GET_AI_PAPER] Error: $e');
       rethrow;
     }
   }

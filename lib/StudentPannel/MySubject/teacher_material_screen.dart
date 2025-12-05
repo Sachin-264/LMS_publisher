@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/StudentPannel/MySubject/my_subject_screen.dart';
+import 'package:lms_publisher/StudentPannel/MySubject/student_attempt_paper_screen.dart';
 import 'package:lms_publisher/StudentPannel/Service/student_subject_service.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/Util/beautiful_loader.dart';
@@ -805,6 +806,11 @@ class _TeacherMaterialsScreenState extends State<TeacherMaterialsScreen> with Si
     final statusColor = _getStatusColor(material.assignmentStatus ?? 'Active');
     final totalMarks = material.totalMarks ?? 0;
 
+    // ✅ CHECK: Detect if it is an AI Paper
+    final bool isAiPaper = material.materialType == 'AI_Paper';
+    // Ensure paperId is available in your TeacherMaterialModel
+    final int paperId = material.paperId ?? 0;
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -815,7 +821,7 @@ class _TeacherMaterialsScreenState extends State<TeacherMaterialsScreen> with Si
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: hasSubmissions ? Colors.green.withOpacity(0.3) : Colors.blue.withOpacity(0.2),
+          color: hasSubmissions ? Colors.green.withOpacity(0.3) : (isAiPaper ? Colors.purple.withOpacity(0.3) : Colors.blue.withOpacity(0.2)),
           width: 2,
         ),
         boxShadow: [
@@ -837,11 +843,18 @@ class _TeacherMaterialsScreenState extends State<TeacherMaterialsScreen> with Si
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [widget.subjectColor, widget.subjectColor.withOpacity(0.8)],
+                      colors: isAiPaper
+                          ? [Colors.purple, Colors.purpleAccent]
+                          : [widget.subjectColor, widget.subjectColor.withOpacity(0.8)],
                     ),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Iconsax.document_text, size: 18, color: Colors.white),
+                  // Change icon for AI Paper
+                  child: Icon(
+                      isAiPaper ? Iconsax.magic_star : Iconsax.document_text,
+                      size: 18,
+                      color: Colors.white
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -875,15 +888,15 @@ class _TeacherMaterialsScreenState extends State<TeacherMaterialsScreen> with Si
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: widget.subjectColor.withOpacity(0.12),
+                    color: (isAiPaper ? Colors.purple : widget.subjectColor).withOpacity(0.12),
                     borderRadius: BorderRadius.circular(5),
                   ),
                   child: Text(
-                    material.materialType,
+                    isAiPaper ? "AI Test" : material.materialType,
                     style: GoogleFonts.inter(
                       fontSize: 9,
                       fontWeight: FontWeight.w800,
-                      color: widget.subjectColor,
+                      color: isAiPaper ? Colors.purple : widget.subjectColor,
                     ),
                   ),
                 ),
@@ -906,6 +919,8 @@ class _TeacherMaterialsScreenState extends State<TeacherMaterialsScreen> with Si
               ],
             ),
             const SizedBox(height: 12),
+
+            // Marks & Due Date Section
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -966,7 +981,9 @@ class _TeacherMaterialsScreenState extends State<TeacherMaterialsScreen> with Si
               ),
             ),
             const SizedBox(height: 12),
-            if (material.materialPath != null && material.materialPath!.isNotEmpty)
+
+            // Only show "Open Document" if path exists AND it's not an AI paper (unless you generate PDFs for them)
+            if (material.materialPath != null && material.materialPath!.isNotEmpty && !isAiPaper)
               GestureDetector(
                 onTap: () => _openDocument(material.materialPath!),
                 child: Container(
@@ -996,27 +1013,70 @@ class _TeacherMaterialsScreenState extends State<TeacherMaterialsScreen> with Si
                 ),
               ),
 
-            // ✅ CHANGED: Replaced dummy button with real dialog call
+            // ✅ CHANGED: Action Button Logic
             if (!hasSubmissions) ...[
               const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () => _showUploadDialog(material), // Call the new function
-                icon: Icon(Iconsax.document_upload, size: 16, color: widget.subjectColor),
-                label: Text(
-                  'Upload Your Work',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: widget.subjectColor,
+
+              if (isAiPaper)
+              // 🔹 OPTION A: Attempt Test (For AI Papers)
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    // Navigate to Attempt Screen
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => StudentAttemptPaperScreen(
+                          paperId: paperId,
+                          studentCode: _studentCode,
+                          subjectName: widget.subjectName,
+                          subjectColor: widget.subjectColor,
+                          materialRecNo: material.materialRecNo,
+                          teacherCode: _currentTeacher.teacherCode,
+                        ),
+                      ),
+                    );
+
+                    // Refresh if test was submitted
+                    if (result == true) {
+                      _loadTeacherMaterials();
+                    }
+                  },
+                  icon: const Icon(Iconsax.timer_1, size: 16, color: Colors.purple),
+                  label: Text(
+                    'Attempt Test Now',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.purple,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Colors.purple.withOpacity(0.4), width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    minimumSize: const Size(double.infinity, 40),
+                  ),
+                )
+              else
+              // 🔹 OPTION B: Upload Work (For Normal Assignments)
+                OutlinedButton.icon(
+                  onPressed: () => _showUploadDialog(material),
+                  icon: Icon(Iconsax.document_upload, size: 16, color: widget.subjectColor),
+                  label: Text(
+                    'Upload Your Work',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: widget.subjectColor,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: widget.subjectColor.withOpacity(0.4), width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    minimumSize: const Size(double.infinity, 40),
                   ),
                 ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: widget.subjectColor.withOpacity(0.4), width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  minimumSize: const Size(double.infinity, 40),
-                ),
-              ),
             ],
           ],
         ),
