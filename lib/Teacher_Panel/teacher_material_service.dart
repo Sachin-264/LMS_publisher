@@ -8,11 +8,11 @@ import 'package:lms_publisher/Teacher_Panel/MyClass/ai_generator_dialog.dart';
 
 
 class TeacherMaterialService {
-  static const String baseUrl = 'http://localhost/AquareLMS/teacher_material.php';
-  static const String assignmentBaseUrl = 'http://localhost/AquareLMS/assignment_api.php';
-  static const String aiBaseUrl = 'http://localhost/AquareLMS/ai_generator.php';
+  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/teacher_material.php';
+  static const String assignmentBaseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/assignment_api.php';
+  static const String aiBaseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/ai_generator.php';
   // New API URL for managing papers
-  static const String manageAiPaperUrl = 'http://localhost/AquareLMS/manage_ai_paper.php';
+  static const String manageAiPaperUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/manage_ai_paper.php';
 
   // ✅ ADD THIS TO TeacherMaterialService
   static Future<void> gradeAiPaper({
@@ -20,7 +20,7 @@ class TeacherMaterialService {
     required String teacherFeedback,
     required List<Map<String, dynamic>> gradedQuestions,
   }) async {
-    const String aiApiUrl = 'http://localhost/AquareLMS/submit_ai_paper_api.php';
+    const String aiApiUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/submit_ai_paper_api.php';
 
     try {
       final response = await http.post(
@@ -91,7 +91,7 @@ class TeacherMaterialService {
   // ✅ ADD THIS: Fetch detailed answers for grading
   static Future<Map<String, dynamic>> getStudentExamAnswers(int submissionRecNo) async {
     // Point to the AI specific API
-    const String aiApiUrl = 'http://localhost/AquareLMS/submit_ai_paper_api.php';
+    const String aiApiUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/submit_ai_paper_api.php';
 
     try {
       final response = await http.post(

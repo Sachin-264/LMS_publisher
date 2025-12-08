@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AddressMasterService {
-  static const String baseUrl = 'http://localhost/AquareLMS';
+  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
 
   // Generic API call method
   Future<Map<String, dynamic>> _callApi({
