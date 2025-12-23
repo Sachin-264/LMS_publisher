@@ -157,7 +157,7 @@ class ClassModel {
   final int displayOrder;
   final bool isActive;
   final String pubCode;
-  final int? subjectCount;  // ADD THIS LINE
+  final int? subjectCount;
 
   ClassModel({
     required this.id,
@@ -166,7 +166,7 @@ class ClassModel {
     required this.displayOrder,
     required this.isActive,
     required this.pubCode,
-    this.subjectCount,  // ADD THIS LINE
+    this.subjectCount,
   });
 
   factory ClassModel.fromJson(Map<String, dynamic> json) {
@@ -176,7 +176,7 @@ class ClassModel {
       description: json['ClassDescription']?.toString() ?? '',
       displayOrder: json['DisplayOrder'] ?? 0,
       isActive: json['IsActive'] == 1 || json['IsActive'] == true,
-      pubCode: json['PubCode']?.toString() ?? '0',  // ✅ FIXED: Convert int to String
+      pubCode: json['PubCode']?.toString() ?? '0',
       subjectCount: json['TotalSubjects'],
     );
   }
@@ -184,7 +184,7 @@ class ClassModel {
 
 
 class SubjectModel {
-  final int id;  // Changed from String to int
+  final int id;
   final int classId;
   final String name;
   final String code;
@@ -219,7 +219,7 @@ class SubjectModel {
       description: json['SubjectDescription']?.toString() ?? '',
       color: json['SubjectColor']?.toString() ?? '#4CAF50',
       isActive: json['IsActive'] == 1 || json['IsActive'] == true,
-      pubCode: json['PubCode']?.toString() ?? '0',  // ✅ FIXED: Convert int to String
+      pubCode: json['PubCode']?.toString() ?? '0',
       className: json['ClassName']?.toString(),
       chapterCount: json['TotalChapters'],
     );
@@ -227,7 +227,7 @@ class SubjectModel {
 }
 
 class ChapterModel {
-  final int id; // Changed from String to int
+  final int id;
   final int subjectId;
   final String name;
   final String code;
@@ -253,7 +253,6 @@ class ChapterModel {
     this.materialCount,
   });
 
-// REPLACE WITH:
   factory ChapterModel.fromJson(Map<String, dynamic> json) {
     return ChapterModel(
       id: json['ChapterID'] ?? 0,
@@ -264,7 +263,6 @@ class ChapterModel {
       order: json['ChapterOrder'] ?? 0,
       isActive: json['IsActive'] == 1 || json['IsActive'] == true,
       pubCode: json['PubCode']?.toString() ?? '0',
-      // ✅ FIXED: Convert int to String
       subjectName: json['SubjectName']?.toString(),
       materialCount: json['MaterialCount'],
     );
@@ -618,78 +616,10 @@ class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
     emit(MaterialsLoaded(_cachedMaterials, isGridView: _isGridView));
   }
 
-  Future<void> _onDeleteSubject(DeleteSubjectEvent event, Emitter<AcademicsState> emit) async {
-    print('🗑️ AcademicsBloc: Deleting Subject ID: ${event.subjectId}, Hard Delete: ${event.hardDelete}');
-
-    emit(AcademicsLoading());
-
-    try {
-      final response = await ApiService.manageAcademicModule({
-        'table': 'Subject_Name_Master',
-        'operation': 'DELETE',
-        'SubjectID': event.subjectId,
-        'HardDelete': event.hardDelete ? 1 : 0,
-        'ModifiedBy': event.modifiedBy,
-      });
-
-      print('📥 AcademicsBloc: Delete Subject Response: $response');
-
-      if (response['status'] == 'success' || response['success'] == true) {
-        print('✅ AcademicsBloc: Subject deleted successfully');
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        print('🔄 AcademicsBloc: Fetching fresh subjects data...');
-        final subjectsResponse = await ApiService.getSubjects(schoolRecNo: 1);
-
-        if ((subjectsResponse['status'] == 'success' || subjectsResponse['success'] == true) &&
-            subjectsResponse['data'] != null) {
-          final List<dynamic> data = subjectsResponse['data'];
-          final subjects = data.map((json) => SubjectModel.fromJson(json)).toList();
-          print('✅ AcademicsBloc: Loaded ${subjects.length} subjects after delete');
-          emit(SubjectsLoaded(subjects));
-          add(LoadKPIEvent());
-        } else {
-          print('⚠️ AcademicsBloc: No subjects data found after delete');
-          emit(SubjectsLoaded([]));
-        }
-      } else {
-        print('❌ AcademicsBloc: Failed to delete subject - ${response['message'] ?? 'Unknown error'}');
-        emit(AcademicsError('Failed to delete subject'));
-        await Future.delayed(const Duration(seconds: 1));
-        print('🔄 AcademicsBloc: Reloading subjects after error...');
-        final subjectsResponse = await ApiService.getSubjects(schoolRecNo: 1);
-        if ((subjectsResponse['status'] == 'success' || subjectsResponse['success'] == true) &&
-            subjectsResponse['data'] != null) {
-          final subjects = (subjectsResponse['data'] as List)
-              .map((json) => SubjectModel.fromJson(json))
-              .toList();
-          emit(SubjectsLoaded(subjects));
-        }
-      }
-    } catch (e) {
-      print('❌ AcademicsBloc: Exception during delete - $e');
-      emit(AcademicsError('Error deleting subject: $e'));
-      await Future.delayed(const Duration(seconds: 1));
-      print('🔄 AcademicsBloc: Reloading subjects after exception...');
-      try {
-        final subjectsResponse = await ApiService.getSubjects(schoolRecNo: 1);
-        if ((subjectsResponse['status'] == 'success' || subjectsResponse['success'] == true) &&
-            subjectsResponse['data'] != null) {
-          final subjects = (subjectsResponse['data'] as List)
-              .map((json) => SubjectModel.fromJson(json))
-              .toList();
-          emit(SubjectsLoaded(subjects));
-        }
-      } catch (reloadError) {
-        print('❌ AcademicsBloc: Failed to reload after exception: $reloadError');
-        emit(SubjectsLoaded([]));
-      }
-    }
-  }
+  // ==================== UPDATED DELETE HANDLERS ====================
 
   Future<void> _onDeleteClass(DeleteClassEvent event, Emitter<AcademicsState> emit) async {
     print('🗑️ AcademicsBloc: Deleting Class ID: ${event.classId}, Hard Delete: ${event.hardDelete}');
-
     emit(AcademicsLoading());
 
     try {
@@ -704,58 +634,60 @@ class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
       print('📥 AcademicsBloc: Delete Class Response: $response');
 
       if (response['status'] == 'success' || response['success'] == true) {
-        print('✅ AcademicsBloc: Class deleted successfully');
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        print('🔄 AcademicsBloc: Fetching fresh classes data...');
-        final classesResponse = await ApiService.getClasses(schoolRecNo: 1);
-
-        if ((classesResponse['status'] == 'success' || classesResponse['success'] == true) &&
-            classesResponse['data'] != null) {
-          final classes = (classesResponse['data'] as List)
-              .map((json) => ClassModel.fromJson(json))
-              .toList();
-          print('✅ AcademicsBloc: Loaded ${classes.length} classes after delete');
-          emit(ClassesLoaded(classes));
-          add(LoadKPIEvent());
-        } else {
-          emit(ClassesLoaded([]));
-        }
+        print('✅ AcademicsBloc: Class deleted successfully. Reloading...');
+        // ✅ FIX: Use event to reload instead of manual fetch
+        add(LoadClassesEvent(schoolRecNo: 1));
+        add(LoadKPIEvent());
       } else {
         print('❌ AcademicsBloc: Failed to delete class');
         emit(AcademicsError('Failed to delete class'));
-        await Future.delayed(const Duration(seconds: 1));
-        final classesResponse = await ApiService.getClasses(schoolRecNo: 1);
-        if ((classesResponse['status'] == 'success' || classesResponse['success'] == true) &&
-            classesResponse['data'] != null) {
-          final classes = (classesResponse['data'] as List)
-              .map((json) => ClassModel.fromJson(json))
-              .toList();
-          emit(ClassesLoaded(classes));
-        }
+        // ✅ FIX: Reload to reset UI from loading state
+        add(LoadClassesEvent(schoolRecNo: 1));
       }
     } catch (e) {
       print('❌ AcademicsBloc: Exception during delete - $e');
       emit(AcademicsError('Error deleting class: $e'));
-      await Future.delayed(const Duration(seconds: 1));
-      try {
-        final classesResponse = await ApiService.getClasses(schoolRecNo: 1);
-        if ((classesResponse['status'] == 'success' || classesResponse['success'] == true) &&
-            classesResponse['data'] != null) {
-          final classes = (classesResponse['data'] as List)
-              .map((json) => ClassModel.fromJson(json))
-              .toList();
-          emit(ClassesLoaded(classes));
-        }
-      } catch (reloadError) {
-        emit(ClassesLoaded([]));
+      // ✅ FIX: Reload to reset UI from loading state
+      add(LoadClassesEvent(schoolRecNo: 1));
+    }
+  }
+
+  Future<void> _onDeleteSubject(DeleteSubjectEvent event, Emitter<AcademicsState> emit) async {
+    print('🗑️ AcademicsBloc: Deleting Subject ID: ${event.subjectId}, Hard Delete: ${event.hardDelete}');
+    emit(AcademicsLoading());
+
+    try {
+      final response = await ApiService.manageAcademicModule({
+        'table': 'Subject_Name_Master',
+        'operation': 'DELETE',
+        'SubjectID': event.subjectId,
+        'HardDelete': event.hardDelete ? 1 : 0,
+        'ModifiedBy': event.modifiedBy,
+      });
+
+      print('📥 AcademicsBloc: Delete Subject Response: $response');
+
+      if (response['status'] == 'success' || response['success'] == true) {
+        print('✅ AcademicsBloc: Subject deleted successfully. Reloading...');
+        // ✅ FIX: Use event to reload
+        add(LoadSubjectsEvent(schoolRecNo: 1));
+        add(LoadKPIEvent());
+      } else {
+        print('❌ AcademicsBloc: Failed to delete subject - ${response['message'] ?? 'Unknown error'}');
+        emit(AcademicsError('Failed to delete subject'));
+        // ✅ FIX: Reload to reset UI
+        add(LoadSubjectsEvent(schoolRecNo: 1));
       }
+    } catch (e) {
+      print('❌ AcademicsBloc: Exception during delete - $e');
+      emit(AcademicsError('Error deleting subject: $e'));
+      // ✅ FIX: Reload to reset UI
+      add(LoadSubjectsEvent(schoolRecNo: 1));
     }
   }
 
   Future<void> _onDeleteChapter(DeleteChapterEvent event, Emitter<AcademicsState> emit) async {
     print('🗑️ AcademicsBloc: Deleting Chapter ID: ${event.chapterId}, Hard Delete: ${event.hardDelete}');
-
     emit(AcademicsLoading());
 
     try {
@@ -770,58 +702,26 @@ class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
       print('📥 AcademicsBloc: Delete Chapter Response: $response');
 
       if (response['status'] == 'success' || response['success'] == true) {
-        print('✅ AcademicsBloc: Chapter deleted successfully');
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        print('🔄 AcademicsBloc: Fetching fresh chapters data...');
-        final chaptersResponse = await ApiService.getChapters(schoolRecNo: 1);
-
-        if ((chaptersResponse['status'] == 'success' || chaptersResponse['success'] == true) &&
-            chaptersResponse['data'] != null) {
-          final chapters = (chaptersResponse['data'] as List)
-              .map((json) => ChapterModel.fromJson(json))
-              .toList();
-          print('✅ AcademicsBloc: Loaded ${chapters.length} chapters after delete');
-          emit(ChaptersLoaded(chapters));
-          add(LoadKPIEvent());
-        } else {
-          emit(ChaptersLoaded([]));
-        }
+        print('✅ AcademicsBloc: Chapter deleted successfully. Reloading...');
+        // ✅ FIX: Use event to reload
+        add(LoadChaptersEvent(schoolRecNo: 1));
+        add(LoadKPIEvent());
       } else {
         print('❌ AcademicsBloc: Failed to delete chapter');
         emit(AcademicsError('Failed to delete chapter'));
-        await Future.delayed(const Duration(seconds: 1));
-        final chaptersResponse = await ApiService.getChapters(schoolRecNo: 1);
-        if ((chaptersResponse['status'] == 'success' || chaptersResponse['success'] == true) &&
-            chaptersResponse['data'] != null) {
-          final chapters = (chaptersResponse['data'] as List)
-              .map((json) => ChapterModel.fromJson(json))
-              .toList();
-          emit(ChaptersLoaded(chapters));
-        }
+        // ✅ FIX: Reload to reset UI
+        add(LoadChaptersEvent(schoolRecNo: 1));
       }
     } catch (e) {
       print('❌ AcademicsBloc: Exception during delete - $e');
       emit(AcademicsError('Error deleting chapter: $e'));
-      await Future.delayed(const Duration(seconds: 1));
-      try {
-        final chaptersResponse = await ApiService.getChapters(schoolRecNo: 1);
-        if ((chaptersResponse['status'] == 'success' || chaptersResponse['success'] == true) &&
-            chaptersResponse['data'] != null) {
-          final chapters = (chaptersResponse['data'] as List)
-              .map((json) => ChapterModel.fromJson(json))
-              .toList();
-          emit(ChaptersLoaded(chapters));
-        }
-      } catch (reloadError) {
-        emit(ChaptersLoaded([]));
-      }
+      // ✅ FIX: Reload to reset UI
+      add(LoadChaptersEvent(schoolRecNo: 1));
     }
   }
 
   Future<void> _onDeleteMaterial(DeleteMaterialEvent event, Emitter<AcademicsState> emit) async {
     print('🗑️ AcademicsBloc: Deleting Material RecNo: ${event.recNo}, Hard Delete: ${event.hardDelete}');
-
     emit(AcademicsLoading());
 
     try {
@@ -836,69 +736,22 @@ class AcademicsBloc extends Bloc<AcademicsEvent, AcademicsState> {
       print('📥 AcademicsBloc: Delete Material Response: $response');
 
       if (response['status'] == 'success' || response['success'] == true) {
-        print('✅ AcademicsBloc: Material deleted successfully');
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        print('🔄 AcademicsBloc: Fetching fresh materials data...');
-        final materialsResponse = await ApiService.getMaterials(schoolRecNo: 1);
-
-        if ((materialsResponse['status'] == 'success' || materialsResponse['success'] == true) &&
-            materialsResponse['data'] != null) {
-          _allMaterials = (materialsResponse['data'] as List)
-              .map((json) => MaterialModel.fromJson(json))
-              .toList();
-
-          // Re-apply filter
-          if (_currentMaterialTypeFilter != 'All') {
-            _onFilterMaterialsByType(
-              FilterMaterialsByTypeEvent(_currentMaterialTypeFilter),
-              emit,
-            );
-          } else {
-            _cachedMaterials = _allMaterials;
-            print('✅ AcademicsBloc: Loaded ${_cachedMaterials.length} materials after delete');
-            emit(MaterialsLoaded(_cachedMaterials, isGridView: _isGridView));
-          }
-
-          add(LoadKPIEvent());
-        } else {
-          _allMaterials = [];
-          _cachedMaterials = [];
-          emit(MaterialsLoaded([], isGridView: _isGridView));
-        }
+        print('✅ AcademicsBloc: Material deleted successfully. Reloading...');
+        // ✅ FIX: Use event to reload
+        // Note: schoolRecNo: 1 ensures default load. You can adjust params if needed.
+        add(LoadMaterialsEvent(schoolRecNo: 1));
+        add(LoadKPIEvent());
       } else {
         print('❌ AcademicsBloc: Failed to delete material');
         emit(AcademicsError('Failed to delete material'));
-        await Future.delayed(const Duration(seconds: 1));
-        final materialsResponse = await ApiService.getMaterials(schoolRecNo: 1);
-        if ((materialsResponse['status'] == 'success' || materialsResponse['success'] == true) &&
-            materialsResponse['data'] != null) {
-          _allMaterials = (materialsResponse['data'] as List)
-              .map((json) => MaterialModel.fromJson(json))
-              .toList();
-          _cachedMaterials = _allMaterials;
-          emit(MaterialsLoaded(_cachedMaterials, isGridView: _isGridView));
-        }
+        // ✅ FIX: Reload to reset UI
+        add(LoadMaterialsEvent(schoolRecNo: 1));
       }
     } catch (e) {
       print('❌ AcademicsBloc: Exception during delete - $e');
       emit(AcademicsError('Error deleting material: $e'));
-      await Future.delayed(const Duration(seconds: 1));
-      try {
-        final materialsResponse = await ApiService.getMaterials(schoolRecNo: 1);
-        if ((materialsResponse['status'] == 'success' || materialsResponse['success'] == true) &&
-            materialsResponse['data'] != null) {
-          _allMaterials = (materialsResponse['data'] as List)
-              .map((json) => MaterialModel.fromJson(json))
-              .toList();
-          _cachedMaterials = _allMaterials;
-          emit(MaterialsLoaded(_cachedMaterials, isGridView: _isGridView));
-        }
-      } catch (reloadError) {
-        _allMaterials = [];
-        _cachedMaterials = [];
-        emit(MaterialsLoaded([], isGridView: _isGridView));
-      }
+      // ✅ FIX: Reload to reset UI
+      add(LoadMaterialsEvent(schoolRecNo: 1));
     }
   }
 }

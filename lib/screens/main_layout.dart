@@ -26,6 +26,7 @@ import 'package:lms_publisher/screens/LogOutTransition.dart';
 import 'package:lms_publisher/screens/School/School_manage.dart';
 import 'package:lms_publisher/screens/SubscriptionScreen/subscription_dart.dart';
 import 'package:lms_publisher/screens/LoginScreen/login_bloc.dart';
+import 'package:lms_publisher/screens/board_master_screen.dart';
 import 'package:provider/provider.dart';
 import '../School_Panel/class_module/class_manage_screen.dart';
 
@@ -51,6 +52,7 @@ enum AppScreen {
   settings,
   parentChildren,
   addressMaster,
+  boardMaster,
 }
 
 // ✅ State management for sidebar
@@ -130,6 +132,8 @@ class _MainLayoutState extends State<MainLayout> {
         return Iconsax.profile_2user;
       case AppScreen.settings:
         return Iconsax.setting_2;
+      case AppScreen.boardMaster:  // ← ADD THIS
+        return Iconsax.scroll;
       default:
         return Iconsax.home;
     }
@@ -170,6 +174,8 @@ class _MainLayoutState extends State<MainLayout> {
         return 'My Classes';
       case AppScreen.addressMaster:
         return 'Address Master';
+      case AppScreen.boardMaster:  // ← ADD THIS
+        return 'Board Master';
       case AppScreen.parentChildren:
         return 'My Children';
       case AppScreen.settings:
@@ -1869,6 +1875,26 @@ class _ModernCollapsibleSidebar extends StatelessWidget {
                           },
                         ),
                       ],
+                      if (userProvider.hasMenuAccess('M018')) ...{
+                        _CollapsibleMenuItem(
+                          icon: Iconsax.scroll,
+                          text: 'Board Master',
+                          isActive: activeScreen == AppScreen.boardMaster,
+                          isCollapsed: isCollapsed,
+                          onTap: () {
+                            if (activeScreen !=  AppScreen.boardMaster) {
+                              Navigator.pushReplacement(
+                                context,
+                                SmoothPageRoute(page: const BoardMasterScreen()),
+                              );
+                            }
+                          },
+                        ),
+                      },
+
+
+
+
 
                       // ✅ UPDATED: Parent Module - M000 (Select Child)
                       if (userProvider.hasMenuAccess('M000')) ...{
@@ -2539,6 +2565,14 @@ class _MobileDrawer extends StatelessWidget {
                         onTap: () =>
                             _navigateTo(context, const AddressMasterScreen()),
                       ),
+                    if (userProvider.hasMenuAccess('M018'))
+                      _SimpleMenuItem(
+                        icon: Iconsax.scroll,
+                        title: 'Board Master',
+                        isActive: activeScreen == AppScreen.boardMaster,
+                        onTap: () => _navigateTo(context, const BoardMasterScreen()),
+                      ),
+
 
                     if (userProvider.hasMenuAccess('M000'))
                       _SimpleMenuItem(

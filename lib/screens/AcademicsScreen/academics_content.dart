@@ -1137,86 +1137,87 @@ class CascadingFiltersWithChapter extends StatelessWidget {
 
 
 class CascadingFilters extends StatelessWidget {
-final int? selectedClassId;
-final int? selectedSubjectId;
-final List<ClassModel> allClasses;
-final List<SubjectModel> allSubjects;
-final ValueChanged<int?> onClassChanged;
-final ValueChanged<int?> onSubjectChanged;
+  final int? selectedClassId;
+  final int? selectedSubjectId;
+  final List<ClassModel> allClasses;
+  final List<SubjectModel> allSubjects;
+  final ValueChanged<int?> onClassChanged;
+  final ValueChanged<int?> onSubjectChanged;
 
-const CascadingFilters({
-super.key,
-this.selectedClassId,
-this.selectedSubjectId,
-required this.allClasses,
-required this.allSubjects,
-required this.onClassChanged,
-required this.onSubjectChanged,
-});
+  const CascadingFilters({
+    super.key,
+    this.selectedClassId,
+    this.selectedSubjectId,
+    required this.allClasses,
+    required this.allSubjects,
+    required this.onClassChanged,
+    required this.onSubjectChanged,
+  });
 
-@override
-Widget build(BuildContext context) {
-final filteredSubjects = selectedClassId != null
-? allSubjects.where((s) => s.classId == selectedClassId.toString()).toList()
-    : allSubjects;
+  @override
+  Widget build(BuildContext context) {
+    // ✅ FIX: Removed .toString() to compare int with int directly
+    final filteredSubjects = selectedClassId != null
+        ? allSubjects.where((s) => s.classId == selectedClassId).toList()
+        : allSubjects;
 
-return Padding(
-padding: const EdgeInsets.only(bottom: AppTheme.defaultPadding * 1.5),
-child: LayoutBuilder(builder: (context, constraints) {
-if (constraints.maxWidth < 700) {
-return Column(mainAxisSize: MainAxisSize.min, children: [
-_buildClassDropdown(),
-const SizedBox(height: 14),
-_buildSubjectDropdown(filteredSubjects),
-]);
-}
-return Row(children: [
-Expanded(child: _buildClassDropdown()),
-const SizedBox(width: 14),
-Expanded(child: _buildSubjectDropdown(filteredSubjects)),
-const Spacer(flex: 2),
-]);
-}),
-);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppTheme.defaultPadding * 1.5),
+      child: LayoutBuilder(builder: (context, constraints) {
+        if (constraints.maxWidth < 700) {
+          return Column(mainAxisSize: MainAxisSize.min, children: [
+            _buildClassDropdown(),
+            const SizedBox(height: 14),
+            _buildSubjectDropdown(filteredSubjects),
+          ]);
+        }
+        return Row(children: [
+          Expanded(child: _buildClassDropdown()),
+          const SizedBox(width: 14),
+          Expanded(child: _buildSubjectDropdown(filteredSubjects)),
+          const Spacer(flex: 2),
+        ]);
+      }),
+    );
+  }
 
-}
+  Widget _buildClassDropdown() {
+    return StyledDropdownField<int>(
+      label: "Select Class",
+      icon: Iconsax.building,
+      selectedValue: selectedClassId,
+      items: allClasses.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
+      onChanged: (value) {
+        print('🔎 CascadingFilters: Class Changed to $value');
+        onClassChanged(value);
+        onSubjectChanged(null);
+      },
+      onClear: () {
+        print('🔎 CascadingFilters: Class Cleared');
+        onClassChanged(null);
+        onSubjectChanged(null);
+      },
+    );
+  }
 
-Widget _buildClassDropdown() {
-return StyledDropdownField<int>(
-label: "Select Class",
-icon: Iconsax.building,
-selectedValue: selectedClassId,
-items: allClasses.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
-onChanged: (value) {
-print('🔎 CascadingFilters: Class Changed to $value'); // ADDED PRINT
-onClassChanged(value);
-onSubjectChanged(null);
-},
-onClear: () {
-print('🔎 CascadingFilters: Class Cleared'); // ADDED PRINT
-onClassChanged(null);
-onSubjectChanged(null);
-},
-);
-}
-
-Widget _buildSubjectDropdown(List<SubjectModel> subjects) {
-return StyledDropdownField<int>(
-label: "Select Subject",
-icon: Iconsax.book_1,
-selectedValue: selectedSubjectId,
-items: subjects.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
-onChanged: selectedClassId != null ? (value) {
-print('🔎 CascadingFilters: Subject Changed to $value'); // ADDED PRINT
-onSubjectChanged(value);
-} : null,
-onClear: () {
-print('🔎 CascadingFilters: Subject Cleared'); // ADDED PRINT
-onSubjectChanged(null);
-},
-enabled: selectedClassId != null && subjects.isNotEmpty,
-);
-}
+  Widget _buildSubjectDropdown(List<SubjectModel> subjects) {
+    return StyledDropdownField<int>(
+      label: "Select Subject",
+      icon: Iconsax.book_1,
+      selectedValue: selectedSubjectId,
+      items: subjects.map((item) => DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
+      onChanged: selectedClassId != null ? (value) {
+        print('🔎 CascadingFilters: Subject Changed to $value');
+        onSubjectChanged(value);
+      } : null,
+      onClear: () {
+        print('🔎 CascadingFilters: Subject Cleared');
+        onSubjectChanged(null);
+      },
+      // Only enable if class is selected and we have subjects to show
+      enabled: selectedClassId != null && subjects.isNotEmpty,
+    );
+  }
 }
 
 class ViewToggleButton extends StatelessWidget {
@@ -3537,39 +3538,45 @@ void showDetailDialog(BuildContext context, DetailDialogData data) {
 
 
 void showAddClassDialog(BuildContext context) {
-final nameController = TextEditingController();
-final descController = TextEditingController();
-final orderController = TextEditingController();
+  final nameController = TextEditingController();
+  final descController = TextEditingController();
+  final orderController = TextEditingController();
 
-showDialog(
-context: context,
-builder: (context) => AddEditDialog(
-title: "Add New Class",
-icon: Iconsax.building,
-color: Colors.blue,
-onSave: () async {
-await ApiService.manageAcademicModule({
-'table': 'Class_Master',
-'operation': 'ADD',
-'ClassName': nameController.text,
-'ClassDescription': descController.text,
-'DisplayOrder': int.tryParse(orderController.text) ?? 0,
-'SchoolRecNo': 1,
-'CreatedBy': 'Admin',
-});
-if (context.mounted) {
-Navigator.pop(context);
-context.read<AcademicsBloc>().add(LoadClassesEvent(schoolRecNo: 1));
-context.read<AcademicsBloc>().add(LoadKPIEvent());
-}
-},
-fields: [
-DialogField(controller: nameController, label: "Class Name", hint: "e.g., Class 11", icon: Iconsax.edit),
-DialogField(controller: descController, label: "Description", hint: "Class description", icon: Iconsax.document_text, maxLines: 3),
-DialogField(controller: orderController, label: "Display Order", hint: "1", icon: Iconsax.sort, keyboardType: TextInputType.number),
-],
-),
-);
+  // ✅ FIX: Capture the Bloc reference BEFORE showing the dialog
+  final academicsBloc = context.read<AcademicsBloc>();
+
+  showDialog(
+    context: context,
+    builder: (context) => AddEditDialog(
+      title: "Add New Class",
+      icon: Iconsax.building,
+      color: Colors.blue,
+      onSave: () async {
+        await ApiService.manageAcademicModule({
+          'table': 'Class_Master',
+          'operation': 'ADD',
+          'ClassName': nameController.text,
+          'ClassDescription': descController.text,
+          'DisplayOrder': int.tryParse(orderController.text) ?? 0,
+          'SchoolRecNo': 1,
+          'CreatedBy': 'Admin',
+        });
+
+        if (context.mounted) {
+          Navigator.pop(context);
+          // ✅ FIX: Use the captured bloc to trigger the reload
+          print('🔄 Class Added. Triggering reload...');
+          academicsBloc.add(LoadClassesEvent(schoolRecNo: 1));
+          academicsBloc.add(LoadKPIEvent());
+        }
+      },
+      fields: [
+        DialogField(controller: nameController, label: "Class Name", hint: "e.g., Class 11", icon: Iconsax.edit),
+        DialogField(controller: descController, label: "Description", hint: "Class description", icon: Iconsax.document_text, maxLines: 3),
+        DialogField(controller: orderController, label: "Display Order", hint: "1", icon: Iconsax.sort, keyboardType: TextInputType.number),
+      ],
+    ),
+  );
 }
 
 void showEditClassDialog(BuildContext context, ClassModel item) {
@@ -3858,90 +3865,102 @@ void showEditSubjectDialog(
 
 // showAddChapterDialog UPDATED to use StyledDropdownField
 void showAddChapterDialog(BuildContext context, List<ClassModel> allClasses, List<SubjectModel> allSubjects) {
-final nameController = TextEditingController();
-final codeController = TextEditingController();
-final descController = TextEditingController();
-final orderController = TextEditingController();
-int? selectedClassId;
-int? selectedSubjectId;
+  final nameController = TextEditingController();
+  final codeController = TextEditingController();
+  final descController = TextEditingController();
+  final orderController = TextEditingController();
 
-showDialog(
-context: context,
-builder: (context) => StatefulBuilder(
-builder: (context, setState) {
-final filteredSubjects = selectedClassId != null
-? allSubjects.where((s) => s.classId == selectedClassId.toString()).toList()
-    : [];
+  // Local state variables for the StatefulBuilder
+  int? selectedClassId;
+  int? selectedSubjectId;
 
-return AddEditDialog(
-title: "Add New Chapter",
-icon: Iconsax.document_text_1,
-color: Colors.orange,
-onSave: () async {
-if (selectedSubjectId != null) {
-await ApiService.manageAcademicModule({
-'table': 'Chapter_Master',
-'operation': 'ADD',
-'SubjectID': selectedSubjectId,
-'ChapterName': nameController.text,
-'ChapterCode': codeController.text,
-'ChapterDescription': descController.text,
-'ChapterOrder': int.tryParse(orderController.text) ?? 0,
-'CreatedBy': 'Admin',
-});
-if (context.mounted) {
-Navigator.pop(context);
-context.read<AcademicsBloc>().add(LoadChaptersEvent());
-context.read<AcademicsBloc>().add(LoadKPIEvent());
-}
-}
-},
-fields: [
-DialogField(
-controller: null,
-label: "Select Class",
-hint: "Choose a class",
-icon: Iconsax.building,
-customWidget: StyledDropdownField<int>(
-label: "Select Class",
-icon: Iconsax.building,
-selectedValue: selectedClassId,
-items: allClasses.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
-onChanged: (value) => setState(() {
-selectedClassId = value;
-selectedSubjectId = null;
-}),
-onClear: () => setState(() {
-selectedClassId = null;
-selectedSubjectId = null;
-}),
-),
-),
-DialogField(
-controller: null,
-label: "Select Subject",
-hint: "Choose a subject",
-icon: Iconsax.book_1,
-customWidget: StyledDropdownField<int>(
-label: "Select Subject",
-icon: Iconsax.book_1,
-selectedValue: selectedSubjectId,
-items: filteredSubjects.map((s) => DropdownMenuItem(value: int.parse(s.id), child: Text(s.name))).toList(),
-onChanged: filteredSubjects.isNotEmpty ? (value) => setState(() => selectedSubjectId = value) : null,
-onClear: () => setState(() => selectedSubjectId = null),
-enabled: filteredSubjects.isNotEmpty,
-),
-),
-DialogField(controller: nameController, label: "Chapter Name", hint: "e.g., Real Numbers", icon: Iconsax.edit),
-DialogField(controller: codeController, label: "Chapter Code", hint: "e.g., MATH_CH01", icon: Iconsax.code),
-DialogField(controller: descController, label: "Description", hint: "Chapter description", icon: Iconsax.document_text, maxLines: 3),
-DialogField(controller: orderController, label: "Chapter Order", hint: "1", icon: Iconsax.sort, keyboardType: TextInputType.number),
-],
-);
-},
-),
+  // ✅ FIX: Capture Bloc reference
+  final academicsBloc = context.read<AcademicsBloc>();
 
-);
+  showDialog(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) {
+
+        // ✅ FIX: Corrected Logic (Removed .toString() comparison)
+        final filteredSubjects = selectedClassId != null
+            ? allSubjects.where((s) => s.classId == selectedClassId).toList()
+            : <SubjectModel>[];
+
+        return AddEditDialog(
+          title: "Add New Chapter",
+          icon: Iconsax.document_text_1,
+          color: Colors.orange,
+          onSave: () async {
+            if (selectedSubjectId != null) {
+              await ApiService.manageAcademicModule({
+                'table': 'Chapter_Master',
+                'operation': 'ADD',
+                'SubjectID': selectedSubjectId,
+                'ChapterName': nameController.text,
+                'ChapterCode': codeController.text,
+                'ChapterDescription': descController.text,
+                'ChapterOrder': int.tryParse(orderController.text) ?? 0,
+                'CreatedBy': 'Admin',
+              });
+
+              if (context.mounted) {
+                Navigator.pop(context);
+                // ✅ FIX: Use captured bloc
+                academicsBloc.add(LoadChaptersEvent());
+                academicsBloc.add(LoadKPIEvent());
+              }
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a subject")));
+            }
+          },
+          fields: [
+            DialogField(
+              controller: null,
+              label: "Select Class",
+              hint: "Choose a class",
+              icon: Iconsax.building,
+              customWidget: StyledDropdownField<int>(
+                label: "Select Class",
+                icon: Iconsax.building,
+                selectedValue: selectedClassId,
+                items: allClasses.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+                onChanged: (value) => setState(() {
+                  selectedClassId = value;
+                  selectedSubjectId = null;
+                }),
+                onClear: () => setState(() {
+                  selectedClassId = null;
+                  selectedSubjectId = null;
+                }),
+              ),
+            ),
+            DialogField(
+              controller: null,
+              label: "Select Subject",
+              hint: "Choose a subject",
+              icon: Iconsax.book_1,
+              customWidget: StyledDropdownField<int>(
+                label: "Select Subject",
+                icon: Iconsax.book_1,
+                selectedValue: selectedSubjectId,
+                items: filteredSubjects.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
+                onChanged: filteredSubjects.isNotEmpty
+                    ? (value) => setState(() => selectedSubjectId = value)
+                    : null,
+                onClear: () => setState(() => selectedSubjectId = null),
+                enabled: filteredSubjects.isNotEmpty,
+              ),
+            ),
+            DialogField(controller: nameController, label: "Chapter Name", hint: "e.g., Real Numbers", icon: Iconsax.edit),
+            DialogField(controller: codeController, label: "Chapter Code", hint: "e.g., MATH_CH01", icon: Iconsax.code),
+            DialogField(controller: descController, label: "Description", hint: "Chapter description", icon: Iconsax.document_text, maxLines: 3),
+            DialogField(controller: orderController, label: "Chapter Order", hint: "1", icon: Iconsax.sort, keyboardType: TextInputType.number),
+          ],
+        );
+      },
+    ),
+  );
 }
 
 void showEditChapterDialog(BuildContext context, ChapterModel item, List<SubjectModel> allSubjects) {

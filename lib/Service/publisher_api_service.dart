@@ -6,8 +6,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:lms_publisher/AdminScreen/AdminPublish/publish_model.dart';
 import 'package:lms_publisher/Service/user_right_service.dart';
 
-
-
 // Helper function to safely parse a value to an integer.
 int _parseInt(dynamic value, {int defaultValue = 0}) {
   if (value == null) return defaultValue;
@@ -43,7 +41,7 @@ class PublisherApiService {
       );
 
       print('✅ [ApiService] Received Response | Status: ${response.statusCode}');
-      print('📄 [ApiService] Raw Response Body: ${response.body}');
+      // print('📄 [ApiService] Raw Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
@@ -73,13 +71,20 @@ class PublisherApiService {
       );
 
       print("✅ getUserGroups response: ${response.statusCode}");
-      print("📦 Response body: ${response.body}");
+      // print("📦 Response body: ${response.body}");
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
         if (data['success'] == true && data['data'] != null) {
-          final List groups = data['data']['resultSet_0'];
-          return groups.map((json) => UserGroup.fromJson(json)).toList();
+          final dynamic innerData = data['data'];
+
+          // FIX: Handle case where resultSet_0 might not exist or data is a list
+          if (innerData is Map<String, dynamic> && innerData.containsKey('resultSet_0')) {
+            final List groups = innerData['resultSet_0'];
+            return groups.map((json) => UserGroup.fromJson(json)).toList();
+          } else if (innerData is List) {
+            return [];
+          }
         }
         throw Exception(data['details'] ?? 'Invalid response format');
       }
@@ -93,35 +98,70 @@ class PublisherApiService {
   Future<AdminKPIs> getAdminKPIs() async {
     print('[ApiService] Fetching Admin KPIs...');
     final response = await _postRequest("StateMaster.php", {"action": "AdminKPI"});
-    if (response['success'] == true && response['data'] != null) {
-      print('[ApiService] Admin KPIs data received. Parsing...');
-      return AdminKPIs.fromJson(response['data']);
-    } else {
-      throw Exception('Failed to load KPIs');
+
+    if (response['success'] == true) {
+      final dynamic data = response['data'];
+
+      // FIX: Handle case where API returns empty List [] instead of Map
+      if (data is List && data.isEmpty) {
+        return AdminKPIs(subjectCount: 0, materialCount: 0, schoolCount: 0, publisherCount: 0);
+      }
+
+      if (data is Map<String, dynamic>) {
+        print('[ApiService] Admin KPIs data received. Parsing...');
+        return AdminKPIs.fromJson(data);
+      }
     }
+
+    throw Exception('Failed to load KPIs');
   }
 
   Future<List<Publisher>> getAllPublishers() async {
     print('[ApiService] Fetching all publishers...');
     final response = await _postRequest("AdminPublish.php", {"Operation": "GET_ALL"});
-    if (response['success'] == true && response['data']['resultSet_0'] != null) {
-      final List<dynamic> data = response['data']['resultSet_0'];
-      print('[ApiService] All publishers data received (${data.length} items). Parsing...');
-      return data.map((json) => Publisher.fromJson(json)).toList();
-    } else {
-      return [];
+
+    if (response['success'] == true) {
+      final dynamic data = response['data'];
+
+      // FIX: Handle case where API returns empty List [] (No records)
+      if (data is List) {
+        print('[ApiService] Received empty list. No publishers found.');
+        return [];
+      }
+
+      // Handle standard Map response with resultSet_0
+      if (data is Map<String, dynamic> && data['resultSet_0'] != null) {
+        final List<dynamic> listData = data['resultSet_0'];
+        print('[ApiService] All publishers data received (${listData.length} items). Parsing...');
+        return listData.map((json) => Publisher.fromJson(json)).toList();
+      }
     }
+
+    return [];
   }
 
   Future<PublisherDetail> getPublisherDetails(int recNo) async {
     print('[ApiService] Fetching details for publisher RecNo: $recNo...');
     final response = await _postRequest("AdminPublish.php", {"Operation": "GET_DETAIL_BY_ID", "RecNo": recNo});
-    if (response['success'] == true && response['data']['resultSet_0'] != null) {
-      print('[ApiService] Publisher details data received. Parsing...');
-      return PublisherDetail.fromJson(response['data']['resultSet_0'][0]);
-    } else {
-      throw Exception('Failed to load publisher details');
+
+    if (response['success'] == true) {
+      final dynamic data = response['data'];
+
+      // FIX: Handle empty list edge case
+      if (data is List) {
+        throw Exception('Publisher not found (Empty Data)');
+      }
+
+      if (data is Map<String, dynamic> && data['resultSet_0'] != null) {
+        final List list = data['resultSet_0'];
+        if (list.isNotEmpty) {
+          print('[ApiService] Publisher details data received. Parsing...');
+          return PublisherDetail.fromJson(list[0]);
+        }
+      }
     }
+
+    throw Exception('Failed to load publisher details');
   }
 
   Future<Map<String, dynamic>> addPublisher(Map<String, dynamic> data) async {
@@ -175,8 +215,6 @@ class PublisherApiService {
     return response['success'];
   }
 
-  // --- FIX APPLIED TO THE NEXT 4 METHODS ---
-
   Future<List<dynamic>> getStates() async {
     print('[ApiService] Fetching states...');
     final response = await _postRequest("StateMaster.php", {"action": "getStates"});
@@ -222,12 +260,26 @@ class PublisherApiService {
       "PubCode": pubCode
     });
 
-    if (response['success'] == true && response['data']['resultSet_0'] != null) {
-      print('[ApiService] Credentials data received.');
-      return response['data']['resultSet_0'][0];
-    } else {
-      throw Exception('Failed to load credentials');
+    if (response['success'] == true) {
+      final dynamic data = response['data'];
+
+      // FIX: Handle empty list edge case
+      if (data is List) {
+        // Return default/empty credentials or throw depending on UI needs.
+        // Throwing lets the UI show "No credentials found"
+        throw Exception('No credentials found for this publisher');
+      }
+
+      if (data is Map<String, dynamic> && data['resultSet_0'] != null) {
+        final List list = data['resultSet_0'];
+        if (list.isNotEmpty) {
+          print('[ApiService] Credentials data received.');
+          return list[0];
+        }
+      }
     }
+
+    throw Exception('Failed to load credentials');
   }
 
   // NEW METHOD - Update user credentials
@@ -244,8 +296,6 @@ class PublisherApiService {
     return response['success'] ?? false;
   }
 
-
-
   Future<List<dynamic>> getPaymentTerms() async {
     print('[ApiService] Fetching payment terms...');
     final response = await _postRequest("StateMaster.php", {"action": "getPaymentTerms"});
@@ -257,6 +307,7 @@ class PublisherApiService {
     }
     return [];
   }
+
   Future<bool> activatePublisher(int recNo) async {
     print('[ApiService] Activating publisher RecNo: $recNo...');
     final response = await _postRequest("AdminPublish.php", {
@@ -296,7 +347,7 @@ class PublisherApiService {
 
       stopwatch.stop();
       print("✅ [uploadLogo] Received response. Status: ${response.statusCode} in ${stopwatch.elapsedMilliseconds}ms");
-      print("📦 [uploadLogo] Response Body: ${response.body}");
+      // print("📦 [uploadLogo] Response Body: ${response.body}");
 
       if (response.statusCode == 200) {
         final responseBody = json.decode(response.body);

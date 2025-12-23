@@ -3,13 +3,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/Service/Subscription_service.dart';
 import 'package:lms_publisher/screens/SubscriptionScreen/subscription_model.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'dart:ui';
 
+import 'package:provider/provider.dart';
+
 class AddEditPlanDialog extends StatefulWidget {
-  // **MODIFICATION**: Accept an optional plan object for editing.
   final Plan? plan;
 
   const AddEditPlanDialog({super.key, this.plan});
@@ -25,7 +27,6 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
   bool _isLoading = false;
   late TabController _tabController;
 
-  // **MODIFICATION**: Add a getter to easily check if we are in edit mode.
   bool get _isEditing => widget.plan != null;
 
   // Form controllers
@@ -56,13 +57,18 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
 
-    // **MODIFICATION**: If editing, populate the form fields with plan data.
+    // 🔥 Wizard Logic: Listen to tab changes to update the button text/icon
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() {});
+      }
+    });
+
     if (_isEditing) {
       _populateFieldsForEdit();
     }
   }
 
-  // **MODIFICATION**: New method to populate all fields from the plan object.
   void _populateFieldsForEdit() {
     final plan = widget.plan!;
     _nameController.text = plan.name;
@@ -76,7 +82,7 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
     _selectedBillingCycle = plan.billingCycle;
 
     // Assuming features are stored as a list of strings in the Plan model.
-    // This part needs to be adapted based on your actual Plan model structure.
+    // Ensure your Plan model has a 'features' list or adapt this logic.
     _isRecordedLectures = plan.features.contains('Recorded Lectures');
     _isAssignmentsTests = plan.features.contains('Assignments & Tests');
     _isDownloadableResources = plan.features.contains('Downloadable Resources');
@@ -105,7 +111,16 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      // **MODIFICATION**: Construct the payload based on form fields.
+      // 1. Get PubCode
+      int pubCode = 0;
+      try {
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        pubCode = int.tryParse(userProvider.userCode ?? '0') ?? 0;
+        print("✅ Retrieved PubCode from Provider: $pubCode");
+      } catch (e) {
+        print("⚠️ Could not fetch PubCode from provider: $e");
+      }
+
       Map<String, dynamic> body;
 
       if (_isEditing) {
@@ -115,8 +130,8 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
           "Subscription_ID": widget.plan!.subscriptionId,
           "Subscription_Name": _nameController.text,
           "Description": _descController.text,
-          "Plan_Type": "Annual", // You may want to make this dynamic
-          "Currency": "USD", // You may want to make this dynamic
+          "Plan_Type": "Annual",
+          "Currency": "INR", // 🔥 Fix: Changed to INR
           "Price": double.tryParse(_priceController.text) ?? 0,
           "Billing_Cycle": _selectedBillingCycle,
           "Discount_Percent": int.tryParse(_discountController.text) ?? 0,
@@ -128,13 +143,13 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
           "Is_Downloadable_Resources": _isDownloadableResources ? 1 : 0,
           "Is_Discussion_Forum": _isDiscussionForum ? 1 : 0,
           "Support_Type": _supportController.text,
-          "Start_Date": "2025-10-01", // You may want to make this dynamic
-          "End_Date": "2026-09-30", // You may want to make this dynamic
+          "Start_Date": "2025-10-01", // Ideally make dynamic
+          "End_Date": "2026-09-30",   // Ideally make dynamic
           "Is_Auto_Renewal": _isAutoRenewal ? 1 : 0,
           "Is_Status": _isActive ? 1 : 0,
           "Modified_By": "Admin",
-          "Payment_Gateway_Ref": "PG123", // You may want to make this dynamic
-          "Tax_Percent": 18, // You may want to make this dynamic
+          "Payment_Gateway_Ref": "PG123",
+          "Tax_Percent": 18,
           "IsPopular": _isPopular ? 1 : 0,
         };
       } else {
@@ -143,8 +158,8 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
           "Subscription_ID": (DateTime.now().millisecondsSinceEpoch ~/ 1000),
           "Subscription_Name": _nameController.text,
           "Description": _descController.text,
-          "Plan_Type": "Annual", // You may want to make this dynamic
-          "Currency": "USD", // You may want to make this dynamic
+          "Plan_Type": "Annual",
+          "Currency": "INR", // 🔥 Fix: Changed to INR
           "Price": double.tryParse(_priceController.text) ?? 0,
           "Billing_Cycle": _selectedBillingCycle,
           "Discount_Percent": int.tryParse(_discountController.text) ?? 0,
@@ -156,25 +171,24 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
           "Is_Downloadable_Resources": _isDownloadableResources ? 1 : 0,
           "Is_Discussion_Forum": _isDiscussionForum ? 1 : 0,
           "Support_Type": _supportController.text,
-          "Start_Date": "2025-10-01", // You may want to make this dynamic
-          "End_Date": "2026-09-30", // You may want to make this dynamic
+          "Start_Date": "2025-10-01",
+          "End_Date": "2026-09-30",
           "Is_Auto_Renewal": _isAutoRenewal ? 1 : 0,
           "Is_Status": _isActive ? 1 : 0,
           "Created_By": "Admin",
           "Modified_By": "Admin",
-          "Payment_Gateway_Ref": "PG123", // You may want to make this dynamic
-          "Tax_Percent": 18, // You may want to make this dynamic
+          "Payment_Gateway_Ref": "PG123",
+          "Tax_Percent": 18,
           "IsPopular": _isPopular ? 1 : 0,
         };
       }
 
       bool success = false;
       try {
-        // **MODIFICATION**: Call the appropriate API service method.
         if (_isEditing) {
-          success = await _apiService.updatePlan(body);
+          success = await _apiService.updatePlan(body, pubCode);
         } else {
-          success = await _apiService.addPlan(body);
+          success = await _apiService.addPlan(body, pubCode);
         }
 
         if (mounted) {
@@ -249,7 +263,7 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
                 _buildHeader(isMobile),
                 _buildTabBar(isMobile),
                 Expanded(child: _buildTabBarView()),
-                _buildFooter(),
+                _buildFooter(), // 🔥 Updated Footer
               ],
             ),
           ),
@@ -279,7 +293,6 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            // **MODIFICATION**: Change icon based on mode.
             child: Icon(
               _isEditing ? Iconsax.edit : Iconsax.add_circle,
               color: Colors.white,
@@ -292,7 +305,6 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  // **MODIFICATION**: Change title based on mode.
                   _isEditing ? 'Edit Plan' : 'Create New Plan',
                   style: GoogleFonts.poppins(
                     fontSize: isMobile ? 18 : 24,
@@ -714,7 +726,11 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
     );
   }
 
+  // 🔥 Wizard Footer Implementation
   Widget _buildFooter() {
+    // Check if we are on the last tab (Settings tab is index 3)
+    bool isLastTab = _tabController.index == 3;
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -728,7 +744,11 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                Navigator.of(context).pop();
+              },
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 side: BorderSide(color: AppTheme.borderGrey),
@@ -749,7 +769,16 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
           Expanded(
             flex: 2,
             child: ElevatedButton.icon(
-              onPressed: _isLoading ? null : _submitForm,
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                if (isLastTab) {
+                  _submitForm();
+                } else {
+                  // Move to next tab
+                  _tabController.animateTo(_tabController.index + 1);
+                }
+              },
               icon: _isLoading
                   ? const SizedBox(
                 width: 20,
@@ -759,14 +788,17 @@ class _AddEditPlanDialogState extends State<AddEditPlanDialog>
                   color: Colors.white,
                 ),
               )
-              // **MODIFICATION**: Change icon based on mode.
-                  : Icon(_isEditing ? Iconsax.edit : Iconsax.add_circle,
+                  : Icon(
+                  isLastTab
+                      ? (_isEditing ? Iconsax.edit : Iconsax.tick_circle)
+                      : Iconsax.arrow_right_1,
                   size: 20),
               label: Text(
-                // **MODIFICATION**: Change button text based on mode and loading state.
                 _isLoading
                     ? 'Saving...'
-                    : (_isEditing ? 'Update Plan' : 'Create Plan'),
+                    : (isLastTab
+                    ? (_isEditing ? 'Update Plan' : 'Create Plan')
+                    : 'Next Step'),
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(

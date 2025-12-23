@@ -38,7 +38,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   final UserRightsService _userRightsService = UserRightsService();
   final ImagePicker _picker = ImagePicker();
   bool get _isEditMode => widget.schoolId != null;
-  final String _logoBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
+  final String _logoBaseUrl =
+      "https://storage.googleapis.com/upload-images-34/images/LMS/";
   String? _originalCreatedBy;
   int? _schoolRecNo;
 
@@ -85,6 +86,19 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   FeeStructure? _selectedFeeStructure;
   XFile? _logoFile;
   String? _existingLogoPath;
+
+  // --- Subscription Logic Variables ---
+  String _selectedValidity = 'Yearly';
+  final List<String> _validityOptions = [
+    'Weekly',
+    'Monthly',
+    'Half-Yearly',
+    'Yearly',
+    'Multi-Year',
+    'Custom Date'
+  ];
+  final TextEditingController _yearsController = TextEditingController(text: '2');
+  DateTime _calculatedEndDate = DateTime.now().add(const Duration(days: 365));
 
   // --- Form Data & Controllers ---
   DateTime _startDate = DateTime.now();
@@ -136,13 +150,16 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     super.initState();
     _tabController = TabController(length: _isEditMode ? 4 : 5, vsync: this);
     _tabController.addListener(_onTabChanged);
-    _controllers['establishmentDate']!.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    _controllers['establishmentDate']!.text =
+        DateFormat('yyyy-MM-dd').format(DateTime.now());
+    _calculateEndDate(); // Init end date
     _fetchAllInitialData().then((_) {
       if (_isEditMode) {
         _fetchAndPopulateSchoolDetails();
       } else {
         setState(() => _isLoading = false);
-        _paymentRefController.text = "PAY-${DateTime.now().millisecondsSinceEpoch}";
+        _paymentRefController.text =
+        "PAY-${DateTime.now().millisecondsSinceEpoch}";
       }
     });
   }
@@ -158,12 +175,12 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     super.dispose();
   }
 
-  // NEW: Tab change listener to validate completion
   void _onTabChanged() {
     _validateCurrentTab();
+    // Force rebuild to update mobile header
+    if (mounted) setState(() {});
   }
 
-  // NEW: Validate current tab completion
   void _validateCurrentTab() {
     bool isCompleted = false;
     final currentIndex = _tabController.index;
@@ -205,12 +222,43 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     });
   }
 
-  // NEW: Verify UserID
+  // Calculate End Date based on Validity
+// Calculate End Date based on Validity
+  void _calculateEndDate() {
+    if (_selectedValidity == 'Custom Date') return; // Do nothing for custom, user picks date manually
+
+    DateTime newEndDate;
+    switch (_selectedValidity) {
+      case 'Weekly':
+        newEndDate = _startDate.add(const Duration(days: 7));
+        break;
+      case 'Monthly':
+        newEndDate = DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
+        break;
+      case 'Half-Yearly':
+        newEndDate = DateTime(_startDate.year, _startDate.month + 6, _startDate.day);
+        break;
+      case 'Yearly':
+        newEndDate = DateTime(_startDate.year + 1, _startDate.month, _startDate.day);
+        break;
+      case 'Multi-Year':
+      // NEW: Calculate based on input years
+        int years = int.tryParse(_yearsController.text) ?? 1;
+        newEndDate = DateTime(_startDate.year + years, _startDate.month, _startDate.day);
+        break;
+      default:
+        newEndDate = _startDate;
+    }
+    setState(() {
+      _calculatedEndDate = newEndDate;
+    });
+  }
+
   Future<void> _verifyUserId() async {
     if (_userIdController.text.isEmpty) {
       CustomSnackbar.showError(
         context,
-           'Please enter a User ID first',
+        'Please enter a User ID first',
       );
       return;
     }
@@ -218,7 +266,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     setState(() => _isVerifyingUserId = true);
 
     try {
-      final exists = await _userRightsService.checkUserIdExists(_userIdController.text);
+      final exists =
+      await _userRightsService.checkUserIdExists(_userIdController.text);
 
       setState(() {
         _isVerifyingUserId = false;
@@ -228,12 +277,12 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
       if (exists) {
         CustomSnackbar.showError(
           context,
-             'User ID already exists. Please choose a different one.',
+          'User ID already exists. Please choose a different one.',
         );
       } else {
         CustomSnackbar.showSuccess(
           context,
-             'User ID is available!',
+          'User ID is available!',
         );
       }
       _validateCurrentTab();
@@ -241,14 +290,14 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
       setState(() => _isVerifyingUserId = false);
       CustomSnackbar.showError(
         context,
-           'Error verifying User ID: $e',
+        'Error verifying User ID: $e',
       );
     }
   }
 
-  // NEW: Progress indicator widget
   Widget buildProgressIndicator() {
-    final completedCount = _tabsCompleted.values.where((completed) => completed).length;
+    final completedCount =
+        _tabsCompleted.values.where((completed) => completed).length;
     final totalTabs = _isEditMode ? kTotalTabs : kTotalTabsAdd;
     final progress = completedCount / totalTabs;
     final percentage = (progress * 100).toInt();
@@ -306,14 +355,15 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
       }
     } catch (e) {
       if (mounted) {
-        CustomSnackbar.showError(context,    'Failed to load initial data: $e');
+        CustomSnackbar.showError(context, 'Failed to load initial data: $e');
       }
     }
   }
 
   Future<void> _fetchAndPopulateSchoolDetails() async {
     try {
-      final school = await _apiService.fetchSchoolDetails(schoolId: widget.schoolId!);
+      final school =
+      await _apiService.fetchSchoolDetails(schoolId: widget.schoolId!);
       if (mounted) {
         _originalCreatedBy = school.createdBy;
         _schoolRecNo = int.tryParse(school.recNo ?? '0');
@@ -322,7 +372,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
         _controllers['schoolCode']!.text = school.code ?? '';
         _controllers['schoolShortName']!.text = school.shortName ?? '';
         _controllers['affiliationNo']!.text = school.affiliationNo ?? '';
-        _controllers['establishmentDate']!.text = school.establishmentDate ?? '';
+        _controllers['establishmentDate']!.text =
+            school.establishmentDate ?? '';
         _controllers['addressLine1']!.text = school.address1 ?? '';
         _controllers['addressLine2']!.text = school.address2 ?? '';
         _controllers['pinCode']!.text = school.pincode ?? '';
@@ -334,15 +385,19 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
         _controllers['principalContact']!.text = school.principalContact ?? '';
         _controllers['chairmanName']!.text = school.chairmanName ?? '';
         _controllers['branchCount']!.text = school.branchCount ?? '1';
-        _controllers['parentOrganization']!.text = school.parentOrganization ?? '';
+        _controllers['parentOrganization']!.text =
+            school.parentOrganization ?? '';
         _controllers['classesOffered']!.text = school.classesOffered ?? '';
-        _controllers['sectionsPerClass']!.text = school.sectionsPerClass ?? '0';
+        _controllers['sectionsPerClass']!.text =
+            school.sectionsPerClass ?? '0';
         _controllers['studentCapacity']!.text = school.studentCapacity ?? '0';
-        _controllers['currentEnrollment']!.text = school.currentEnrollment ?? '0';
+        _controllers['currentEnrollment']!.text =
+            school.currentEnrollment ?? '0';
         _controllers['teacherStrength']!.text = school.teacherStrength ?? '0';
         _controllers['panNumber']!.text = school.pan ?? '';
         _controllers['gstNumber']!.text = school.gst ?? '';
-        _controllers['bankAccountDetails']!.text = school.bankAccountDetails ?? '';
+        _controllers['bankAccountDetails']!.text =
+            school.bankAccountDetails ?? '';
         _existingLogoPath = school.logoPath;
 
         _facilitySwitches['isHostel'] = school.isHostel ?? false;
@@ -353,25 +408,65 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
         _facilitySwitches['isAuditorium'] = school.isAuditorium ?? false;
         _scholarshipsGrants = school.scholarshipsGrants?.toLowerCase() == 'yes';
 
-        try { _selectedBoardAffiliation = _boardAffiliations.firstWhere((b) => b['id'] == school.board); } catch (e) { _selectedBoardAffiliation = null; }
-        try { _selectedSchoolType = _schoolTypes.firstWhere((st) => st['id'] == school.schoolType); } catch (e) { _selectedSchoolType = null; }
-        try { _selectedMediumInstruction = _mediumInstructions.firstWhere((m) => m['id'] == school.medium); } catch (e) { _selectedMediumInstruction = null; }
-        try { _selectedManagementType = _managementTypes.firstWhere((m) => m['id'] == school.managementType); } catch (e) { _selectedManagementType = null; }
+        try {
+          _selectedBoardAffiliation =
+              _boardAffiliations.firstWhere((b) => b['id'] == school.board);
+        } catch (e) {
+          _selectedBoardAffiliation = null;
+        }
+        try {
+          _selectedSchoolType =
+              _schoolTypes.firstWhere((st) => st['id'] == school.schoolType);
+        } catch (e) {
+          _selectedSchoolType = null;
+        }
+        try {
+          _selectedMediumInstruction = _mediumInstructions
+              .firstWhere((m) => m['id'] == school.medium);
+        } catch (e) {
+          _selectedMediumInstruction = null;
+        }
+        try {
+          _selectedManagementType = _managementTypes
+              .firstWhere((m) => m['id'] == school.managementType);
+        } catch (e) {
+          _selectedManagementType = null;
+        }
 
         if (school.feeStructureRef != null) {
-          try { _selectedFeeStructure = _feeStructures.firstWhere((fs) => fs.id == school.feeStructureRef); } catch (e) { _selectedFeeStructure = null; }
+          try {
+            _selectedFeeStructure = _feeStructures
+                .firstWhere((fs) => fs.id == school.feeStructureRef);
+          } catch (e) {
+            _selectedFeeStructure = null;
+          }
         }
 
         if (school.stateId != null) {
-          try { _selectedState = _states.firstWhere((s) => s.id == school.stateId); } catch (e) { _selectedState = null; }
+          try {
+            _selectedState =
+                _states.firstWhere((s) => s.id == school.stateId);
+          } catch (e) {
+            _selectedState = null;
+          }
           if (_selectedState != null) {
             await _fetchDistricts(_selectedState!.id);
             if (school.districtId != null) {
-              try { _selectedDistrict = _districts.firstWhere((d) => d.id == school.districtId); } catch (e) { _selectedDistrict = null; }
+              try {
+                _selectedDistrict =
+                    _districts.firstWhere((d) => d.id == school.districtId);
+              } catch (e) {
+                _selectedDistrict = null;
+              }
               if (_selectedDistrict != null) {
                 await _fetchCities(_selectedDistrict!.id);
                 if (school.cityId != null) {
-                  try { _selectedCity = _cities.firstWhere((c) => c.id == school.cityId); } catch (e) { _selectedCity = null; }
+                  try {
+                    _selectedCity =
+                        _cities.firstWhere((c) => c.id == school.cityId);
+                  } catch (e) {
+                    _selectedCity = null;
+                  }
                 }
               }
             }
@@ -381,13 +476,21 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
         _paymentRefController.text = school.paymentRefId ?? '';
         _isAutoRenewal = school.isAutoRenewal ?? true;
         if (school.startDate != null) _startDate = school.startDate!;
+
+        if (school.endDate != null) _calculatedEndDate = school.endDate!;
+
         if (school.subscription != null) {
-          try { _selectedSubscription = _subscriptionPlans.firstWhere((p) => p.name == school.subscription); } catch (e) { _selectedSubscription = null; }
+          try {
+            _selectedSubscription = _subscriptionPlans
+                .firstWhere((p) => p.name == school.subscription);
+          } catch (e) {
+            _selectedSubscription = null;
+          }
         }
       }
     } catch (e) {
       if (mounted) {
-        CustomSnackbar.showError(context,    'Failed to load school details: $e');
+        CustomSnackbar.showError(context, 'Failed to load school details: $e');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -441,7 +544,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
   }
 
   Future<void> _pickLogo() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    final XFile? image =
+    await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
     if (image != null) setState(() => _logoFile = image);
   }
 
@@ -464,7 +568,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
         if (!_isEditMode) {
           if (!_isUserIdVerified) {
             OverlayLoader.hide();
-            CustomSnackbar.showError(context,    'Please verify the User ID before submitting');
+            CustomSnackbar.showError(
+                context, 'Please verify the User ID before submitting');
             setState(() => _isSaving = false);
             return;
           }
@@ -472,7 +577,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           final userGroups = await _userRightsService.getUserGroups();
           final schoolGroup = userGroups.firstWhere(
                 (group) => group.userGroupName.toLowerCase().contains('school'),
-            orElse: () => throw Exception('School user group not found in system'),
+            orElse: () =>
+            throw Exception('School user group not found in system'),
           );
 
           final insertUserResponse = await _userRightsService.insertUser({
@@ -488,7 +594,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           if (insertUserResponse['success'] == true &&
               insertUserResponse['data'] != null &&
               insertUserResponse['data']['UserCode'] != null) {
-            returnedUserCode = insertUserResponse['data']['UserCode'].toString();
+            returnedUserCode =
+                insertUserResponse['data']['UserCode'].toString();
           } else {
             throw Exception('Failed to create user credentials');
           }
@@ -522,10 +629,14 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           "Branch_Count": int.tryParse(_controllers['branchCount']!.text) ?? 1,
           "Parent_Organization": _controllers['parentOrganization']!.text,
           "Classes_Offered": _controllers['classesOffered']!.text,
-          "Sections_Per_Class": int.tryParse(_controllers['sectionsPerClass']!.text) ?? 0,
-          "Student_Capacity": int.tryParse(_controllers['studentCapacity']!.text) ?? 0,
-          "Current_Enrollment": int.tryParse(_controllers['currentEnrollment']!.text) ?? 0,
-          "Teacher_Strength": int.tryParse(_controllers['teacherStrength']!.text) ?? 0,
+          "Sections_Per_Class":
+          int.tryParse(_controllers['sectionsPerClass']!.text) ?? 0,
+          "Student_Capacity":
+          int.tryParse(_controllers['studentCapacity']!.text) ?? 0,
+          "Current_Enrollment":
+          int.tryParse(_controllers['currentEnrollment']!.text) ?? 0,
+          "Teacher_Strength":
+          int.tryParse(_controllers['teacherStrength']!.text) ?? 0,
           "IsHostel": _facilitySwitches['isHostel'],
           "IsTransport": _facilitySwitches['isTransport'],
           "IsLibrary": _facilitySwitches['isLibrary'],
@@ -544,27 +655,11 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           schoolMasterData['Logo_Path'] = _existingLogoPath;
         }
 
-        // Step 3: Calculate subscription end date
-        DateTime endDate;
-        switch (_selectedSubscription?.planType) {
-          case 'Weekly':
-            endDate = _startDate.add(const Duration(days: 7));
-            break;
-          case 'Monthly':
-            endDate = DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
-            break;
-          case 'Yearly':
-            endDate = DateTime(_startDate.year + 1, _startDate.month, _startDate.day);
-            break;
-          default:
-            endDate = _startDate;
-        }
-
         final subscriptionData = {
           "Subscription_ID": _selectedSubscription?.id,
           "Purchase_Date": DateFormat('yyyy-MM-dd').format(DateTime.now()),
           "Start_Date": DateFormat('yyyy-MM-dd').format(_startDate),
-          "End_Date": DateFormat('yyyy-MM-dd').format(endDate),
+          "End_Date": DateFormat('yyyy-MM-dd').format(_calculatedEndDate),
           "Payment_Ref_ID": _paymentRefController.text,
           "Is_Auto_Renewal": _isAutoRenewal,
           "Subscription_Status": "Active",
@@ -573,7 +668,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
         // Step 4: Trigger BLoC event
         if (_isEditMode) {
           if (_schoolRecNo == null || _schoolRecNo == 0) {
-            throw Exception('Cannot update: Missing RecNo. Please reload the school details.');
+            throw Exception(
+                'Cannot update: Missing RecNo. Please reload the school details.');
           }
 
           context.read<AddEditSchoolBloc>().add(UpdateSchool(
@@ -597,7 +693,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
       } catch (e) {
         setState(() => _isSaving = false);
         OverlayLoader.hide();
-        CustomSnackbar.showError(context,    'Error: ${e.toString()}');
+        CustomSnackbar.showError(context, 'Error: ${e.toString()}');
       }
     }
   }
@@ -677,16 +773,19 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
                       ),
                     )
                         : Icon(
-                      _isUserIdVerified ? Iconsax.tick_circle : Iconsax.verify,
+                      _isUserIdVerified
+                          ? Iconsax.tick_circle
+                          : Iconsax.verify,
                       size: 18,
                     ),
                     label: Text(_isUserIdVerified ? 'Verified' : 'Verify'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _isUserIdVerified
                           ? AppTheme.primaryGreen
-                          : AppTheme.accentGreen, // FIXED: Use accentGreen instead of primaryBlue
+                          : AppTheme.accentGreen,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -718,18 +817,21 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
               decoration: BoxDecoration(
                 color: AppTheme.primaryGreen.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)),
+                border:
+                Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)),
               ),
               child: Row(
                 children: [
-                  const Icon(Iconsax.info_circle, size: 16, color: AppTheme.primaryGreen),
+                  const Icon(Iconsax.info_circle,
+                      size: 16, color: AppTheme.primaryGreen),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _isUserIdVerified
                           ? 'User ID verified! You can now set the password.'
                           : 'Please verify the User ID before setting a password.',
-                      style: GoogleFonts.inter(fontSize: 12, color: AppTheme.darkText),
+                      style: GoogleFonts.inter(
+                          fontSize: 12, color: AppTheme.darkText),
                     ),
                   ),
                 ],
@@ -750,7 +852,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           OverlayLoader.hide();
           CustomSnackbar.showSuccess(
             context,
-               _isEditMode
+            _isEditMode
                 ? 'School updated successfully!'
                 : 'School added successfully! ID: ${state.successResponse['School_ID']}',
           );
@@ -760,7 +862,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           OverlayLoader.hide();
           CustomSnackbar.showError(
             context,
-               _isEditMode
+            _isEditMode
                 ? 'Failed to update school: ${state.error}'
                 : 'Failed to add school: ${state.error}',
           );
@@ -768,86 +870,206 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           setState(() => _isSaving = true);
         }
       },
-      child: Scaffold(
+      child: LayoutBuilder(builder: (context, constraints) {
+        // RESPONSIVE LOGIC: Use different layouts based on width
+        if (constraints.maxWidth < 600) {
+          return _buildMobileLayout();
+        } else {
+          return _buildDesktopLayout();
+        }
+      }),
+    );
+  }
+
+  // --- Layout 1: Desktop/Tablet (Original TabBar approach) ---
+  Widget _buildDesktopLayout() {
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
         backgroundColor: AppTheme.background,
-        appBar: AppBar(
-          backgroundColor: AppTheme.background,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Iconsax.arrow_left_2, color: AppTheme.darkText),
-            onPressed: () => Navigator.of(context).pop(),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Iconsax.arrow_left_2, color: AppTheme.darkText),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          _isEditMode ? 'Edit School Details' : 'Register New School',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.darkText,
+            fontSize: 22,
           ),
-          title: Text(
-            _isEditMode ? 'Edit School Details' : 'Register New School',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.bold,
-              color: AppTheme.darkText,
-              fontSize: 22,
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: buildProgressIndicator(),
             ),
           ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: buildProgressIndicator(),
-              ),
-            ),
-          ],
-          bottom: TabBar(
-            controller: _tabController,
-            isScrollable: false,
-            indicatorColor: AppTheme.primaryGreen,
-            labelColor: AppTheme.primaryGreen,
-            unselectedLabelColor: AppTheme.bodyText,
-            labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold),
-            unselectedLabelStyle: GoogleFonts.inter(),
-            tabs: [
-              _buildTabWithCompletionIcon(
-                icon: Iconsax.buildings,
-                text: 'Basic Info',
-                isCompleted: _tabsCompleted[0] ?? false,
-              ),
-              _buildTabWithCompletionIcon(
-                icon: Iconsax.location,
-                text: 'Location',
-                isCompleted: _tabsCompleted[1] ?? false,
-              ),
-              _buildTabWithCompletionIcon(
-                icon: Iconsax.book,
-                text: 'Details',
-                isCompleted: _tabsCompleted[2] ?? false,
-              ),
-              if (!_isEditMode)
-                _buildTabWithCompletionIcon(
-                  icon: Iconsax.lock,
-                  text: 'Credentials',
-                  isCompleted: _tabsCompleted[3] ?? false,
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          isScrollable: false,
+          indicatorColor: AppTheme.primaryGreen,
+          labelColor: AppTheme.primaryGreen,
+          unselectedLabelColor: AppTheme.bodyText,
+          labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold),
+          unselectedLabelStyle: GoogleFonts.inter(),
+          tabs: _buildTabsList(),
+        ),
+      ),
+      body: _buildBodyContent(),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  // --- Layout 2: Mobile (Clean PageView approach) ---
+  Widget _buildMobileLayout() {
+    // Current Step Name
+    String currentStepName = '';
+    switch (_tabController.index) {
+      case 0:
+        currentStepName = 'Basic Info';
+        break;
+      case 1:
+        currentStepName = 'Location';
+        break;
+      case 2:
+        currentStepName = 'Details';
+        break;
+      case 3:
+        currentStepName = _isEditMode ? 'Subscription' : 'Credentials';
+        break;
+      case 4:
+        currentStepName = 'Subscription';
+        break;
+    }
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        backgroundColor: AppTheme.background,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Iconsax.arrow_left_2, color: AppTheme.darkText),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          _isEditMode ? 'Edit School' : 'New School',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.darkText,
+            fontSize: 18,
+          ),
+        ),
+        // No Bottom TabBar to save space
+      ),
+      body: Column(
+        children: [
+          // Custom Compact Header for Mobile
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            color: AppTheme.background,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Step ${_tabController.index + 1} of ${_isEditMode ? 4 : 5}',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.primaryGreen,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      currentStepName,
+                      style: GoogleFonts.inter(
+                        color: AppTheme.darkText,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
-              _buildTabWithCompletionIcon(
-                icon: Iconsax.crown,
-                text: 'Subscription',
-                isCompleted: _tabsCompleted[_isEditMode ? 3 : 4] ?? false,
-              ),
-            ],
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: (_tabController.index + 1) / (_isEditMode ? 4 : 5),
+                    backgroundColor: AppTheme.lightGrey,
+                    valueColor:
+                    const AlwaysStoppedAnimation(AppTheme.primaryGreen),
+                    minHeight: 6,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
-            : Form(
-          key: _formKey,
-          child: TabBarView(
-            controller: _tabController,
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              _buildSchoolInformationSection(),
-              _buildLocationAndContactSection(),
-              _buildAcademicAndFacilitiesSection(),
-              if (!_isEditMode) _buildCredentialsSection(),
-              _buildSubscriptionSection(),
-            ],
+          const Divider(height: 1),
+          // Scrollable Body
+          Expanded(
+            child: _buildBodyContent(),
           ),
+        ],
+      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  // Extracted Tabs List to reuse
+  List<Widget> _buildTabsList() {
+    return [
+      _buildTabWithCompletionIcon(
+        icon: Iconsax.buildings,
+        text: 'Basic Info',
+        isCompleted: _tabsCompleted[0] ?? false,
+      ),
+      _buildTabWithCompletionIcon(
+        icon: Iconsax.location,
+        text: 'Location',
+        isCompleted: _tabsCompleted[1] ?? false,
+      ),
+      _buildTabWithCompletionIcon(
+        icon: Iconsax.book,
+        text: 'Details',
+        isCompleted: _tabsCompleted[2] ?? false,
+      ),
+      if (!_isEditMode)
+        _buildTabWithCompletionIcon(
+          icon: Iconsax.lock,
+          text: 'Credentials',
+          isCompleted: _tabsCompleted[3] ?? false,
         ),
-        bottomNavigationBar: _buildBottomNavigationBar(),
+      _buildTabWithCompletionIcon(
+        icon: Iconsax.crown,
+        text: 'Subscription',
+        isCompleted: _tabsCompleted[_isEditMode ? 3 : 4] ?? false,
+      ),
+    ];
+  }
+
+  // Common Body Content
+  Widget _buildBodyContent() {
+    if (_isLoading) {
+      return const Center(
+          child: CircularProgressIndicator(color: AppTheme.primaryGreen));
+    }
+    return Form(
+      key: _formKey,
+      child: TabBarView(
+        controller: _tabController,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          _buildSchoolInformationSection(),
+          _buildLocationAndContactSection(),
+          _buildAcademicAndFacilitiesSection(),
+          if (!_isEditMode) _buildCredentialsSection(),
+          _buildSubscriptionSection(),
+        ],
       ),
     );
   }
@@ -894,7 +1116,6 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     );
   }
 
-
   Widget _buildBottomNavigationBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -907,7 +1128,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
             blurRadius: 10,
           ),
         ],
-        border: const Border(top: BorderSide(color: AppTheme.borderGrey, width: 0.5)),
+        border: const Border(
+            top: BorderSide(color: AppTheme.borderGrey, width: 0.5)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -920,10 +1142,12 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
                 child: OutlinedButton(
                   onPressed: _previousPage,
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
                     foregroundColor: AppTheme.darkText,
                     side: const BorderSide(color: AppTheme.borderGrey),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                   child: const Text('Back'),
                 ),
@@ -937,14 +1161,17 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
                 ? const SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+              child: CircularProgressIndicator(
+                  color: Colors.white, strokeWidth: 2.5),
             )
                 : AnimatedBuilder(
               animation: _tabController,
               builder: (context, child) {
                 final lastTabIndex = _isEditMode ? 3 : 4;
                 return Icon(
-                  _tabController.index == lastTabIndex ? Iconsax.save_2 : Iconsax.arrow_right_3,
+                  _tabController.index == lastTabIndex
+                      ? Iconsax.save_2
+                      : Iconsax.arrow_right_3,
                   size: 20,
                 );
               },
@@ -964,7 +1191,8 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
               backgroundColor: AppTheme.primaryGreen,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               elevation: 2,
             ),
           ),
@@ -1361,25 +1589,10 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     ]);
   }
 
+  // UPDATED: Subscription Section with Validity Dropdown
   Widget _buildSubscriptionSection() {
-    DateTime endDate;
-    if (_selectedSubscription == null) {
-      endDate = _startDate;
-    } else {
-      switch (_selectedSubscription!.planType) {
-        case 'Weekly':
-          endDate = _startDate.add(const Duration(days: 7));
-          break;
-        case 'Monthly':
-          endDate = DateTime(_startDate.year, _startDate.month + 1, _startDate.day);
-          break;
-        case 'Yearly':
-          endDate = DateTime(_startDate.year + 1, _startDate.month, _startDate.day);
-          break;
-        default:
-          endDate = _startDate;
-      }
-    }
+    final bool isCustomDate = _selectedValidity == 'Custom Date';
+    final bool isMultiYear = _selectedValidity == 'Multi-Year';
 
     return _buildSection(children: [
       _buildCard(
@@ -1394,32 +1607,88 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
                   _selectedSubscription = value;
                   _startDate = DateTime.now();
                 });
+                _calculateEndDate();
                 _validateCurrentTab();
               },
               itemToString: (plan) => '${plan.name} (${plan.planType})',
               isLoading: _isLoading,
-              icon: Iconsax.crown
-          ),
+              icon: Iconsax.crown),
           if (_selectedSubscription != null) ...[
             const SizedBox(height: 16),
-            _buildDatePicker(
-              label: 'Subscription Start Date',
+            _buildResponsiveRow(children: [
+              _buildDatePicker(
+                label: 'Start Date',
+                controller: TextEditingController(
+                    text: DateFormat('yyyy-MM-dd').format(_startDate)),
+                icon: Iconsax.calendar_add,
+                onDateSelected: (date) {
+                  setState(() {
+                    _startDate = date;
+                  });
+                  _calculateEndDate();
+                },
+              ),
+              _buildDropdown<String>(
+                label: 'Validity Period',
+                value: _selectedValidity,
+                items: _validityOptions,
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedValidity = value);
+                    _calculateEndDate();
+                  }
+                },
+                itemToString: (item) => item,
+                icon: Iconsax.clock,
+              ),
+            ]),
+
+            // NEW: Show "Number of Years" input only if Multi-Year is selected
+            if (isMultiYear) ...[
+              const SizedBox(height: 16),
+              _buildTextField(
+                label: 'Number of Years',
+                controller: _yearsController,
+                icon: Iconsax.calendar_edit,
+                isNumeric: true,
+                required: true,
+                // Recalculate date whenever user types
+                onChanged: (val) => _calculateEndDate(),
+              ),
+            ],
+
+            const SizedBox(height: 16),
+
+            // Logic:
+            // 1. If Custom Date -> Enable Date Picker
+            // 2. If Multi-Year or Standard -> Show Read-Only Text Field calculated automatically
+            isCustomDate
+                ? _buildDatePicker(
+              label: 'Select End Date',
               controller: TextEditingController(
-                  text: DateFormat('yyyy-MM-dd').format(_startDate)),
-              icon: Iconsax.calendar_add,
+                  text: DateFormat('yyyy-MM-dd').format(_calculatedEndDate)),
+              icon: Iconsax.calendar_tick,
               onDateSelected: (date) {
-                setState(() {
-                  _startDate = date;
-                });
+                setState(() => _calculatedEndDate = date);
               },
+            )
+                : IgnorePointer(
+              // Makes the field read-only but keeps styling
+              child: _buildTextField(
+                label: 'End Date (Calculated)',
+                controller: TextEditingController(
+                    text: DateFormat('yyyy-MM-dd').format(_calculatedEndDate)),
+                icon: Iconsax.calendar_tick,
+                required: false,
+              ),
             ),
+
             const SizedBox(height: 16),
             _buildTextField(
                 label: 'Payment Reference ID',
                 controller: _paymentRefController,
                 icon: Iconsax.receipt_edit,
-                required: true
-            ),
+                required: true),
             const SizedBox(height: 16),
             _buildSwitchListTile(
               title: 'Enable Auto-Renewal',
@@ -1455,8 +1724,13 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
                     _selectedSubscription!.name),
                 _buildSummaryRow(Iconsax.calendar_1, 'Start Date',
                     DateFormat.yMMMd().format(_startDate)),
+
+                // Show "X Years" if multi-year, else show validity name
+                _buildSummaryRow(Iconsax.clock, 'Validity',
+                    isMultiYear ? '${_yearsController.text} Years' : _selectedValidity),
+
                 _buildSummaryRow(Iconsax.calendar_tick, 'End Date',
-                    DateFormat.yMMMd().format(endDate)),
+                    DateFormat.yMMMd().format(_calculatedEndDate)),
                 _buildSummaryRow(Iconsax.refresh, 'Auto-Renews',
                     _isAutoRenewal ? 'Yes' : 'No'),
               ],
@@ -1466,19 +1740,19 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     ]);
   }
 
-  Widget _buildSwitchListTile({
-    required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged
-  }) {
+  Widget _buildSwitchListTile(
+      {required String title,
+        required bool value,
+        required ValueChanged<bool> onChanged}) {
     return Container(
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.borderGrey.withOpacity(0.7))
-      ),
+          border: Border.all(color: AppTheme.borderGrey.withOpacity(0.7))),
       child: SwitchListTile(
-        title: Text(title, style: GoogleFonts.inter(color: AppTheme.darkText, fontWeight: FontWeight.w500)),
+        title: Text(title,
+            style: GoogleFonts.inter(
+                color: AppTheme.darkText, fontWeight: FontWeight.w500)),
         value: value,
         onChanged: onChanged,
         activeColor: AppTheme.primaryGreen,
@@ -1540,6 +1814,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
     bool isNumeric = false,
     bool isEmail = false,
     int maxLines = 1,
+    void Function(String)? onChanged, // Add this parameter
   }) {
     return TextFormField(
       controller: controller,
@@ -1547,11 +1822,16 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
       keyboardType: isNumeric
           ? TextInputType.number
           : (isEmail ? TextInputType.emailAddress : TextInputType.text),
-      inputFormatters: isNumeric
-          ? [FilteringTextInputFormatter.digitsOnly]
-          : [],
+      inputFormatters:
+      isNumeric ? [FilteringTextInputFormatter.digitsOnly] : [],
       decoration: _buildInputDecoration(label, icon),
-      onChanged: (value) => _validateCurrentTab(),
+
+      // Update this line to call both the validation and your custom callback
+      onChanged: (value) {
+        _validateCurrentTab();
+        if (onChanged != null) onChanged(value);
+      },
+
       validator: (value) {
         if (required && (value == null || value.isEmpty)) {
           return '$label is required';
@@ -1626,7 +1906,9 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(
-            color: value ? AppTheme.primaryGreen.withOpacity(0.7) : AppTheme.borderGrey.withOpacity(0.7)),
+            color: value
+                ? AppTheme.primaryGreen.withOpacity(0.7)
+                : AppTheme.borderGrey.withOpacity(0.7)),
       ),
     );
   }
@@ -1711,8 +1993,7 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
           Icon(icon, size: 20, color: AppTheme.primaryGreen),
           const SizedBox(width: 12),
           Text(label,
-              style:
-              GoogleFonts.inter(color: AppTheme.darkText, fontSize: 14)),
+              style: GoogleFonts.inter(color: AppTheme.darkText, fontSize: 14)),
           const Spacer(),
           Text(value,
               style: GoogleFonts.inter(
@@ -1726,11 +2007,14 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
 
   Widget _buildLogoPicker() {
     final hasNewFile = _logoFile != null;
-    final hasExistingImage = _existingLogoPath != null && _existingLogoPath!.isNotEmpty;
+    final hasExistingImage =
+        _existingLogoPath != null && _existingLogoPath!.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("School Logo", style: GoogleFonts.inter(color: AppTheme.bodyText, fontWeight: FontWeight.w500)),
+        Text("School Logo",
+            style: GoogleFonts.inter(
+                color: AppTheme.bodyText, fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
         InkWell(
           onTap: _pickLogo,
@@ -1744,15 +2028,21 @@ class _AddSchoolScreenState extends State<AddSchoolScreen>
               border: Border.all(color: AppTheme.borderGrey.withOpacity(0.7)),
             ),
             child: hasNewFile
-                ? (kIsWeb ? Image.network(_logoFile!.path, fit: BoxFit.contain) : Image.file(File(_logoFile!.path), fit: BoxFit.contain))
+                ? (kIsWeb
+                ? Image.network(_logoFile!.path, fit: BoxFit.contain)
+                : Image.file(File(_logoFile!.path), fit: BoxFit.contain))
                 : hasExistingImage
-                ? Image.network('$_logoBaseUrl$_existingLogoPath', fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => const Column(
+                ? Image.network('$_logoBaseUrl$_existingLogoPath',
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) =>
+                const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Iconsax.gallery_slash, color: Colors.redAccent, size: 40),
+                    Icon(Iconsax.gallery_slash,
+                        color: Colors.redAccent, size: 40),
                     SizedBox(height: 8),
-                    Text("Could not load image", style: TextStyle(color: Colors.redAccent)),
+                    Text("Could not load image",
+                        style: TextStyle(color: Colors.redAccent)),
                   ],
                 ))
                 : const Column(
@@ -1815,8 +2105,8 @@ class _AddFeeStructureDialogState extends State<AddFeeStructureDialog> {
       _feeDetails.add({
         'class': TextEditingController(),
         'amount': TextEditingController(),
-        'dueDate':
-        TextEditingController(text: DateFormat('yyyy-MM-dd').format(DateTime.now())),
+        'dueDate': TextEditingController(
+            text: DateFormat('yyyy-MM-dd').format(DateTime.now())),
       });
     });
   }

@@ -1515,9 +1515,7 @@ class _ImprovedDeleteConfirmationDialogState
   }
 }
 
-// ============================================================================
-// IMPROVED RENEW SUBSCRIPTION DIALOG (REFACTORED UI)
-// ============================================================================
+
 
 class _RenewSubscriptionDialog extends StatefulWidget {
   final School school;
@@ -1535,18 +1533,38 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
   bool _isLoadingPlans = true;
   bool _isRenewing = false;
   bool _renewalCompleted = false;
+
+  // Validity Variables
   DateTime _selectedStartDate = DateTime.now();
   DateTime? _calculatedEndDate;
+
+  String _selectedValidity = 'Yearly';
+  final List<String> _validityOptions = [
+    'Weekly',
+    'Monthly',
+    'Half-Yearly',
+    'Yearly',
+    'Multi-Year',
+    'Custom Date'
+  ];
+  final TextEditingController _yearsController = TextEditingController(text: '2');
 
   @override
   void initState() {
     super.initState();
     _loadPlans();
+    // Initial calculation
+    _calculateEndDate();
+  }
+
+  @override
+  void dispose() {
+    _yearsController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPlans() async {
     try {
-      // Assuming SchoolApiService can be instantiated directly for this
       final service = SchoolApiService();
       final plans = await service.fetchSubscriptions();
       if (mounted) {
@@ -1558,44 +1576,39 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingPlans = false);
-        // Optionally, show an error message
       }
     }
   }
 
   void _calculateEndDate() {
-    if (_selectedPlan == null) {
-      setState(() => _calculatedEndDate = null);
-      return;
-    }
+    // If Custom Date is selected, we don't calculate automatically
+    if (_selectedValidity == 'Custom Date') return;
 
     DateTime endDate;
-    final planType = _selectedPlan!.planType.toLowerCase();
-    // A more robust way to calculate duration
-    if (planType.contains('week')) {
-      final weeks = int.tryParse(planType.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
-      endDate = _selectedStartDate.add(Duration(days: 7 * weeks));
-    } else if (planType.contains('month')) {
-      final months = int.tryParse(planType.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
-      endDate = DateTime(
-        _selectedStartDate.year,
-        _selectedStartDate.month + months,
-        _selectedStartDate.day,
-      );
-    } else if (planType.contains('year') || planType.contains('annual')) {
-      final years = int.tryParse(planType.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
-      endDate = DateTime(
-        _selectedStartDate.year + years,
-        _selectedStartDate.month,
-        _selectedStartDate.day,
-      );
-    } else {
-      // Default fallback (e.g., 30 days)
-      endDate = _selectedStartDate.add(const Duration(days: 30));
+
+    switch (_selectedValidity) {
+      case 'Weekly':
+        endDate = _selectedStartDate.add(const Duration(days: 7));
+        break;
+      case 'Monthly':
+        endDate = DateTime(_selectedStartDate.year, _selectedStartDate.month + 1, _selectedStartDate.day);
+        break;
+      case 'Half-Yearly':
+        endDate = DateTime(_selectedStartDate.year, _selectedStartDate.month + 6, _selectedStartDate.day);
+        break;
+      case 'Yearly':
+        endDate = DateTime(_selectedStartDate.year + 1, _selectedStartDate.month, _selectedStartDate.day);
+        break;
+      case 'Multi-Year':
+        int years = int.tryParse(_yearsController.text) ?? 1;
+        endDate = DateTime(_selectedStartDate.year + years, _selectedStartDate.month, _selectedStartDate.day);
+        break;
+      default:
+        endDate = _selectedStartDate.add(const Duration(days: 30));
     }
+
     setState(() => _calculatedEndDate = endDate);
   }
-
 
   Future<void> _renewSubscription() async {
     if (_selectedPlan == null || _calculatedEndDate == null) return;
@@ -1614,8 +1627,8 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
     final date = await showDatePicker(
       context: context,
       initialDate: _selectedStartDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 30)), // Allow picking a recent past date if needed
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -1633,11 +1646,39 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
     if (date != null) {
       setState(() {
         _selectedStartDate = date;
-        _calculateEndDate(); // Recalculate when date changes
+        _calculateEndDate();
       });
     }
   }
 
+  Future<void> _selectEndDate() async {
+    if (_selectedValidity != 'Custom Date') return;
+
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _calculatedEndDate ?? _selectedStartDate.add(const Duration(days: 30)),
+      firstDate: _selectedStartDate,
+      lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppTheme.primaryGreen,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+            ),
+            dialogBackgroundColor: Colors.white,
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (date != null) {
+      setState(() {
+        _calculatedEndDate = date;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1645,30 +1686,15 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
       listener: (context, state) {
         if (_isRenewing && !state.isLoading && !_renewalCompleted) {
           _renewalCompleted = true;
-          // Use a microtask to ensure the build context is valid
           Future.microtask(() {
             if (mounted) {
               Navigator.of(context).pop();
               if (state.error == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Row(
-                      children: [
-                        const Icon(Icons.check_circle_outline, color: Colors.white),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Subscription renewed successfully!',
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                      ],
-                    ),
+                    content: const Text('Subscription renewed successfully!'),
                     backgroundColor: AppTheme.accentGreen,
                     behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    margin: const EdgeInsets.all(16),
                   ),
                 );
               }
@@ -1690,16 +1716,16 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildHeader(),
-             _isLoadingPlans
-                 ? Padding(
-               padding: const EdgeInsets.symmetric(vertical: 64.0),
-               child: BeautifulLoader(
-                 type: LoaderType.pulse,
-                 message: 'Loading subscription plans...',
-                 color: AppTheme.primaryGreen,
-               ),
-             )
-                 : Flexible(
+              _isLoadingPlans
+                  ? Padding(
+                padding: const EdgeInsets.symmetric(vertical: 64.0),
+                child: BeautifulLoader(
+                  type: LoaderType.pulse,
+                  message: 'Loading plans...',
+                  color: AppTheme.primaryGreen,
+                ),
+              )
+                  : Flexible(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(28.0),
                   child: Column(
@@ -1712,13 +1738,54 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
                         iconColor: Colors.blue.shade700,
                       ),
                       const SizedBox(height: 24),
+
+                      // 1. Subscription Plan
                       _buildSectionTitle('1. Select New Subscription Plan'),
                       const SizedBox(height: 12),
                       _buildPlanSelector(),
                       const SizedBox(height: 24),
-                      _buildSectionTitle('2. Choose Subscription Start Date'),
+
+                      // 2. Validity
+                      _buildSectionTitle('2. Select Validity Period'),
                       const SizedBox(height: 12),
-                      _buildDatePicker(),
+                      _buildValiditySelector(),
+
+                      if (_selectedValidity == 'Multi-Year') ...[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _yearsController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Number of Years',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Iconsax.calendar_edit),
+                          ),
+                          onChanged: (_) => _calculateEndDate(),
+                        ),
+                      ],
+
+                      const SizedBox(height: 24),
+
+                      // 3. Dates
+                      _buildSectionTitle('3. Duration'),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: _buildDatePickerItem(
+                              label: 'Start Date',
+                              date: _selectedStartDate,
+                              onTap: _selectStartDate
+                          )),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildDatePickerItem(
+                              label: 'End Date',
+                              date: _calculatedEndDate,
+                              onTap: _selectedValidity == 'Custom Date' ? _selectEndDate : null,
+                              isReadOnly: _selectedValidity != 'Custom Date'
+                          )),
+                        ],
+                      ),
+
                       const SizedBox(height: 24),
                       if (_calculatedEndDate != null) _buildSummary(),
                     ],
@@ -1732,6 +1799,90 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
       ),
     );
   }
+
+  // ... (Header and InfoCard methods remain the same as previous implementation)
+
+  Widget _buildValiditySelector() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.borderGrey, width: 1.5),
+      ),
+      child: DropdownButtonFormField<String>(
+        value: _selectedValidity,
+        decoration: const InputDecoration(
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          border: InputBorder.none,
+          prefixIcon: Icon(Iconsax.clock, color: AppTheme.bodyText),
+        ),
+        items: _validityOptions.map((v) {
+          return DropdownMenuItem(
+            value: v,
+            child: Text(v, style: GoogleFonts.inter()),
+          );
+        }).toList(),
+        onChanged: (value) {
+          if (value != null) {
+            setState(() {
+              _selectedValidity = value;
+              _calculateEndDate();
+            });
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildDatePickerItem({
+    required String label,
+    required DateTime? date,
+    VoidCallback? onTap,
+    bool isReadOnly = false
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isReadOnly ? Colors.grey.shade100 : Colors.grey.shade50,
+          border: Border.all(color: AppTheme.borderGrey, width: 1.5),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: GoogleFonts.inter(fontSize: 12, color: AppTheme.bodyText)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    date != null ? DateFormat.yMMMd().format(date) : 'Select Date',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: AppTheme.darkText,
+                    ),
+                  ),
+                ),
+                if (!isReadOnly)
+                  const Icon(Iconsax.calendar_1, size: 16, color: AppTheme.primaryGreen),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ... (Summary, Plan Selector, Header, and Action Buttons methods remain similar)
+
+  // Need to include _buildHeader, _buildSectionTitle, _buildInfoCard, _buildPlanSelector,
+  // _buildSummary and _buildActionButtons from your previous code or the file content provided.
+  // For brevity, I assumed you kept the existing helper methods.
+  // If you need the full file content re-pasted, let me know.
 
   Widget _buildHeader() {
     return Container(
@@ -1775,7 +1926,7 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Extend the validity for the selected school',
+                  'Extend validity for the selected school',
                   style: GoogleFonts.inter(
                     color: Colors.white.withOpacity(0.9),
                     fontSize: 13,
@@ -1844,7 +1995,6 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
     );
   }
 
-
   Widget _buildPlanSelector() {
     return Container(
       decoration: BoxDecoration(
@@ -1876,51 +2026,10 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
         onChanged: (value) {
           setState(() {
             _selectedPlan = value;
+            // Recalculate end date with new plan (if needed) and validity
             _calculateEndDate();
           });
         },
-      ),
-    );
-  }
-
-  Widget _buildDatePicker() {
-    return InkWell(
-      onTap: _selectStartDate,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade50,
-          border: Border.all(color: AppTheme.borderGrey, width: 1.5),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            const Icon(Iconsax.calendar_1, color: AppTheme.primaryGreen),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Selected Start Date',
-                    style: GoogleFonts.inter(fontSize: 12, color: AppTheme.bodyText),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    DateFormat.yMMMMd().format(_selectedStartDate),
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                      color: AppTheme.darkText,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Iconsax.edit_2, size: 18, color: AppTheme.bodyText),
-          ],
-        ),
       ),
     );
   }
@@ -1949,9 +2058,11 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Starts On:',
+              Text('Validity:',
                   style: GoogleFonts.inter(color: AppTheme.bodyText)),
-              Text(DateFormat.yMMMd().format(_selectedStartDate),
+              Text(_selectedValidity == 'Multi-Year'
+                  ? '${_yearsController.text} Years'
+                  : _selectedValidity,
                   style: GoogleFonts.inter(
                       fontWeight: FontWeight.bold, color: AppTheme.darkText)),
             ],
@@ -1983,7 +2094,6 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
       ),
     );
   }
-
 
   Widget _buildActionButtons() {
     return Container(
@@ -2023,7 +2133,6 @@ class _RenewSubscriptionDialogState extends State<_RenewSubscriptionDialog> {
               ),
               child: _isRenewing
                   ? const ButtonLoader(size: 20, color: Colors.white)
-
                   : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

@@ -17,7 +17,7 @@ class SubscriptionApiService {
 
   SubscriptionApiService._internal();
 
-  final String _baseUrl = "https://aquare.co.in/mobileAPI/sachin/lms";
+  final String _baseUrl = "http://localhost/Aquarelms";
   final String _planUrl = "/AddSubPlan.php"; // URL for CUD operations
   final String _fetchUrl = "/GetSchool.php";
 
@@ -125,14 +125,13 @@ class SubscriptionApiService {
     }
   }
 
-  // 🔥 Updated: Automatically adds PubCode to planData
-  Future<bool> addPlan(Map<String, dynamic> planData) async {
+  Future<bool> addPlan(Map<String, dynamic> planData, int pubCode) async {
     print("🚀 Adding plan with PubCode: $_pubCode");
 
     // Add PubCode to the planData explicitly
     final updatedPlanData = {
       ...planData,
-      'PubCode': _pubCode, // Automatically inject PubCode
+      'PubCode': pubCode, // Use the passed value
     };
 
     print("📤 Adding plan with data: $updatedPlanData");
@@ -155,14 +154,14 @@ class SubscriptionApiService {
     return false;
   }
 
-  // 🔥 Updated: Automatically adds PubCode to planUpdateData
-  Future<bool> updatePlan(Map<String, dynamic> planUpdateData) async {
+
+  Future<bool> updatePlan(Map<String, dynamic> planUpdateData, int pubCode) async {
     print("🚀 Updating plan with PubCode: $_pubCode");
 
     // Add PubCode to the planUpdateData explicitly
     final updatedPlanData = {
       ...planUpdateData,
-      'PubCode': _pubCode, // Automatically inject PubCode
+      'PubCode': pubCode, // Use the passed value
     };
 
     print("📤 Updating plan with data: $updatedPlanData");

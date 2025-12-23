@@ -82,6 +82,7 @@ String? extractYoutubeVideoId(String url) {
 
 class MaterialDetailScreen extends StatefulWidget {
   final MaterialModel? material;
+  // Kept for fallback/initialization, but data will be refreshed from API
   final List<ClassModel> allClasses;
   final List<SubjectModel> allSubjects;
   final List<ChapterModel> allChapters;
@@ -103,11 +104,16 @@ class MaterialDetailScreen extends StatefulWidget {
 class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
   bool isEditMode = false;
   bool isUploading = false;
+  bool isLoadingData = true; // ✅ Track data loading status
 
   // For Add mode
   int? selectedClassId;
   int? selectedSubjectId;
   int? selectedChapterId;
+
+  // ✅ Local lists to hold fresh data from API
+  List<ClassModel> _localClasses = [];
+  List<SubjectModel> _localSubjects = [];
   List<ChapterModel> filteredChapters = [];
 
   // File extension preferences for upload
@@ -122,11 +128,61 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
     super.initState();
     _loadExtensionPreferences();
 
+    // ✅ Load fresh data immediately
+    _loadFreshData();
+
     if (widget.isAddMode) {
       isEditMode = true;
       _initializeEmptyFiles();
     } else {
       _initializeEditedFiles();
+      // If editing existing material, populate selection variables
+      selectedClassId = widget.material?.classId;
+      selectedSubjectId = widget.material?.subjectId;
+      selectedChapterId = widget.material?.chapterId;
+    }
+  }
+
+  // ✅ NEW: Fetch latest Classes and Subjects from API
+  Future<void> _loadFreshData() async {
+    setState(() => isLoadingData = true);
+    try {
+      print("🔄 Fetching fresh academic data...");
+
+      // 1. Fetch Classes
+      final classResponse = await ApiService.getClasses(schoolRecNo: 1);
+      if (classResponse['status'] == 'success' && classResponse['data'] != null) {
+        final classesData = classResponse['data'] as List;
+        _localClasses = classesData.map((json) => ClassModel.fromJson(json)).toList();
+        print("✅ Loaded ${_localClasses.length} fresh classes");
+      } else {
+        _localClasses = widget.allClasses; // Fallback
+      }
+
+      // 2. Fetch Subjects
+      final subjectResponse = await ApiService.getSubjects(schoolRecNo: 1);
+      if (subjectResponse['status'] == 'success' && subjectResponse['data'] != null) {
+        final subjectsData = subjectResponse['data'] as List;
+        _localSubjects = subjectsData.map((json) => SubjectModel.fromJson(json)).toList();
+        print("✅ Loaded ${_localSubjects.length} fresh subjects");
+      } else {
+        _localSubjects = widget.allSubjects; // Fallback
+      }
+
+      // 3. If editing/viewing existing material, load its chapters
+      if (!widget.isAddMode && widget.material != null) {
+        await _loadChaptersForSubject(widget.material!.subjectId);
+      }
+
+    } catch (e) {
+      print("❌ Error loading fresh data: $e");
+      // Fallback to passed data
+      _localClasses = widget.allClasses;
+      _localSubjects = widget.allSubjects;
+    } finally {
+      if (mounted) {
+        setState(() => isLoadingData = false);
+      }
     }
   }
 
@@ -159,6 +215,8 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
   }
 
   void _initializeEditedFiles() {
+    if (widget.material == null) return;
+
     editedFiles['video'] = widget.material!.videoLinks.map((f) => {
       'path': f['path'].toString(),
       'type': 'video',
@@ -235,27 +293,33 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
       );
 
       if (response['status'] == 'success' && response['data'] != null) {
-        setState(() {
-          filteredChapters = (response['data'] as List)
-              .map((json) => ChapterModel.fromJson(json))
-              .toList();
-        });
+        if (mounted) {
+          setState(() {
+            filteredChapters = (response['data'] as List)
+                .map((json) => ChapterModel.fromJson(json))
+                .toList();
+          });
+          print("✅ Loaded ${filteredChapters.length} chapters for subject $subjectId");
+        }
       }
     } catch (e) {
       print('Error loading chapters: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading chapters: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading chapters: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   Color get subjectColor {
     try {
+      // Use local fresh list
       int subjectId = widget.isAddMode ? (selectedSubjectId ?? 0) : widget.material!.subjectId;
-      final subject = widget.allSubjects.firstWhere((s) => s.id == subjectId);
+      final subject = _localSubjects.firstWhere((s) => s.id == subjectId);
       final colorHex = subject.color.startsWith('#') ? subject.color : '#${subject.color}';
       return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
     } catch (e) {
@@ -281,7 +345,8 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
     if (widget.isAddMode) {
       if (selectedSubjectId != null) {
         try {
-          return widget.allSubjects.firstWhere((s) => s.id == selectedSubjectId).name;
+          // Use local fresh list
+          return _localSubjects.firstWhere((s) => s.id == selectedSubjectId).name;
         } catch (e) {
           return 'Select Subject';
         }
@@ -295,7 +360,8 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
     if (widget.isAddMode) {
       if (selectedClassId != null) {
         try {
-          return widget.allClasses.firstWhere((c) => c.id == selectedClassId).name;
+          // Use local fresh list
+          return _localClasses.firstWhere((c) => c.id == selectedClassId).name;
         } catch (e) {
           return 'Select Class';
         }
@@ -311,6 +377,22 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
     final isMobile = screenWidth < 900;
     final userProvider = Provider.of<UserProvider>(context);
     final canEdit = widget.isAddMode || userProvider.hasPermission('M004', 'edit');
+
+    // Show loading spinner if data is still fetching
+    if (isLoadingData) {
+      return Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: Colors.white,
+          leading: IconButton(
+            icon: const Icon(Iconsax.arrow_left, color: AppTheme.darkText),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen)),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -476,7 +558,8 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                     ),
                   ),
                 ),
-                items: widget.allClasses.map((c) {
+                // ✅ Use _localClasses instead of widget.allClasses
+                items: _localClasses.map((c) {
                   return DropdownMenuItem(
                     value: c.id,
                     child: Text(
@@ -536,7 +619,8 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                     ),
                   ),
                 ),
-                items: widget.allSubjects
+                // ✅ Use _localSubjects instead of widget.allSubjects
+                items: _localSubjects
                     .where((s) => s.classId == selectedClassId)
                     .map((s) {
                   return DropdownMenuItem(
@@ -603,6 +687,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                     ),
                   ),
                 ),
+                // ✅ filteredChapters is updated via _loadChaptersForSubject
                 items: filteredChapters.map((ch) {
                   return DropdownMenuItem(
                     value: ch.id,
