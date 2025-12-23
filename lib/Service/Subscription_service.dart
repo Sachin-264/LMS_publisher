@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:lms_publisher/Util/AppUrl.dart';
 import 'package:lms_publisher/screens/SubscriptionScreen/subscription_model.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/Service/navigation_service.dart';
@@ -17,7 +18,7 @@ class SubscriptionApiService {
 
   SubscriptionApiService._internal();
 
-  final String _baseUrl = "http://localhost/Aquarelms";
+  final String _baseUrl = AppUrls.baseUrl;
   final String _planUrl = "/AddSubPlan.php"; // URL for CUD operations
   final String _fetchUrl = "/GetSchool.php";
 

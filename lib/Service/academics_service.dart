@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:lms_publisher/Theme/apptheme.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/Service/navigation_service.dart';
+import 'package:lms_publisher/Util/AppUrl.dart';
 import 'package:provider/provider.dart';
 
 
@@ -23,9 +24,8 @@ class ApiService {
   }
 
   ApiService._internal();
-
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
-  static const String _logoBaseUrl = "https://aquare.co.in/mobileAPI/sachin/lms/uploadgcp.php";
+  static const String baseUrl = AppUrls.baseUrl;
+  static const String _logoBaseUrl = "${AppUrls.baseUrl}/uploadgcp.php";
   static const String _imageBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
   static const String _documentBaseUrl = "https://storage.googleapis.com/upload-images-34/documents/LMS/";
 

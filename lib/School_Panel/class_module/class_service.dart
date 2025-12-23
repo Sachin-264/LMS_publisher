@@ -1,11 +1,12 @@
 // class_api_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:lms_publisher/Util/AppUrl.dart';
 import 'class_model.dart';
 
 class ClassApiService {
   // Change this to your actual API URL
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl = AppUrls.baseUrl;
 
   Future<Map<String, dynamic>> _post(Map<String, dynamic> data) async {
     try {

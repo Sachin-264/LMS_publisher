@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:lms_publisher/Util/AppUrl.dart';
 import 'package:lms_publisher/screens/School/school_model.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/Service/navigation_service.dart'; // Import NavigationService
@@ -20,7 +21,7 @@ class SchoolApiService {
 
   SchoolApiService._internal();
 
-  final String _baseUrl = "https://aquare.co.in/mobileAPI/sachin/lms/";
+  final String _baseUrl = "${AppUrls.baseUrl}/;";
   final String _imageUploadUrl = "https://www.aquare.co.in/mobileAPI/sachin/photogcp1.php";
 
   // 🔥 Automatic access to userCode from anywhere!

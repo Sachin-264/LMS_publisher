@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
+import 'package:lms_publisher/Util/AppUrl.dart';
 
 class UserRightsService {
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl = AppUrls.baseUrl;
 
   // Fetch all user groups/roles
   Future<List<UserGroup>> getUserGroups() async {

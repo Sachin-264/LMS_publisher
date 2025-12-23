@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:lms_publisher/Util/AppUrl.dart';
 
 class TeacherPanelService {
   // Base URL for Teacher Panel API
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl = AppUrls.baseUrl;
 
   /// Get Teacher Dashboard Summary
   static Future<Map<String, dynamic>> getDashboardSummary({

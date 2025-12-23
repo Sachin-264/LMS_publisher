@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:lms_publisher/School_Panel/teacher_module/teacher_model.dart';
+import 'package:lms_publisher/Util/AppUrl.dart';
 
 // ✅ Location Models
 class StateModel {
@@ -26,7 +27,7 @@ class CityModel {
 
 
 class TeacherApiService {
-  static const String baseUrl =  'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl =  AppUrls.baseUrl;
 
   static const String _imageUploadUrl = "https://www.aquare.co.in/mobileAPI/sachin/photogcp1.php";
   static const String _imageBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";

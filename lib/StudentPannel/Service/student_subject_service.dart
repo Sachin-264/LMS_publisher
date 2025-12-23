@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:lms_publisher/StudentPannel/Service/student_subject_service.dart';
+import 'package:lms_publisher/Util/AppUrl.dart';
 
 class StudentSubjectService {
   // API URLs
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl = AppUrls.baseUrl;
   static const String documentBaseUrl = "https://storage.googleapis.com/upload-images-34/documents/LMS/";
   static const String manageAiPaperUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/manage_ai_paper.php';
-  static const String submitUrl = 'https://aquare.co.in/mobileAPI/sachin/lms/submit_ai_paper_api.php';
+  static const String submitUrl = '${baseUrl}/submit_ai_paper_api.php';
 
   // Helper function to get YouTube thumbnail
   static String getYouTubeThumbnail(String videoUrl) {

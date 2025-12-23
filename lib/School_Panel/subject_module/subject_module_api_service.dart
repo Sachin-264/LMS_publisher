@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/Service/navigation_service.dart';
+import 'package:lms_publisher/Util/AppUrl.dart';
 import 'package:provider/provider.dart';
 import 'subject_module_model.dart';
 
@@ -20,7 +21,7 @@ class SubjectModuleApiService {
 
   SubjectModuleApiService._internal();
 
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl = AppUrls.baseUrl;
   static const String apiEndpoint = '$baseUrl/manage_school_academics.php';
 
 

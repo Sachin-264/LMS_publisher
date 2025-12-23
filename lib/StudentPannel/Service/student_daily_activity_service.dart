@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:lms_publisher/Util/AppUrl.dart';
 
 class StudentDailyActivityService {
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl = AppUrls.baseUrl;
 
   /// Record daily activity (called periodically + on chapter exit)
   static Future<bool> recordDailyActivity({

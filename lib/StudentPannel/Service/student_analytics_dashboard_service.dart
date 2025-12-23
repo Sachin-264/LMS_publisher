@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:lms_publisher/Util/AppUrl.dart';
 
 class StudentAnalyticsDashboardService {
   // API URLs
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl = AppUrls.baseUrl;
   static const String logoBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
 
   /// Get complete analytics dashboard data

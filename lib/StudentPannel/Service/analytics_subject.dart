@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:lms_publisher/Util/AppUrl.dart';
 
 class AnalyticsService {
   // API URLs (using same base URL as StudentSubjectService)
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl =AppUrls.baseUrl;
 
   static Future<Map<String, dynamic>> updateChapterProgress({
     required String userCode,

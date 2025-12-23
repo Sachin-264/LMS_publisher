@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:lms_publisher/Util/AppUrl.dart';
 
 class AddressMasterService {
-  static const String baseUrl = 'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl = AppUrls.baseUrl;
 
   // Generic API call method
   Future<Map<String, dynamic>> _callApi({

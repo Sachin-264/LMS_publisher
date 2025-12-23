@@ -4,6 +4,7 @@ import 'dart:io' show SocketException, HttpException;
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:lms_publisher/School_Panel/student_module/student_model.dart';
+import 'package:lms_publisher/Util/AppUrl.dart';
 
 
 // ✅ Location Models
@@ -27,7 +28,7 @@ class CityModel {
 
 class StudentApiService {
   // Update this with your actual API URL
-  static const String baseUrl =  'https://aquare.co.in/mobileAPI/sachin/lms';
+  static const String baseUrl =  AppUrls.baseUrl;
   static const String _imageBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
   // static const String _imageUploadUrl = "$baseUrl/upload-image-gcp/uploadgcp.php";
   static const String _imageUploadUrl = "https://www.aquare.co.in/mobileAPI/sachin/photogcp1.php";

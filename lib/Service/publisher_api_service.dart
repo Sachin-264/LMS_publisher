@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:lms_publisher/AdminScreen/AdminPublish/publish_model.dart';
 import 'package:lms_publisher/Service/user_right_service.dart';
+import 'package:lms_publisher/Util/AppUrl.dart';
 
 // Helper function to safely parse a value to an integer.
 int _parseInt(dynamic value, {int defaultValue = 0}) {
@@ -18,7 +19,7 @@ int _parseInt(dynamic value, {int defaultValue = 0}) {
 }
 
 class PublisherApiService {
-  final String _baseUrl = "https://aquare.co.in/mobileAPI/sachin/lms/";
+  final String _baseUrl = "${AppUrls.baseUrl}/";
   final String _imageUploadUrl = "https://www.aquare.co.in/mobileAPI/sachin/photogcp1.php";
   final String _logoBaseUrl = "https://storage.googleapis.com/upload-images-34/images/LMS/";
 

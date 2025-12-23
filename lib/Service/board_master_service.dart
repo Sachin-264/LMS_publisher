@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:lms_publisher/Util/AppUrl.dart';
 
 class BoardMasterService {
   static final BoardMasterService _instance = BoardMasterService._internal();
@@ -7,7 +8,7 @@ class BoardMasterService {
   BoardMasterService._internal();
 
   // Base URL for the API
-  final String _baseUrl = "http://localhost/Aquarelms";
+  final String _baseUrl =AppUrls.baseUrl;
 
   // Helper to get specific endpoints
   Uri _getUri(String fileName) => Uri.parse('$_baseUrl/$fileName');

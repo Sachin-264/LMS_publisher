@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
+import 'package:lms_publisher/Util/AppUrl.dart';
 import 'package:provider/provider.dart';
 import 'package:lms_publisher/Provider/UserProvider.dart';
 import 'package:lms_publisher/Service/navigation_service.dart';
@@ -11,7 +12,7 @@ class DashboardApiService {
   factory DashboardApiService() => _instance;
   DashboardApiService._internal();
 
-  static const String _baseUrl = "https://aquare.co.in/mobileAPI/sachin/lms";
+  static const String _baseUrl = AppUrls.baseUrl;
 
   // Automatic access to userCode as PubCode (Integer)
   int get _pubCode {
